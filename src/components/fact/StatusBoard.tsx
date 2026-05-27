@@ -15,7 +15,7 @@ const STATUS_HELP: Record<JobStatus, string> = {
   YA_SE_ENVIO: "Despachado al cliente",
 };
 
-export function StatusBoard({ jobs }: { jobs: Job[] }) {
+export function StatusBoard({ jobs, onJobClick }: { jobs: Job[]; onJobClick?: (job: Job) => void }) {
   const update = useUpdateJobStatus();
   const [dragOver, setDragOver] = useState<JobStatus | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -119,6 +119,10 @@ export function StatusBoard({ jobs }: { jobs: Job[] }) {
                     onDragEnd={() => {
                       setDragId(null);
                       setDragOver(null);
+                    }}
+                    onClick={(e) => {
+                      if (e.defaultPrevented) return;
+                      onJobClick?.(j);
                     }}
                     className={`rounded border border-border bg-card p-2 text-[11px] leading-tight cursor-grab active:cursor-grabbing select-none hover:border-primary/60 hover:shadow-sm transition-all ${
                       dragId === j.id ? "opacity-40" : ""
