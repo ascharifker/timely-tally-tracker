@@ -47,3 +47,52 @@ export function formatShiftLabel(iso: string | null | undefined): string {
   const day = d.toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" });
   return `${day} · ${s.name} ${String(s.startHour).padStart(2, "0")}:00`;
 }
+
+const SHIFT_LENGTH_MS = 8 * 60 * 60 * 1000;
+
+/** Next 06:00 / 14:00 / 22:00 boundary at or after `from`. */
+export function nextShiftBoundary(from: Date = new Date()): Date {
+  const d = new Date(from);
+  d.setMinutes(0, 0, 0);
+  const h = d.getHours();
+  const boundaries = [6, 14, 22];
+  const next = boundaries.find((b) => h < b);
+  if (next !== undefined) {
+    d.setHours(next);
+  } else {
+    d.setDate(d.getDate() + 1);
+    d.setHours(6);
+  }
+  return d;
+}
+
+/** Add N shifts (8h each) to a date. */
+export function addShifts(d: Date, n: number): Date {
+  return new Date(d.getTime() + n * SHIFT_LENGTH_MS);
+}
+
+/** Unique shift indices a [start, end) interval touches, in chronological order. */
+export function shiftSpan(startISO: string, endISO: string): number[] {
+  const s = new Date(startISO).getTime();
+  const e = new Date(endISO).getTime();
+  if (e <= s) return [shiftIndexFromDate(startISO)];
+  const seen = new Set<number>();
+  const out: number[] = [];
+  // sample every 30 min — cheap and accurate enough for 8h bands
+  for (let t = s; t < e; t += 30 * 60 * 1000) {
+    const idx = shiftIndexFromHour(new Date(t).getHours());
+    if (!seen.has(idx)) {
+      seen.add(idx);
+      out.push(idx);
+    }
+    if (seen.size === 3) break;
+  }
+  return out;
+}
+
+/** Snap a date to the start of a given shift on the same calendar day. */
+export function snapToShift(d: Date, shiftIdx: number): Date {
+  const out = new Date(d);
+  out.setHours(SHIFTS[shiftIdx].startHour, 0, 0, 0);
+  return out;
+}
