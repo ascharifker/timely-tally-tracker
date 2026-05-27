@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
 import { STATUS_COLOR, STATUS_LABEL, type EventKind } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
-import { useRecentDelays } from "@/hooks/useFactData";
+import { useRecentDelays, useRedistributeSchedules } from "@/hooks/useFactData";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
-import { SHIFTS, shiftStartMs, shiftIndexFromDate } from "@/lib/shifts";
+import { SHIFTS, shiftStartMs, shiftIndexFromDate, shiftSpan, snapToShift } from "@/lib/shifts";
 
 interface Props {
   jobs: Job[];
@@ -18,7 +18,9 @@ type ViewMode = "14d" | "month" | "quarter";
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
+  const redistribute = useRedistributeSchedules();
   const [dragJobId, setDragJobId] = useState<string | null>(null);
+  const [hoverJobId, setHoverJobId] = useState<string | null>(null);
   const [hoverCell, setHoverCell] = useState<string | null>(null); // `${machineId}:${dayIdx}`
   const [viewMode, setViewMode] = useState<ViewMode>("14d");
   // Which shifts are visible. When exactly one is selected, the Gantt enters
@@ -209,6 +211,50 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     });
   };
 
+  // Move/nudge a bar to a different shift without dragging.
+  // Same machine, same calendar day, snap to shift start.
+  const moveJobToShift = (jobId: string, targetShiftIdx: number, dayDelta = 0) => {
+    const job = effectiveJobs.find((j) => j.id === jobId);
+    if (!job || !job.planned_start || !job.planned_end) return;
+    const oldStart = new Date(job.planned_start);
+    const durMs = new Date(job.planned_end).getTime() - oldStart.getTime();
+    const baseDay = new Date(oldStart);
+    baseDay.setDate(baseDay.getDate() + dayDelta);
+    const newStart = snapToShift(baseDay, targetShiftIdx);
+    const newEnd = new Date(newStart.getTime() + durMs);
+    const original = jobs.find((j) => j.id === jobId);
+    setPending((prev) => {
+      const next = new Map(prev);
+      next.set(jobId, {
+        jobId,
+        odf: job.odf,
+        planned_start: newStart.toISOString(),
+        planned_end: newEnd.toISOString(),
+        machine_id: job.machine_id ?? original?.machine_id ?? "",
+        original_start: original?.planned_start ?? null,
+        original_end: original?.planned_end ?? null,
+        original_machine_id: original?.machine_id ?? null,
+        eventKind: "delay",
+      });
+      return next;
+    });
+  };
+
+  // Shift load: how many bars currently touch each shift band in the visible window.
+  const shiftLoad = useMemo(() => {
+    const counts = [0, 0, 0];
+    for (const j of effectiveJobs) {
+      if (!j.planned_start || !j.planned_end) continue;
+      const js = new Date(j.planned_start).getTime();
+      const je = new Date(j.planned_end).getTime();
+      if (je < start || js > end) continue;
+      for (const idx of shiftSpan(j.planned_start, j.planned_end)) {
+        counts[idx]++;
+      }
+    }
+    return counts;
+  }, [effectiveJobs, start, end]);
+
   // Visual state = jobs with pending moves applied on top.
   const effectiveJobs = useMemo(() => {
     if (pending.size === 0) return jobs;
@@ -233,8 +279,40 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
             {headerLabel}
           </span>
+          {showShifts && (
+            <div className="flex items-center gap-1 text-[10px] font-mono">
+              <span className="text-muted-foreground">Carga:</span>
+              {SHIFTS.map((s, i) => (
+                <span
+                  key={s.key}
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5"
+                  style={{ backgroundColor: s.tint }}
+                  title={`${shiftLoad[i]} ODF${shiftLoad[i] === 1 ? "" : "s"} en ${s.name}`}
+                >
+                  <span
+                    className="inline-flex h-3 w-3 items-center justify-center rounded-sm text-[8px] font-bold text-white"
+                    style={{ backgroundColor: s.color }}
+                  >
+                    {s.label}
+                  </span>
+                  <span className="font-semibold">{shiftLoad[i]}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-[10px] uppercase tracking-widest font-mono mr-1"
+            onClick={() => redistribute.mutate()}
+            disabled={redistribute.isPending}
+            title="Redistribuye automáticamente todos los ODFs programados en bloques M/T/N"
+          >
+            <Shuffle className="h-3.5 w-3.5" />
+            {redistribute.isPending ? "Redistribuyendo…" : "Redistribuir"}
+          </Button>
           {showShifts && (
             <div className="flex items-center gap-1 mr-2 rounded border border-border bg-card px-1 py-0.5">
               <span className="px-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
