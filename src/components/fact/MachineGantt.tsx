@@ -6,6 +6,7 @@ import { useRecentDelays } from "@/hooks/useFactData";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
+import { SHIFTS, shiftStartMs, shiftIndexFromDate } from "@/lib/shifts";
 
 interface Props {
   jobs: Job[];
@@ -15,25 +16,15 @@ interface Props {
 
 type ViewMode = "14d" | "month" | "quarter";
 
-// Production shifts (24h coverage)
-const SHIFTS = [
-  { key: "manana", label: "M", name: "Mañana", startHour: 6, hours: 8, tint: "rgba(250, 204, 21, 0.08)" },
-  { key: "tarde", label: "T", name: "Tarde", startHour: 14, hours: 8, tint: "rgba(56, 189, 248, 0.08)" },
-  { key: "noche", label: "N", name: "Noche", startHour: 22, hours: 8, tint: "rgba(139, 92, 246, 0.10)" },
-] as const;
-
-/** Given a Date (day) and shift index, return the absolute start ms of that shift. */
-function shiftStartMs(day: Date, shiftIdx: number): number {
-  const d = new Date(day);
-  d.setHours(SHIFTS[shiftIdx].startHour, 0, 0, 0);
-  return d.getTime();
-}
-
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
   const [dragJobId, setDragJobId] = useState<string | null>(null);
   const [hoverCell, setHoverCell] = useState<string | null>(null); // `${machineId}:${dayIdx}`
   const [viewMode, setViewMode] = useState<ViewMode>("14d");
+  // Which shifts are visible. When exactly one is selected, the Gantt enters
+  // "single-shift mode": each day collapses to that 8h band, other bars hide.
+  const [shiftFilter, setShiftFilter] = useState<Set<number>>(new Set([0, 1, 2]));
+  const soloShift = shiftFilter.size === 1 ? [...shiftFilter][0] : null;
   const [anchor, setAnchor] = useState<Date>(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -205,6 +196,18 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       : `${days[0].toLocaleDateString("es", { day: "2-digit", month: "short" })} → ${new Date(end - 1).toLocaleDateString("es", { day: "2-digit", month: "short" })}`;
 
   const showShifts = viewMode === "14d";
+  const toggleShift = (idx: number) => {
+    setShiftFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        if (next.size === 1) return new Set([0, 1, 2]); // re-enable all
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
 
   // Visual state = jobs with pending moves applied on top.
   const effectiveJobs = useMemo(() => {
@@ -232,6 +235,46 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          {showShifts && (
+            <div className="flex items-center gap-1 mr-2 rounded border border-border bg-card px-1 py-0.5">
+              <span className="px-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
+                Turnos
+              </span>
+              {SHIFTS.map((s, i) => {
+                const active = shiftFilter.has(i);
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => toggleShift(i)}
+                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${
+                      active ? "text-foreground" : "text-muted-foreground/60 opacity-50"
+                    }`}
+                    style={{
+                      backgroundColor: active ? s.tint : "transparent",
+                      boxShadow: active ? `inset 0 0 0 1px ${s.color}` : undefined,
+                    }}
+                    title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00–${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00${active ? " · click para ocultar" : " · click para mostrar"}`}
+                  >
+                    <span
+                      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white"
+                      style={{ backgroundColor: s.color }}
+                    >
+                      {s.label}
+                    </span>
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
+              {soloShift !== null && (
+                <button
+                  onClick={() => setShiftFilter(new Set([0, 1, 2]))}
+                  className="ml-1 text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  ver todos
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex rounded border border-border overflow-hidden mr-2">
             {(["14d", "month", "quarter"] as ViewMode[]).map((m) => (
               <button
@@ -259,24 +302,28 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
         </div>
       </div>
 
+      {soloShift !== null && showShifts && (
+        <div
+          className="border-b border-border px-4 py-1.5 text-[11px] flex items-center gap-2"
+          style={{ backgroundColor: SHIFTS[soloShift].tint }}
+        >
+          <span
+            className="inline-flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold text-white"
+            style={{ backgroundColor: SHIFTS[soloShift].color }}
+          >
+            {SHIFTS[soloShift].label}
+          </span>
+          <span className="font-medium">Viendo solo turno {SHIFTS[soloShift].name}</span>
+          <span className="text-muted-foreground">
+            ({String(SHIFTS[soloShift].startHour).padStart(2, "0")}:00 – {String((SHIFTS[soloShift].startHour + SHIFTS[soloShift].hours) % 24).padStart(2, "0")}:00) ·
+            las ODFs fuera de este turno aparecen atenuadas
+          </span>
+        </div>
+      )}
+
       <div className="grid border-b border-border" style={{ gridTemplateColumns: `140px 1fr` }}>
         <div className="border-r border-border px-3 py-2 text-[10px] uppercase tracking-widest text-muted-foreground">
           Máquina
-          {showShifts && (
-            <div className="mt-1 flex items-center gap-2 normal-case tracking-normal text-[9px]">
-              {SHIFTS.map((s) => (
-                <span key={s.key} className="flex items-center gap-1">
-                  <span
-                    className="inline-flex h-3 w-3 items-center justify-center rounded-sm text-[8px] font-bold text-foreground/80"
-                    style={{ backgroundColor: s.tint.replace("0.08", "0.5").replace("0.10", "0.5") }}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="text-muted-foreground">{s.name}</span>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         <div className="grid font-mono text-[10px] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {days.map((d, i) => (
@@ -296,10 +343,28 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                   <div>{d.toLocaleDateString("es", { weekday: "short" })}</div>
                   <div className="text-foreground">{d.getDate()}</div>
                   {showShifts && (
-                    <div className="mt-1 grid grid-cols-3 gap-px text-[8px]">
-                      {SHIFTS.map((s) => (
-                        <span key={s.key} className="text-muted-foreground/70">{s.label}</span>
-                      ))}
+                    <div
+                      className="mt-1 grid gap-px text-[9px] font-semibold"
+                      style={{ gridTemplateColumns: `repeat(${soloShift !== null ? 1 : 3}, 1fr)` }}
+                    >
+                      {SHIFTS.map((s, sIdx) => {
+                        if (soloShift !== null && sIdx !== soloShift) return null;
+                        const visible = shiftFilter.has(sIdx);
+                        return (
+                          <span
+                            key={s.key}
+                            className="rounded-sm py-0.5 text-white"
+                            style={{
+                              backgroundColor: visible ? s.color : "transparent",
+                              opacity: visible ? 0.85 : 0.25,
+                              color: visible ? "#fff" : undefined,
+                            }}
+                            title={`${s.name} ${String(s.startHour).padStart(2, "0")}:00`}
+                          >
+                            {s.label}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </>
@@ -333,15 +398,20 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 {days.map((d, i) => (
                   <div
                     key={i}
-                    className={`relative border-r border-border/40 ${
+                    className={`relative border-r border-border ${
                       d.getTime() === today.getTime() ? "bg-primary/5" : ""
                     }`}
                   >
                     {showShifts ? (
-                      <div className="absolute inset-0 grid grid-cols-3">
+                      <div
+                        className="absolute inset-0 grid"
+                        style={{ gridTemplateColumns: `repeat(${soloShift !== null ? 1 : 3}, 1fr)` }}
+                      >
                         {SHIFTS.map((s, sIdx) => {
+                          if (soloShift !== null && sIdx !== soloShift) return null;
                           const cellKey = `${m.id}:${i}:${sIdx}`;
                           const isHover = hoverCell === cellKey;
+                          const isDragging = dragJobId !== null;
                           return (
                             <div
                               key={s.key}
@@ -349,12 +419,30 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                               onDragEnter={() => dragJobId && setHoverCell(cellKey)}
                               onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
                               onDrop={() => onCellDrop(m.id, i, sIdx)}
-                              className={`border-r border-border/20 last:border-r-0 transition-colors ${
-                                isHover ? "bg-primary/25 ring-1 ring-primary ring-inset" : ""
+                              className={`relative border-r border-border/60 last:border-r-0 transition-all ${
+                                isHover ? "ring-2 ring-inset" : ""
                               }`}
-                              style={!isHover ? { backgroundColor: s.tint } : undefined}
-                              title={`${s.name} · ${s.startHour}:00 – ${(s.startHour + s.hours) % 24}:00`}
-                            />
+                              style={{
+                                backgroundColor: isHover ? s.color + "55" : s.tint,
+                                // @ts-expect-error css var
+                                "--tw-ring-color": s.color,
+                              }}
+                              title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00 – ${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00`}
+                            >
+                              {isHover && isDragging && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                  <span
+                                    className="inline-flex h-5 w-5 items-center justify-center rounded text-[11px] font-bold text-white shadow"
+                                    style={{ backgroundColor: s.color }}
+                                  >
+                                    {s.label}
+                                  </span>
+                                  <span className="mt-0.5 text-[8px] font-semibold text-foreground/90 leading-tight">
+                                    {String(s.startHour).padStart(2, "0")}h
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -378,9 +466,12 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 const left = Math.max(0, ((s - start) / range) * 100);
                 const width = Math.max(2, ((Math.min(e, end) - Math.max(s, start)) / range) * 100);
                 if (left >= 100 || left + width <= 0) return null;
+                const jobShiftIdx = shiftIndexFromDate(j.planned_start as string);
+                const dimmedByFilter = showShifts && !shiftFilter.has(jobShiftIdx);
                 const ghost = ghosts[j.id];
                 const hasDelay = delayedJobIds.has(j.id);
                 const pendingMove = pending.get(j.id);
+                const shiftMeta = SHIFTS[jobShiftIdx];
                 return (
                   <div key={j.id}>
                     {ghost && (() => {
@@ -393,7 +484,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                           className="absolute top-2 h-10 rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
                           style={{ left: `${gl}%`, width: `${gw}%`, opacity: 0.35 }}
                         />
-                      );
+                          );
                     })()}
                     {pendingMove && pendingMove.original_start && pendingMove.original_end && (() => {
                       const os = new Date(pendingMove.original_start).getTime();
@@ -419,16 +510,26 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                     onClick={() => onJobClick?.(j)}
                     className={`absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md cursor-grab active:cursor-grabbing ${
                       dragJobId === j.id ? "opacity-50" : ""
-                    } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-card" : ""}`}
+                    } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-card" : ""} ${dimmedByFilter ? "opacity-25" : ""}`}
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
                       backgroundColor: STATUS_COLOR[j.status],
+                      borderLeft: showShifts ? `3px solid ${shiftMeta.color}` : undefined,
                     }}
-                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}${pendingMove ? " · pendiente de aprobar" : ""}`}
+                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · Turno ${shiftMeta.name}${pendingMove ? " · pendiente de aprobar" : ""}`}
                   >
                     {hasDelay && (
                       <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-card" />
+                    )}
+                    {showShifts && (
+                      <span
+                        className="absolute top-0.5 right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white shadow-sm"
+                        style={{ backgroundColor: shiftMeta.color }}
+                        title={`Turno ${shiftMeta.name}`}
+                      >
+                        {shiftMeta.label}
+                      </span>
                     )}
                     <div className="font-mono leading-tight truncate">ODF {j.odf}</div>
                     <div className="text-[10px] opacity-80 truncate">{j.tube_spec ?? ""}</div>
