@@ -372,25 +372,16 @@ export function useApplyReschedules() {
           .eq("id", m.jobId);
         if (updErr) throw updErr;
 
-        // 2. cascade downstream on the *new* machine (skip absence/breakdown — handled below)
-        if (m.eventKind !== "absence" && m.eventKind !== "breakdown" && shiftedHours !== 0 && original) {
-          const downstreamSource = jobs.map((j) =>
-            j.id === m.jobId
-              ? {
-                  ...j,
-                  planned_start: m.planned_start,
-                  planned_end: m.planned_end,
-                  machine_id: m.machine_id,
-                }
-              : j,
-          );
-          // anchor change is the move itself; push downstream using the *delta*
+        // 2. cascade downstream on the original machine using the delta.
+        //    cascade() takes the un-moved jobs + delayHours and computes
+        //    downstream shifts on the same machine; we skip the anchor itself
+        //    since we wrote it explicitly above.
+        if (shiftedHours !== 0 && original && original.machine_id && original.planned_end) {
           const changes = cascade({
-            jobs: downstreamSource,
+            jobs,
             delayedJobId: m.jobId,
-            delayHours: 0, // the job is already moved; downstream calc needs a pretend delta
+            delayHours: shiftedHours,
           });
-          // skip the anchor itself in the cascade output to avoid double-write
           for (const c of changes) {
             if (c.job_id === m.jobId) continue;
             await supabase
