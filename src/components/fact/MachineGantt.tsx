@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
 import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
+import { useRecentDelays } from "@/hooks/useFactData";
 
 interface Props {
   jobs: Job[];
@@ -12,6 +13,53 @@ interface Props {
 const DAYS = 14;
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
+  const { data: delays = [] } = useRecentDelays();
+
+  // Track previous planned_end per job to render a ghost bar that fades out
+  // when a delay is applied — makes small schedule shifts visually obvious.
+  const prevEnds = useRef<Map<string, string>>(new Map());
+  const [ghosts, setGhosts] = useState<
+    Record<string, { start: string; end: string; expiresAt: number }>
+  >({});
+
+  useEffect(() => {
+    const next: Record<string, { start: string; end: string; expiresAt: number }> = { ...ghosts };
+    let changed = false;
+    for (const j of jobs) {
+      if (!j.planned_start || !j.planned_end) continue;
+      const prev = prevEnds.current.get(j.id);
+      if (prev && prev !== j.planned_end) {
+        next[j.id] = {
+          start: prevEnds.current.get(j.id + ":start") ?? j.planned_start,
+          end: prev,
+          expiresAt: Date.now() + 4000,
+        };
+        changed = true;
+      }
+      prevEnds.current.set(j.id, j.planned_end);
+      prevEnds.current.set(j.id + ":start", j.planned_start);
+    }
+    if (changed) setGhosts(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs]);
+
+  useEffect(() => {
+    if (Object.keys(ghosts).length === 0) return;
+    const t = setTimeout(() => {
+      const now = Date.now();
+      const filtered = Object.fromEntries(
+        Object.entries(ghosts).filter(([, v]) => v.expiresAt > now),
+      );
+      setGhosts(filtered);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [ghosts]);
+
+  const delayedJobIds = useMemo(
+    () => new Set(delays.map((d) => d.job_id as string)),
+    [delays],
+  );
+
   const today = useMemo(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -96,11 +144,25 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 const left = Math.max(0, ((s - start) / range) * 100);
                 const width = Math.max(2, ((Math.min(e, end) - Math.max(s, start)) / range) * 100);
                 if (left >= 100 || left + width <= 0) return null;
+                const ghost = ghosts[j.id];
+                const hasDelay = delayedJobIds.has(j.id);
                 return (
+                  <div key={j.id}>
+                    {ghost && (() => {
+                      const gs = new Date(ghost.start).getTime();
+                      const ge = new Date(ghost.end).getTime();
+                      const gl = Math.max(0, ((gs - start) / range) * 100);
+                      const gw = Math.max(2, ((Math.min(ge, end) - Math.max(gs, start)) / range) * 100);
+                      return (
+                        <div
+                          className="absolute top-2 h-10 rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
+                          style={{ left: `${gl}%`, width: `${gw}%`, opacity: 0.35 }}
+                        />
+                      );
+                    })()}
                   <button
-                    key={j.id}
                     onClick={() => onJobClick?.(j)}
-                    className="absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition hover:translate-y-[-1px] hover:shadow-md"
+                    className="absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md"
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
@@ -108,9 +170,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                     }}
                     title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}`}
                   >
+                    {hasDelay && (
+                      <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-card" />
+                    )}
                     <div className="font-mono leading-tight truncate">ODF {j.odf}</div>
                     <div className="text-[10px] opacity-80 truncate">{j.tube_spec ?? ""}</div>
                   </button>
+                  </div>
                 );
               })}
             </div>
