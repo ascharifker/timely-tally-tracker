@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Job } from "@/lib/fact-types";
-import { STATUS_LABEL, toHours, type DelayUnit } from "@/lib/fact-types";
+import { STATUS_LABEL, toHours, type DelayUnit, type EventKind, EVENT_KIND_LABEL, EVENT_KIND_COLOR } from "@/lib/fact-types";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { JobHistorySheet } from "./JobHistorySheet";
+import { History } from "lucide-react";
 
 interface Props {
   job: Job | null;
@@ -33,6 +35,8 @@ export function JobDetailDialog({ job, onClose }: Props) {
   const [amount, setAmount] = useState(1);
   const [unit, setUnit] = useState<DelayUnit>("days");
   const [reason, setReason] = useState("");
+  const [eventKind, setEventKind] = useState<EventKind>("delay");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const delayHours = toHours(amount, unit);
 
@@ -52,7 +56,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
       return;
     }
     try {
-      await logDelay.mutateAsync({ jobId: job.id, delayHours, reason: reason.trim() });
+      await logDelay.mutateAsync({ jobId: job.id, delayHours, reason: reason.trim(), eventKind });
       toast.success(
         `Retraso registrado · ${preview.length} ODF${preview.length > 1 ? "s" : ""} reprogramado${preview.length > 1 ? "s" : ""}`,
       );
@@ -66,11 +70,16 @@ export function JobDetailDialog({ job, onClose }: Props) {
   if (!job) return null;
 
   return (
+    <>
     <Dialog open={!!job} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl bg-card">
         <DialogHeader>
-          <DialogTitle className="font-mono">
-            ODF {job.odf} · {STATUS_LABEL[job.status]}
+          <DialogTitle className="font-mono flex items-center justify-between">
+            <span>ODF {job.odf} · {STATUS_LABEL[job.status]}</span>
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5" onClick={() => setHistoryOpen(true)}>
+              <History className="h-3.5 w-3.5" />
+              <span className="text-xs">Historial</span>
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -92,14 +101,30 @@ export function JobDetailDialog({ job, onClose }: Props) {
         )}
 
         <div className="mt-4 border-t border-border pt-4">
-          <h3 className="text-sm font-semibold mb-1">Registrar retraso de producción</h3>
+          <h3 className="text-sm font-semibold mb-1">Reprogramar ODF</h3>
           <p className="text-[11px] text-muted-foreground mb-3">
-            Motor determinístico · empuja este ODF y todos los trabajos posteriores en la misma máquina.
+            Empuja este ODF + todos los siguientes en la misma máquina. Horas negativas = adelantar.
           </p>
 
-          <div className="grid grid-cols-[1fr,140px] gap-2 mb-2">
+          <div className="grid grid-cols-[1fr,1fr] gap-2 mb-2">
+            <div className="col-span-2">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Categoría</Label>
+              <Select value={eventKind} onValueChange={(v) => setEventKind(v as EventKind)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["delay","priority_shift","absence","change_order","breakdown"] as EventKind[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EVENT_KIND_COLOR[k] }} />
+                        {EVENT_KIND_LABEL[k]}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Retraso</Label>
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Shift (+/−)</Label>
               <Input
                 type="number"
                 step="0.5"
@@ -160,12 +185,19 @@ export function JobDetailDialog({ job, onClose }: Props) {
             className="w-full"
           >
             {logDelay.isPending
-              ? "Registrando…"
-              : `Registrar y reprogramar ${preview.length} ODF${preview.length > 1 ? "s" : ""}`}
+              ? "Aplicando…"
+              : `Aplicar y reprogramar ${preview.length} ODF${preview.length > 1 ? "s" : ""}`}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
+    <JobHistorySheet
+      jobId={job.id}
+      odf={job.odf}
+      open={historyOpen}
+      onClose={() => setHistoryOpen(false)}
+    />
+    </>
   );
 }
 
