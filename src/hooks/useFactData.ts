@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Machine, Job, JobStatus } from "@/lib/fact-types";
 import { cascade, type CascadeChange } from "@/lib/scheduling/cascade";
+import { toast } from "sonner";
+import { STATUS_LABEL } from "@/lib/fact-types";
 
 export function useMachines() {
   return useQuery({
@@ -53,7 +55,22 @@ export function useUpdateJobStatus() {
         .eq("id", input.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ["jobs"] });
+      const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const job = previous.find((j) => j.id === id);
+      qc.setQueryData<Job[]>(["jobs"], previous.map((j) => (j.id === id ? { ...j, status } : j)));
+      return { previous, job };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["jobs"], ctx.previous);
+      toast.error("No se pudo cambiar el estado", { description: (err as Error).message });
+    },
+    onSuccess: (_data, vars, ctx) => {
+      const odf = ctx?.job?.odf ?? "ODF";
+      toast.success(`ODF ${odf} → ${STATUS_LABEL[vars.status]}`);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
 }
 
