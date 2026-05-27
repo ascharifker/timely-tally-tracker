@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useLogDelay, useJobs } from "@/hooks/useFactData";
+import { useLogDelay, useJobs, useRescheduleJob } from "@/hooks/useFactData";
 import { cascade } from "@/lib/scheduling/cascade";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { JobHistorySheet } from "./JobHistorySheet";
 import { History } from "lucide-react";
-import { SHIFTS, shiftIndexFromDate } from "@/lib/shifts";
+import { SHIFTS, shiftIndexFromDate, snapToShift } from "@/lib/shifts";
 
 interface Props {
   job: Job | null;
@@ -33,6 +33,7 @@ interface Props {
 export function JobDetailDialog({ job, onClose }: Props) {
   const { data: jobs = [] } = useJobs();
   const logDelay = useLogDelay();
+  const reschedule = useRescheduleJob();
   const [amount, setAmount] = useState(1);
   const [unit, setUnit] = useState<DelayUnit>("days");
   const [reason, setReason] = useState("");
@@ -69,6 +70,26 @@ export function JobDetailDialog({ job, onClose }: Props) {
   };
 
   if (!job) return null;
+
+  const moveToShift = async (targetShiftIdx: number, dayDelta = 0) => {
+    if (!job.planned_start || !job.planned_end) {
+      toast.error("El ODF no tiene fecha planificada — no se puede mover a un turno");
+      return;
+    }
+    const oldStart = new Date(job.planned_start);
+    const durMs = new Date(job.planned_end).getTime() - oldStart.getTime();
+    const baseDay = new Date(oldStart);
+    baseDay.setDate(baseDay.getDate() + dayDelta);
+    const newStart = snapToShift(baseDay, targetShiftIdx);
+    const newEnd = new Date(newStart.getTime() + durMs);
+    await reschedule.mutateAsync({
+      id: job.id,
+      planned_start: newStart.toISOString(),
+      planned_end: newEnd.toISOString(),
+    });
+  };
+
+  const currentShiftIdx = job.planned_start ? shiftIndexFromDate(job.planned_start) : null;
 
   return (
     <>
