@@ -14,7 +14,294 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      briefings: {
+        Row: {
+          briefing_date: string
+          content: string
+          created_at: string
+          id: string
+          kind: string
+          source_snapshot: Json | null
+        }
+        Insert: {
+          briefing_date: string
+          content: string
+          created_at?: string
+          id?: string
+          kind: string
+          source_snapshot?: Json | null
+        }
+        Update: {
+          briefing_date?: string
+          content?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          source_snapshot?: Json | null
+        }
+        Relationships: []
+      }
+      job_steps: {
+        Row: {
+          completed_at: string | null
+          id: string
+          job_id: string
+          machine_id: string | null
+          note: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          step_name: string
+          step_order: number
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          job_id: string
+          machine_id?: string | null
+          note?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          step_name: string
+          step_order: number
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          job_id?: string
+          machine_id?: string | null
+          note?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          step_name?: string
+          step_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_steps_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          created_at: string
+          customer_date: string | null
+          export_date: string | null
+          id: string
+          machine_id: string | null
+          notes: string | null
+          odf: string
+          pir: string | null
+          planned_end: string | null
+          planned_start: string | null
+          po_halliburton: string | null
+          po_musa: string | null
+          priority: Database["public"]["Enums"]["job_priority"]
+          qty: number
+          status: Database["public"]["Enums"]["job_status"]
+          tube_spec: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_date?: string | null
+          export_date?: string | null
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          odf: string
+          pir?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          po_halliburton?: string | null
+          po_musa?: string | null
+          priority?: Database["public"]["Enums"]["job_priority"]
+          qty?: number
+          status?: Database["public"]["Enums"]["job_status"]
+          tube_spec?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_date?: string | null
+          export_date?: string | null
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          odf?: string
+          pir?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          po_halliburton?: string | null
+          po_musa?: string | null
+          priority?: Database["public"]["Enums"]["job_priority"]
+          qty?: number
+          status?: Database["public"]["Enums"]["job_status"]
+          tube_spec?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machines: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          type: Database["public"]["Enums"]["machine_type"]
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          type?: Database["public"]["Enums"]["machine_type"]
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          type?: Database["public"]["Enums"]["machine_type"]
+        }
+        Relationships: []
+      }
+      part_times: {
+        Row: {
+          created_at: string
+          hours_per_piece: number
+          id: string
+          machine_id: string
+          pir: string
+        }
+        Insert: {
+          created_at?: string
+          hours_per_piece: number
+          id?: string
+          machine_id: string
+          pir: string
+        }
+        Update: {
+          created_at?: string
+          hours_per_piece?: number
+          id?: string
+          machine_id?: string
+          pir?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_times_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          available: boolean
+          created_at: string
+          date: string
+          id: string
+          job_id: string | null
+          machine_id: string
+          note: string | null
+          slot: Database["public"]["Enums"]["shift_slot"]
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          date: string
+          id?: string
+          job_id?: string | null
+          machine_id: string
+          note?: string | null
+          slot: Database["public"]["Enums"]["shift_slot"]
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          date?: string
+          id?: string
+          job_id?: string | null
+          machine_id?: string
+          note?: string | null
+          slot?: Database["public"]["Enums"]["shift_slot"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      status_events: {
+        Row: {
+          created_at: string
+          delay_hours: number | null
+          from_status: Database["public"]["Enums"]["job_status"] | null
+          id: string
+          job_id: string
+          reason: string | null
+          to_status: Database["public"]["Enums"]["job_status"]
+        }
+        Insert: {
+          created_at?: string
+          delay_hours?: number | null
+          from_status?: Database["public"]["Enums"]["job_status"] | null
+          id?: string
+          job_id: string
+          reason?: string | null
+          to_status: Database["public"]["Enums"]["job_status"]
+        }
+        Update: {
+          created_at?: string
+          delay_hours?: number | null
+          from_status?: Database["public"]["Enums"]["job_status"] | null
+          id?: string
+          job_id?: string
+          reason?: string | null
+          to_status?: Database["public"]["Enums"]["job_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "status_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +310,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      job_priority: "low" | "normal" | "high" | "urgent"
+      job_status:
+        | "PLANNED"
+        | "MAZAK"
+        | "MAQUINADO_LISTO"
+        | "CEMENTACION"
+        | "EXPO"
+        | "YA_SE_ENVIO"
+      machine_type: "internal" | "external_shop"
+      shift_slot: "manana" | "tarde" | "noche"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +446,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      job_priority: ["low", "normal", "high", "urgent"],
+      job_status: [
+        "PLANNED",
+        "MAZAK",
+        "MAQUINADO_LISTO",
+        "CEMENTACION",
+        "EXPO",
+        "YA_SE_ENVIO",
+      ],
+      machine_type: ["internal", "external_shop"],
+      shift_slot: ["manana", "tarde", "noche"],
+    },
   },
 } as const
