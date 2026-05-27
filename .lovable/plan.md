@@ -1,40 +1,84 @@
-## Hacer que ODF PRUEBA (y cualquier MAZAK sin fechas) aparezca en el Gantt + drag para mover
 
-### Diagnóstico
-Hay 2 ODFs `PRUEBA` en estado `MAZAK` con `machine_id` asignada pero `planned_start`/`planned_end` en NULL. Por eso caen en la fila "Sin programar" y no como barras. El auto-asignar de fechas que agregamos solo dispara cuando el status **transiciona** a MAZAK — no toca ODFs que ya estaban ahí antes del cambio.
+## Qué pasa hoy (por qué confunde)
 
-Además, hoy solo se puede reprogramar abriendo el diálogo. Para que sea "seamless" hace falta poder arrastrar la barra en el cronograma.
+- El diálogo se llama "Registrar retraso" y sólo acepta horas positivas → no sirve si querés adelantar un ODF.
+- El motivo es texto libre → no se puede filtrar/leer después por causa.
+- Arrastrar una barra en el Gantt **mueve sólo ese ODF** y se guarda al instante. Si caés encima de otro, se solapan en silencio.
+- No hay forma de "probar" varios movimientos antes de confirmar — cada drag es definitivo.
+- El historial de eventos existe en la tabla `status_events` pero no se ve en la UI.
 
-### Cambios
+## Qué vamos a construir
 
-**1. Auto-asignar fechas también para ODFs ya en MAZAK+ sin programar (`useFactData.ts`)**
-- En `useJobs`, después del fetch, detectar jobs con `status ∈ {MAZAK, EXTERNAL, INSPECTION, READY}` + `machine_id` no nulo + sin `planned_start`/`planned_end`.
-- Para cada uno, hacer un update con fechas default (`nextShiftStart()` + 2 días, escalonado por máquina para no superponer): primer hueco libre en esa máquina después de las barras existentes.
-- Hacerlo una sola vez por sesión (flag en `useRef` o `useEffect` con guard) para no spamear updates.
-- Patch optimista en cache para que aparezcan al toque.
-- Toast resumen: "Programadas 2 ODFs sin fecha en MAZAK".
+### 1. Tipos de evento (reemplaza "retraso" libre)
 
-**2. Drag-to-reschedule en el Gantt (`MachineGantt.tsx`)**
-- Hacer cada barra `draggable` (HTML5 drag, mismo patrón que el Kanban).
-- Drop targets: las celdas de día de cualquier fila de máquina.
-- Al soltar:
-  - Calcular nueva `planned_start` = día de drop a la misma hora actual (o al `nextShiftStart` si era null).
-  - Mantener la **duración** original (`planned_end - planned_start`).
-  - Si se soltó en otra máquina, también actualizar `machine_id`.
-  - Disparar nueva mutación `useRescheduleJob({ id, planned_start, planned_end, machine_id })` con patch optimista.
-- Cursor `grab`/`grabbing`, ring de highlight en la celda hovered.
-- Las barras de "Sin programar" también se pueden arrastrar al cronograma → asigna fechas + máquina en un solo gesto.
+Nueva categoría obligatoria al reprogramar. Cada una determina cómo se aplica la cascada:
 
-**3. Nueva mutación `useRescheduleJob` (`useFactData.ts`)**
-- Update directo de `planned_start`, `planned_end`, `machine_id`.
-- Optimista + rollback en error.
-- Toast: "ODF X movido a [máquina] · 28/05 → 30/05".
+| Categoría | Comportamiento de cascada |
+|---|---|
+| **Retraso de producción** | Empuja ODF + todos los siguientes en la misma máquina |
+| **Prioridad cambiada** (orden urgente entra) | Inserta el ODF en una posición/fecha y empuja los desplazados hacia adelante |
+| **Ausencia de personal** | Selecciona un turno (mañana/tarde/noche) en una fecha → empuja todos los ODFs activos de ese turno en TODAS las máquinas internas |
+| **Cambio de orden del cliente** | Recalcula duración (qty × hours_per_piece de `part_times`) y reprograma sólo ese ODF + cascada normal |
+| **Avería de máquina** | Selecciona máquina + horas fuera de servicio → empuja todo lo de esa máquina |
 
-### Archivos tocados
-- `src/hooks/useFactData.ts` — backfill al cargar + `useRescheduleJob`.
-- `src/components/fact/MachineGantt.tsx` — drag handlers en barras y chips, drop zones en celdas.
+Migración DB: agregar columna `event_kind` a `status_events` (enum: `delay`, `priority_shift`, `absence`, `change_order`, `breakdown`).
 
-### Fuera de alcance
-- Resize de barra (cambiar duración arrastrando los bordes) — próxima iteración.
-- Detección de conflictos / superposición entre ODFs en la misma máquina.
-- Vista anual / heatmap.
+### 2. Pull-in (adelantar) + Push (retrasar)
+
+El campo de horas acepta negativos. La cascada con shift negativo sólo se aplica si no genera solapamiento con ODFs anteriores; si genera conflicto, se avisa antes de confirmar.
+
+### 3. Modo borrador con botón "Aprobar movimientos"
+
+Cambio importante en UX del Gantt. Hoy cada drag es instantáneo → reemplazar por:
+
+- Arrastrar marca el movimiento como **pendiente** (barra con borde punteado dorado, posición nueva visible, posición vieja como ghost).
+- Aparece una **barra de acciones flotante** abajo del Gantt: `3 movimientos pendientes · [Descartar] [Aprobar movimientos]`.
+- Cada movimiento pendiente puede tener su propia categoría (default "Retraso de producción", editable en un mini popover sobre la barra pendiente).
+- "Aprobar" abre un único diálogo con resumen: lista de cambios + selector global de categoría (si todos comparten) + motivo opcional + preview de cascada combinada → confirma todo en una transacción.
+- "Descartar" revierte las posiciones visuales sin tocar la DB.
+
+Estado de pendientes vive en React (no en DB) — `Map<jobId, { planned_start, planned_end, machine_id, event_kind }>`.
+
+### 4. Historial lateral por ODF
+
+Nuevo panel deslizable (Sheet de shadcn) accesible desde el `JobDetailDialog` con botón "Ver historial". Lista cronológica de `status_events` para ese ODF mostrando:
+- Icono + color por `event_kind`
+- Fecha/hora del evento
+- Shift en horas (+/-)
+- Motivo
+- Diff de fechas (de X a Y)
+
+### 5. Renombrar y clarificar
+
+- Diálogo: "Registrar retraso" → **"Reprogramar ODF"**
+- Toast del drag: explica qué pasó ("Movido a MAZAK 2 · pendiente de aprobar")
+- Tooltip permanente en barra Gantt explicando: arrastrá para mover, click para editar, los movimientos se aprueban en lote.
+
+## Detalles técnicos
+
+**Archivos:**
+- `supabase/migrations/<ts>_event_kind.sql` — agrega enum `event_kind` y columna en `status_events` (default `'delay'` para filas existentes).
+- `src/lib/fact-types.ts` — `EventKind` type + `EVENT_KIND_LABEL` + `EVENT_KIND_COLOR`.
+- `src/lib/scheduling/cascade.ts` — nuevas funciones `cascadeAbsence(jobs, machineIds, shiftDate, slot, hours)` y `cascadePriorityInsert(jobs, jobId, targetMachine, targetDate)`. La `cascade` existente sigue siendo el motor común (suma horas en máquinas relevantes).
+- `src/hooks/useFactData.ts`:
+  - `useApplyReschedule({ moves: PendingMove[], event_kind, reason })` — reemplaza el patrón actual de `useRescheduleJob` directo; itera moves, calcula cascada por tipo, escribe `status_events` + `jobs` en bloque.
+  - Mantener `useRescheduleJob` sólo para uso interno (drag inicial / optimistic preview).
+- `src/components/fact/MachineGantt.tsx`:
+  - Estado `pendingMoves: Map<string, PendingMove>` (no se persiste).
+  - Drag handler ya no llama mutación — sólo actualiza `pendingMoves` y posición visual.
+  - Barras renderizan posición pendiente si existe, con borde dorado punteado + ghost en posición original.
+  - Footer flotante con `PendingMovesBar` (componente nuevo).
+- `src/components/fact/PendingMovesBar.tsx` (nuevo) — contador + descartar + aprobar.
+- `src/components/fact/ApproveMovesDialog.tsx` (nuevo) — selector de categoría, inputs específicos por tipo (turno/máquina/etc.), preview de cascada, confirmar.
+- `src/components/fact/JobHistorySheet.tsx` (nuevo) — Sheet con `status_events` filtrados por job_id.
+- `src/components/fact/JobDetailDialog.tsx` — botón "Ver historial" abre el sheet; el bloque de "Registrar retraso" se reemplaza por el nuevo flujo de reprogramación con categoría.
+
+**Fuera de alcance (lo dejamos para después):**
+- Detección de conflictos visuales en tiempo real durante drag (sólo se muestra al aprobar).
+- Resize de barras desde los extremos.
+- Drag multi-selección.
+- Notificaciones a operarios.
+
+## Resultado esperado
+
+El usuario ve el Gantt, arrastra 2-3 ODFs por urgencia + marca un turno sin personal, revisa la cascada combinada, elige categorías, aprueba todo de una vez. Después puede abrir cualquier ODF y ver exactamente qué pasó y por qué.

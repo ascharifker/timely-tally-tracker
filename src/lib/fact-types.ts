@@ -90,3 +90,26 @@ export function toHours(amount: number, unit: DelayUnit): number {
       return amount * 24;
   }
 }
+
+export type EventKind =
+  | "delay"
+  | "priority_shift"
+  | "absence"
+  | "change_order"
+  | "breakdown";
+
+export const EVENT_KIND_LABEL: Record<EventKind, string> = {
+  delay: "Retraso de producción",
+  priority_shift: "Prioridad cambiada",
+  absence: "Ausencia de personal",
+  change_order: "Cambio de orden",
+  breakdown: "Avería de máquina",
+};
+
+export const EVENT_KIND_COLOR: Record<EventKind, string> = {
+  delay: "var(--status-risk)",
+  priority_shift: "var(--status-mazak)",
+  absence: "var(--status-listo)",
+  change_order: "var(--status-cementacion)",
+  breakdown: "var(--status-expo)",
+};

@@ -1,0 +1,2 @@
+CREATE TYPE public.event_kind AS ENUM ('delay','priority_shift','absence','change_order','breakdown');
+ALTER TABLE public.status_events ADD COLUMN event_kind public.event_kind NOT NULL DEFAULT 'delay';
