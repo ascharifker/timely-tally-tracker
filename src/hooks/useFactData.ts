@@ -6,6 +6,7 @@ import { cascade, type CascadeChange } from "@/lib/scheduling/cascade";
 import type { EventKind } from "@/lib/fact-types";
 import { toast } from "sonner";
 import { STATUS_LABEL } from "@/lib/fact-types";
+import { nextShiftBoundary, addShifts } from "@/lib/shifts";
 
 export function useMachines() {
   return useQuery({
@@ -57,8 +58,8 @@ export function useUpdateJobStatus() {
         status: input.status,
       };
       if (input.status === "MAZAK" && job && (!job.planned_start || !job.planned_end)) {
-        const start = nextShiftStart();
-        const end = new Date(start.getTime() + 2 * 24 * 60 * 60 * 1000);
+        const start = nextShiftBoundary();
+        const end = addShifts(start, durationShifts(job));
         patch.planned_start = start.toISOString();
         patch.planned_end = end.toISOString();
       }
@@ -73,8 +74,8 @@ export function useUpdateJobStatus() {
       let planned_start = job?.planned_start ?? null;
       let planned_end = job?.planned_end ?? null;
       if (status === "MAZAK" && job && (!planned_start || !planned_end)) {
-        const s = nextShiftStart();
-        const e = new Date(s.getTime() + 2 * 24 * 60 * 60 * 1000);
+        const s = nextShiftBoundary();
+        const e = addShifts(s, durationShifts(job));
         planned_start = s.toISOString();
         planned_end = e.toISOString();
       }
@@ -105,18 +106,12 @@ export function useUpdateJobStatus() {
   });
 }
 
-/** Round up to the next 8h shift boundary (00:00, 08:00, 16:00 local). */
-function nextShiftStart(): Date {
-  const d = new Date();
-  d.setMinutes(0, 0, 0);
-  const h = d.getHours();
-  if (h < 8) d.setHours(8);
-  else if (h < 16) d.setHours(16);
-  else {
-    d.setDate(d.getDate() + 1);
-    d.setHours(0);
-  }
-  return d;
+/** How many 8h shifts a job realistically occupies, based on priority + qty. */
+function durationShifts(job: Pick<Job, "priority" | "qty">): number {
+  // urgent runs fast (1 shift), low-priority/large runs span longer.
+  const base = { urgent: 1, high: 1, normal: 2, low: 3 }[job.priority] ?? 2;
+  const qtyBoost = job.qty >= 10 ? 1 : 0;
+  return Math.min(4, base + qtyBoost); // cap at 4 shifts (~32h)
 }
 
 const SCHEDULED_STATUSES: JobStatus[] = [
@@ -125,7 +120,6 @@ const SCHEDULED_STATUSES: JobStatus[] = [
   "CEMENTACION",
   "EXPO",
 ];
-const DEFAULT_DURATION_MS = 2 * 24 * 60 * 60 * 1000;
 
 /**
  * One-shot backfill: any job in MAZAK+ with a machine assigned but no
@@ -149,28 +143,7 @@ export function useBackfillSchedules(jobs: Job[]) {
     }
     done.current = true;
     (async () => {
-      // group already-scheduled bars per machine to find next free slot
-      const tails = new Map<string, number>();
-      for (const j of jobs) {
-        if (!j.machine_id || !j.planned_end) continue;
-        const e = new Date(j.planned_end).getTime();
-        tails.set(j.machine_id, Math.max(tails.get(j.machine_id) ?? 0, e));
-      }
-      const updates: { id: string; planned_start: string; planned_end: string }[] = [];
-      for (const j of needs) {
-        const baseline = Math.max(
-          tails.get(j.machine_id!) ?? 0,
-          nextShiftStart().getTime(),
-        );
-        const start = new Date(baseline);
-        const end = new Date(baseline + DEFAULT_DURATION_MS);
-        tails.set(j.machine_id!, end.getTime());
-        updates.push({
-          id: j.id,
-          planned_start: start.toISOString(),
-          planned_end: end.toISOString(),
-        });
-      }
+      const updates = computeSpreadSchedule(needs, jobs);
       // optimistic patch
       const prev = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const byId = new Map(updates.map((u) => [u.id, u]));
@@ -200,6 +173,96 @@ export function useBackfillSchedules(jobs: Job[]) {
       }
     })();
   }, [jobs, qc]);
+}
+
+/**
+ * Spread jobs across the 3-shift day, machine by machine.
+ * Each machine has its own cursor starting at the next shift boundary
+ * (or after its last scheduled job). Jobs are placed back-to-back so the
+ * day fills with M → T → N bands instead of every job starting at 08:00.
+ */
+function computeSpreadSchedule(
+  jobsToSchedule: Job[],
+  existingJobs: Job[],
+): { id: string; planned_start: string; planned_end: string }[] {
+  const base = nextShiftBoundary().getTime();
+  const cursors = new Map<string, number>();
+  // Initialize each cursor from the tail of already-scheduled jobs on that machine.
+  for (const j of existingJobs) {
+    if (!j.machine_id || !j.planned_end) continue;
+    const e = new Date(j.planned_end).getTime();
+    cursors.set(j.machine_id, Math.max(cursors.get(j.machine_id) ?? base, e));
+  }
+  const out: { id: string; planned_start: string; planned_end: string }[] = [];
+  for (const j of jobsToSchedule) {
+    const mId = j.machine_id!;
+    const cursor = cursors.get(mId) ?? base;
+    const start = new Date(cursor);
+    const end = addShifts(start, durationShifts(j));
+    cursors.set(mId, end.getTime());
+    out.push({
+      id: j.id,
+      planned_start: start.toISOString(),
+      planned_end: end.toISOString(),
+    });
+  }
+  return out;
+}
+
+/**
+ * Redistribute ALL scheduled jobs across the 3 shifts, starting from now.
+ * Useful as a "rebalance" button to fix legacy data clumped at 08:00.
+ * Sorts jobs by current planned_start so the existing sequence per machine is preserved.
+ */
+export function useRedistributeSchedules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const jobs = (qc.getQueryData<Job[]>(["jobs"]) ?? []).filter(
+        (j) => SCHEDULED_STATUSES.includes(j.status) && j.machine_id,
+      );
+      // Sort per-machine by current planned_start (nulls last) then by odf.
+      const sorted = [...jobs].sort((a, b) => {
+        const am = a.machine_id ?? "";
+        const bm = b.machine_id ?? "";
+        if (am !== bm) return am.localeCompare(bm);
+        const as = a.planned_start ? new Date(a.planned_start).getTime() : Infinity;
+        const bs = b.planned_start ? new Date(b.planned_start).getTime() : Infinity;
+        if (as !== bs) return as - bs;
+        return a.odf.localeCompare(b.odf);
+      });
+      const base = nextShiftBoundary().getTime();
+      const cursors = new Map<string, number>();
+      const updates: { id: string; planned_start: string; planned_end: string }[] = [];
+      for (const j of sorted) {
+        const mId = j.machine_id!;
+        const cursor = cursors.get(mId) ?? base;
+        const start = new Date(cursor);
+        const end = addShifts(start, durationShifts(j));
+        cursors.set(mId, end.getTime());
+        updates.push({
+          id: j.id,
+          planned_start: start.toISOString(),
+          planned_end: end.toISOString(),
+        });
+      }
+      for (const u of updates) {
+        const { error } = await supabase
+          .from("jobs")
+          .update({ planned_start: u.planned_start, planned_end: u.planned_end })
+          .eq("id", u.id);
+        if (error) throw error;
+      }
+      return { count: updates.length };
+    },
+    onSuccess: ({ count }) => {
+      toast.success(`Cronograma redistribuido · ${count} ODFs en turnos M/T/N`);
+    },
+    onError: (err) => {
+      toast.error("No se pudo redistribuir", { description: (err as Error).message });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
 }
 
 export interface RescheduleInput {

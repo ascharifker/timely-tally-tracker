@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useLogDelay, useJobs } from "@/hooks/useFactData";
+import { useLogDelay, useJobs, useRescheduleJob } from "@/hooks/useFactData";
 import { cascade } from "@/lib/scheduling/cascade";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { JobHistorySheet } from "./JobHistorySheet";
 import { History } from "lucide-react";
-import { SHIFTS, shiftIndexFromDate } from "@/lib/shifts";
+import { SHIFTS, shiftIndexFromDate, snapToShift } from "@/lib/shifts";
 
 interface Props {
   job: Job | null;
@@ -33,6 +33,7 @@ interface Props {
 export function JobDetailDialog({ job, onClose }: Props) {
   const { data: jobs = [] } = useJobs();
   const logDelay = useLogDelay();
+  const reschedule = useRescheduleJob();
   const [amount, setAmount] = useState(1);
   const [unit, setUnit] = useState<DelayUnit>("days");
   const [reason, setReason] = useState("");
@@ -69,6 +70,26 @@ export function JobDetailDialog({ job, onClose }: Props) {
   };
 
   if (!job) return null;
+
+  const moveToShift = async (targetShiftIdx: number, dayDelta = 0) => {
+    if (!job.planned_start || !job.planned_end) {
+      toast.error("El ODF no tiene fecha planificada — no se puede mover a un turno");
+      return;
+    }
+    const oldStart = new Date(job.planned_start);
+    const durMs = new Date(job.planned_end).getTime() - oldStart.getTime();
+    const baseDay = new Date(oldStart);
+    baseDay.setDate(baseDay.getDate() + dayDelta);
+    const newStart = snapToShift(baseDay, targetShiftIdx);
+    const newEnd = new Date(newStart.getTime() + durMs);
+    await reschedule.mutateAsync({
+      id: job.id,
+      planned_start: newStart.toISOString(),
+      planned_end: newEnd.toISOString(),
+    });
+  };
+
+  const currentShiftIdx = job.planned_start ? shiftIndexFromDate(job.planned_start) : null;
 
   return (
     <>
@@ -118,6 +139,65 @@ export function JobDetailDialog({ job, onClose }: Props) {
         {job.notes && (
           <div className="mt-3 rounded border border-border bg-sidebar/30 p-2 text-xs text-muted-foreground">
             {job.notes}
+          </div>
+        )}
+
+        {job.planned_start && (
+          <div className="mt-4 rounded border border-border bg-sidebar/20 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold">Cambiar turno</h3>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+                mismo día · 1 click
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2"
+                onClick={() => currentShiftIdx !== null && moveToShift(currentShiftIdx, -1)}
+                disabled={reschedule.isPending}
+                title="Día anterior, mismo turno"
+              >
+                ← Día
+              </Button>
+              <div className="flex-1 grid grid-cols-3 gap-1.5">
+                {SHIFTS.map((s, sIdx) => {
+                  const active = currentShiftIdx === sIdx;
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => moveToShift(sIdx)}
+                      disabled={reschedule.isPending || active}
+                      className={`flex flex-col items-center gap-0.5 rounded-md px-2 py-2 text-xs font-semibold transition-all ${
+                        active ? "text-white shadow-md" : "text-foreground hover:scale-[1.02]"
+                      } disabled:cursor-default`}
+                      style={{
+                        backgroundColor: active ? s.color : s.tint,
+                        boxShadow: active ? `0 0 0 2px ${s.color}` : `inset 0 0 0 1px ${s.color}40`,
+                      }}
+                      title={`Mover a turno ${s.name}`}
+                    >
+                      <span className="text-base leading-none">{s.label}</span>
+                      <span className="text-[10px] opacity-90 font-mono">
+                        {String(s.startHour).padStart(2, "0")}:00
+                      </span>
+                      <span className="text-[9px] opacity-80">{s.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2"
+                onClick={() => currentShiftIdx !== null && moveToShift(currentShiftIdx, 1)}
+                disabled={reschedule.isPending}
+                title="Día siguiente, mismo turno"
+              >
+                Día →
+              </Button>
+            </div>
           </div>
         )}
 
