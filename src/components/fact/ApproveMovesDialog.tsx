@@ -19,6 +19,7 @@ import { X } from "lucide-react";
 import type { EventKind, Machine } from "@/lib/fact-types";
 import { EVENT_KIND_LABEL, EVENT_KIND_COLOR } from "@/lib/fact-types";
 import { useApplyReschedules } from "@/hooks/useFactData";
+import { SHIFTS, shiftIndexFromDate, formatShiftLabel } from "@/lib/shifts";
 
 export interface PendingMove {
   jobId: string;
@@ -106,6 +107,15 @@ export function ApproveMovesDialog({
                   </div>
                   <div className="text-[11px] font-mono text-amber-600 dark:text-amber-400">
                     → {fmt(m.planned_start)} → {fmt(m.planned_end)}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+                    <span
+                      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white"
+                      style={{ backgroundColor: SHIFTS[shiftIndexFromDate(m.planned_start)].color }}
+                    >
+                      {SHIFTS[shiftIndexFromDate(m.planned_start)].label}
+                    </span>
+                    <span className="text-muted-foreground">{formatShiftLabel(m.planned_start)}</span>
                   </div>
                   {movedMachine && (
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
