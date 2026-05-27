@@ -76,3 +76,17 @@ export const SHIFT_LABEL: Record<ShiftSlot, string> = {
   tarde: "Tarde",
   noche: "Noche",
 };
+
+export type DelayUnit = "hours" | "shifts" | "days";
+
+/** Convert a delay amount in the chosen unit into hours. 1 turno = 8h. */
+export function toHours(amount: number, unit: DelayUnit): number {
+  switch (unit) {
+    case "hours":
+      return amount;
+    case "shifts":
+      return amount * 8;
+    case "days":
+      return amount * 24;
+  }
+}
