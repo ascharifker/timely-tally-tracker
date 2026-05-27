@@ -12,6 +12,7 @@ import { useJobs, useMachines } from "@/hooks/useFactData";
 import type { Job } from "@/lib/fact-types";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "FACT · Mego Afek Producción" },
