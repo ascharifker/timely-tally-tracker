@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
-import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
+import { STATUS_COLOR, STATUS_LABEL, type EventKind } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
-import { useRecentDelays, useRescheduleJob } from "@/hooks/useFactData";
+import { useRecentDelays } from "@/hooks/useFactData";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
 
 interface Props {
   jobs: Job[];
@@ -16,7 +17,6 @@ type ViewMode = "14d" | "month" | "quarter";
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
-  const reschedule = useRescheduleJob();
   const [dragJobId, setDragJobId] = useState<string | null>(null);
   const [hoverCell, setHoverCell] = useState<string | null>(null); // `${machineId}:${dayIdx}`
   const [viewMode, setViewMode] = useState<ViewMode>("14d");
@@ -25,6 +25,9 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     t.setHours(0, 0, 0, 0);
     return t;
   });
+  // Drag staging: each drag updates pending moves; commit happens via dialog.
+  const [pending, setPending] = useState<Map<string, PendingMove>>(new Map());
+  const [approveOpen, setApproveOpen] = useState(false);
 
   // Track previous planned_end per job to render a ghost bar that fades out
   // when a delay is applied — makes small schedule shifts visually obvious.
@@ -128,7 +131,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   };
   const onCellDrop = (machineId: string, dayIdx: number) => {
     if (!dragJobId) return;
-    const job = jobs.find((j) => j.id === dragJobId);
+    const job = effectiveJobs.find((j) => j.id === dragJobId);
     if (!job) return;
     const dropDay = days[dayIdx];
     // preserve time-of-day + duration if previously scheduled; else default
@@ -146,13 +149,22 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       startMs = d.getTime();
       durMs = DEFAULT_DUR_MS;
     }
-    // quarter view = each cell is a week, snap to start of week
     const endMs = startMs + durMs;
-    reschedule.mutate({
-      id: job.id,
-      planned_start: new Date(startMs).toISOString(),
-      planned_end: new Date(endMs).toISOString(),
-      machine_id: job.machine_id === machineId ? undefined : machineId,
+    const original = jobs.find((j) => j.id === dragJobId);
+    setPending((prev) => {
+      const next = new Map(prev);
+      next.set(dragJobId, {
+        jobId: dragJobId,
+        odf: job.odf,
+        planned_start: new Date(startMs).toISOString(),
+        planned_end: new Date(endMs).toISOString(),
+        machine_id: machineId,
+        original_start: original?.planned_start ?? null,
+        original_end: original?.planned_end ?? null,
+        original_machine_id: original?.machine_id ?? null,
+        eventKind: "delay",
+      });
+      return next;
     });
     setDragJobId(null);
     setHoverCell(null);
@@ -176,7 +188,23 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       ? anchor.toLocaleDateString("es", { month: "long", year: "numeric" })
       : `${days[0].toLocaleDateString("es", { day: "2-digit", month: "short" })} → ${new Date(end - 1).toLocaleDateString("es", { day: "2-digit", month: "short" })}`;
 
+  // Visual state = jobs with pending moves applied on top.
+  const effectiveJobs = useMemo(() => {
+    if (pending.size === 0) return jobs;
+    return jobs.map((j) => {
+      const p = pending.get(j.id);
+      if (!p) return j;
+      return {
+        ...j,
+        planned_start: p.planned_start,
+        planned_end: p.planned_end,
+        machine_id: p.machine_id,
+      };
+    });
+  }, [jobs, pending]);
+
   return (
+    <>
     <Card className="overflow-hidden border-border bg-card p-0">
       <div className="border-b border-border bg-sidebar/40 px-4 py-2 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
@@ -242,7 +270,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       </div>
 
       {machines.map((m) => {
-        const rowJobs = jobs.filter(
+        const rowJobs = effectiveJobs.filter(
           (j) => j.machine_id === m.id && j.planned_start && j.planned_end,
         );
         return (
@@ -283,6 +311,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 if (left >= 100 || left + width <= 0) return null;
                 const ghost = ghosts[j.id];
                 const hasDelay = delayedJobIds.has(j.id);
+                const pendingMove = pending.get(j.id);
                 return (
                   <div key={j.id}>
                     {ghost && (() => {
@@ -297,6 +326,20 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                         />
                       );
                     })()}
+                    {pendingMove && pendingMove.original_start && pendingMove.original_end && (() => {
+                      const os = new Date(pendingMove.original_start).getTime();
+                      const oe = new Date(pendingMove.original_end).getTime();
+                      const ol = Math.max(0, ((os - start) / range) * 100);
+                      const ow = Math.max(2, ((Math.min(oe, end) - Math.max(os, start)) / range) * 100);
+                      if (ol >= 100 || ol + ow <= 0) return null;
+                      return (
+                        <div
+                          className="absolute top-2 h-10 rounded border border-dashed border-muted-foreground/50 bg-muted/20 pointer-events-none"
+                          style={{ left: `${ol}%`, width: `${ow}%` }}
+                          title="Posición original"
+                        />
+                      );
+                    })()}
                   <button
                     draggable
                     onDragStart={(e) => {
@@ -307,13 +350,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                     onClick={() => onJobClick?.(j)}
                     className={`absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md cursor-grab active:cursor-grabbing ${
                       dragJobId === j.id ? "opacity-50" : ""
-                    }`}
+                    } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-card" : ""}`}
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
                       backgroundColor: STATUS_COLOR[j.status],
                     }}
-                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}`}
+                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}${pendingMove ? " · pendiente de aprobar" : ""}`}
                   >
                     {hasDelay && (
                       <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-card" />
@@ -364,6 +407,44 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
         </div>
       )}
     </Card>
+    {pending.size > 0 && (
+      <div className="sticky bottom-3 z-30 mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/60 bg-amber-50/95 dark:bg-amber-950/40 px-4 py-2.5 shadow-lg">
+        <div className="text-sm">
+          <span className="font-semibold">{pending.size}</span> movimiento{pending.size === 1 ? "" : "s"} pendiente{pending.size === 1 ? "" : "s"} de aprobar
+        </div>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setPending(new Map())}>
+            Descartar
+          </Button>
+          <Button size="sm" onClick={() => setApproveOpen(true)}>
+            Aprobar movimientos
+          </Button>
+        </div>
+      </div>
+    )}
+    <ApproveMovesDialog
+      open={approveOpen}
+      onClose={() => setApproveOpen(false)}
+      moves={Array.from(pending.values())}
+      machines={machines}
+      onApplied={() => { setPending(new Map()); setApproveOpen(false); }}
+      onUpdateKind={(jobId, kind) => {
+        setPending((prev) => {
+          const next = new Map(prev);
+          const m = next.get(jobId);
+          if (m) next.set(jobId, { ...m, eventKind: kind });
+          return next;
+        });
+      }}
+      onRemove={(jobId) => {
+        setPending((prev) => {
+          const next = new Map(prev);
+          next.delete(jobId);
+          return next;
+        });
+      }}
+    />
+    </>
   );
 }
 
