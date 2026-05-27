@@ -268,6 +268,7 @@ export type Database = {
         Row: {
           created_at: string
           delay_hours: number | null
+          event_kind: Database["public"]["Enums"]["event_kind"]
           from_status: Database["public"]["Enums"]["job_status"] | null
           id: string
           job_id: string
@@ -277,6 +278,7 @@ export type Database = {
         Insert: {
           created_at?: string
           delay_hours?: number | null
+          event_kind?: Database["public"]["Enums"]["event_kind"]
           from_status?: Database["public"]["Enums"]["job_status"] | null
           id?: string
           job_id: string
@@ -286,6 +288,7 @@ export type Database = {
         Update: {
           created_at?: string
           delay_hours?: number | null
+          event_kind?: Database["public"]["Enums"]["event_kind"]
           from_status?: Database["public"]["Enums"]["job_status"] | null
           id?: string
           job_id?: string
@@ -310,6 +313,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      event_kind:
+        | "delay"
+        | "priority_shift"
+        | "absence"
+        | "change_order"
+        | "breakdown"
       job_priority: "low" | "normal" | "high" | "urgent"
       job_status:
         | "PLANNED"
@@ -447,6 +456,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      event_kind: [
+        "delay",
+        "priority_shift",
+        "absence",
+        "change_order",
+        "breakdown",
+      ],
       job_priority: ["low", "normal", "high", "urgent"],
       job_status: [
         "PLANNED",
