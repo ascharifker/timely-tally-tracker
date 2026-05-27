@@ -8,7 +8,7 @@ import { OTDTracker } from "@/components/fact/OTDTracker";
 import { CreateJobDialog } from "@/components/fact/CreateJobDialog";
 import { BriefingPanel } from "@/components/fact/BriefingPanel";
 import { JobDetailDialog } from "@/components/fact/JobDetailDialog";
-import { useJobs, useMachines } from "@/hooks/useFactData";
+import { useJobs, useMachines, useBackfillSchedules } from "@/hooks/useFactData";
 import type { Job } from "@/lib/fact-types";
 
 export const Route = createFileRoute("/")({
@@ -26,6 +26,7 @@ function FactDashboard() {
   const { data: machines = [] } = useMachines();
   const { data: jobs = [], isLoading } = useJobs();
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  useBackfillSchedules(jobs);
 
   return (
     <AppShell>
