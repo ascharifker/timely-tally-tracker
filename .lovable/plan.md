@@ -1,43 +1,60 @@
-## Sembrar datos demo: cronograma saturado
 
-Llenar las 4 MAZAK con trabajos consecutivos durante las próximas ~3 semanas para que el Gantt se vea cargado y podamos role-playear movimientos, ausencias, change orders y averías.
+# Hacer turnos claros e intuitivos
 
-### Qué se va a sembrar
+Hoy los turnos son apenas tres bandas de color tenues dentro de cada día. Cuesta ver dónde empieza cada turno, no se puede aislar uno, y al arrastrar una ODF no queda claro a qué turno cae.
 
-**~32 ODFs nuevos** (8 por cada MAZAK 1-4) más algunos en talleres externos:
+## 1. Filtro de turno (arriba del Gantt)
 
-- **MAZAK 1-4**: 8 ODFs cada una, encadenados sin huecos, duración 1-3 días por trabajo, arrancando hoy y cubriendo ~21 días
-- **Estados variados** a lo largo del pipeline:
-  - 1-2 en `MAZAK` (en curso, los más cercanos a hoy)
-  - 2-3 en `PLANNED` (próximos)
-  - 1 en `MAQUINADO_LISTO`, 1 en `CEMENTACION`, 1 en `EXPO` (más adelante o pasados)
-  - 1 en `YA_SE_ENVIO` (ya pasado, para ver el verde)
-- **Prioridades mezcladas**: ~70% normal, 20% high, 10% urgent (uno por máquina urgente para tener candidatos a "priority_shift")
-- **Specs realistas**: tube specs tipo `2-7/8" L-80`, `3-1/2" P-110`, `4-1/2" J-55`, etc.
-- **Fechas de cliente** (`customer_date`) ~2-4 días después del `planned_end` para que el OTD tracker tenga señal
-- **PO/PIR** ficticios pero con formato consistente (`PO-MUSA-2026-xxxx`, `PIR-xxxx`)
-- **Talleres externos** (GEMAK/MAQYRO/TECMAC): 2-3 ODFs cada uno para mostrar fila externa también
+Agregar un selector en el header del `MachineGantt`, junto a "14 días / Mes / Trimestre":
 
-### Eventos demo opcionales (para tener historial)
+```text
+Turnos:  [Todos] [M Mañana] [T Tarde] [N Noche]
+         06–14    14–22       22–06
+```
 
-Insertar 3-4 `status_events` pasados así el side panel de historial no está vacío:
-- 1 `delay` (retraso de producción de 8h en una ODF)
-- 1 `priority_shift` (urgente que se metió la semana pasada)
-- 1 `breakdown` (avería corta en MAZAK 2)
+- Multi-toggle (se pueden activar 1, 2 o 3).
+- Al elegir un solo turno, el Gantt entra en **modo turno**: cada día muestra solo esa franja horaria, las barras de ODF se recortan a ese turno, y las celdas de otros turnos desaparecen. Esto responde directo a "ver un turno específico".
+- En vistas Mes / Trimestre el filtro sigue actuando sobre qué ODFs se muestran (las que caen en ese turno), aunque no haya sub-columnas.
 
-### Cómo se ejecuta
+## 2. Turnos visualmente obvios en la vista 14 días
 
-Una sola llamada al insert tool con todos los `INSERT INTO jobs (...)` y `INSERT INTO status_events (...)`. **No** se borran los 9 ODFs existentes — se agregan encima. Si después querés empezar limpio te paso un script para vaciar.
+- Separadores verticales más fuertes entre M / T / N (línea sólida, no `border/20`).
+- Encabezado de día rediseñado: en lugar de tres letras chiquitas debajo del número, una fila dedicada con tres "chips" `M 06` · `T 14` · `N 22` usando el color del turno, sticky cuando se hace scroll horizontal.
+- Etiqueta de hora visible al hacer hover sobre cualquier celda de turno (tooltip ya existe, hacerlo más prominente).
+- Leyenda actual de la columna "Máquina" se reemplaza por la barra de filtro del punto 1, así no se duplica.
 
-### Después de sembrar
+## 3. Asignación explícita de turno al arrastrar
 
-Vas a poder:
-1. Ver las 4 MAZAK llenas en vista 14d
-2. Arrastrar un urgente y aprobar el movimiento (priority_shift)
-3. Marcar ausencia de personal en un turno y ver el cascade
-4. Cambiar un change order y ver el ghost bar
-5. Revisar historial en el side panel
+Hoy el drop infiere el turno por la sub-celda. Mejoras:
 
-### Pregunta antes de ejecutar
+- **Indicador de turno durante el drag**: mientras se arrastra, la celda destino muestra un overlay grande con la letra del turno (`M`, `T`, `N`) y el rango horario, no solo un ring de color.
+- **Snap visible**: cuando el cursor entra en una sub-celda, resaltar el día entero con borde tenue y el turno destino con el color sólido del turno + label "Mañana 06:00–14:00".
+- En el `ApproveMovesDialog`, mostrar el turno destino en texto (`Lun 28 · Tarde 14:00`) además de la hora ISO actual.
 
-¿Querés que **borre los 9 ODFs existentes** primero para tener un set limpio, o los dejo y agrego encima?
+## 4. Turno en el card de ODF
+
+- Cada barra del Gantt muestra una mini-insignia con la inicial del turno en la esquina (M/T/N con el color del turno), así de un vistazo se sabe en qué turno corre sin contar celdas.
+- En el `JobDetailDialog` agregar fila "Turno: Mañana (06–14)" derivada de `planned_start`.
+
+## 5. Asignación de turno desde el Kanban
+
+En `StatusBoard`, al hacer click en una ODF sin programar (o con menú contextual), permitir asignar turno + día rápidamente vía un pequeño popover con tres botones M/T/N — útil cuando no se quiere arrastrar al Gantt.
+
+(Opcional, lo marco como "fase 2" si el alcance se siente grande.)
+
+## Archivos a tocar
+
+- `src/components/fact/MachineGantt.tsx` — filtro de turnos, header rediseñado, overlay de drag, recorte de barras en modo turno único, insignia M/T/N en cards.
+- `src/components/fact/ApproveMovesDialog.tsx` — etiqueta de turno destino.
+- `src/components/fact/JobDetailDialog.tsx` — fila de turno.
+- `src/lib/fact-types.ts` (o un nuevo `src/lib/shifts.ts`) — helper `getShiftForDate(date)` reutilizable.
+- `src/components/fact/StatusBoard.tsx` — (fase 2) popover de asignación rápida.
+
+## Detalles técnicos
+
+- Helper único `SHIFTS` y `getShiftIndex(date)` movido a `src/lib/shifts.ts` para evitar duplicación.
+- Estado de filtro: `const [shiftFilter, setShiftFilter] = useState<Set<0|1|2>>(new Set([0,1,2]))`.
+- En modo turno único (filter.size === 1), `range` se recalcula a `dayCount * 8h` y las barras se clipan: si `planned_start` cae fuera del turno, no se renderizan (o se renderizan al borde con opacidad reducida).
+- El overlay de drag se monta en la sub-celda hovered con `position: absolute; inset: 0` y un `<div>` con el nombre completo del turno + horario.
+
+¿Te parece bien arrancar con puntos 1–4 y dejar el 5 (popover en kanban) para una segunda vuelta?
