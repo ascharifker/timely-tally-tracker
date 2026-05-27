@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Machine, Job, JobStatus } from "@/lib/fact-types";
 import { cascade, type CascadeChange } from "@/lib/scheduling/cascade";
+import type { EventKind } from "@/lib/fact-types";
 import { toast } from "sonner";
 import { STATUS_LABEL } from "@/lib/fact-types";
 
@@ -257,6 +258,7 @@ export interface LogDelayInput {
   jobId: string;
   delayHours: number;
   reason: string;
+  eventKind?: EventKind;
 }
 
 export interface LogDelayResult {
@@ -273,7 +275,7 @@ export interface LogDelayResult {
 export function useLogDelay() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ jobId, delayHours, reason }: LogDelayInput) => {
+    mutationFn: async ({ jobId, delayHours, reason, eventKind = "delay" }: LogDelayInput) => {
       const jobs = (qc.getQueryData<Job[]>(["jobs"]) ?? []);
       const changes = cascade({ jobs, delayedJobId: jobId, delayHours });
       if (changes.length === 0) {
@@ -288,6 +290,7 @@ export function useLogDelay() {
         to_status: anchor?.status ?? "PLANNED",
         delay_hours: delayHours,
         reason,
+        event_kind: eventKind,
       } as never);
       if (evErr) throw evErr;
 
@@ -320,6 +323,123 @@ export function useLogDelay() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["status_events"] });
+    },
+  });
+}
+
+// ============================================================================
+// Batch apply: takes a list of pending moves (drag-staged in the Gantt) and
+// commits them in a single confirmation. Each move can have its own event kind
+// and the cascade is computed sequentially per move.
+// ============================================================================
+
+export interface PendingMoveCommit {
+  jobId: string;
+  planned_start: string;
+  planned_end: string;
+  machine_id: string | null;
+  eventKind: EventKind;
+}
+
+export interface ApplyReschedulesInput {
+  moves: PendingMoveCommit[];
+  reason: string;
+}
+
+export function useApplyReschedules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ moves, reason }: ApplyReschedulesInput) => {
+      if (moves.length === 0) throw new Error("Sin movimientos para aplicar");
+      const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const byId = new Map(jobs.map((j) => [j.id, j]));
+
+      for (const m of moves) {
+        const original = byId.get(m.jobId);
+        const fromStatus = original?.status ?? "PLANNED";
+        const oldEndMs = original?.planned_end ? new Date(original.planned_end).getTime() : null;
+        const newEndMs = new Date(m.planned_end).getTime();
+        const shiftedHours = oldEndMs ? (newEndMs - oldEndMs) / (60 * 60 * 1000) : 0;
+
+        // 1. patch the dragged job (position + machine)
+        const { error: updErr } = await supabase
+          .from("jobs")
+          .update({
+            planned_start: m.planned_start,
+            planned_end: m.planned_end,
+            machine_id: m.machine_id,
+          })
+          .eq("id", m.jobId);
+        if (updErr) throw updErr;
+
+        // 2. cascade downstream on the *new* machine (skip absence/breakdown — handled below)
+        if (m.eventKind !== "absence" && m.eventKind !== "breakdown" && shiftedHours !== 0 && original) {
+          const downstreamSource = jobs.map((j) =>
+            j.id === m.jobId
+              ? {
+                  ...j,
+                  planned_start: m.planned_start,
+                  planned_end: m.planned_end,
+                  machine_id: m.machine_id,
+                }
+              : j,
+          );
+          // anchor change is the move itself; push downstream using the *delta*
+          const changes = cascade({
+            jobs: downstreamSource,
+            delayedJobId: m.jobId,
+            delayHours: 0, // the job is already moved; downstream calc needs a pretend delta
+          });
+          // skip the anchor itself in the cascade output to avoid double-write
+          for (const c of changes) {
+            if (c.job_id === m.jobId) continue;
+            await supabase
+              .from("jobs")
+              .update({ planned_start: c.new_start, planned_end: c.new_end })
+              .eq("id", c.job_id);
+          }
+        }
+
+        // 3. audit row
+        const { error: evErr } = await supabase.from("status_events").insert({
+          job_id: m.jobId,
+          from_status: fromStatus,
+          to_status: fromStatus,
+          delay_hours: shiftedHours,
+          reason,
+          event_kind: m.eventKind,
+        } as never);
+        if (evErr) throw evErr;
+      }
+
+      return { count: moves.length };
+    },
+    onSuccess: ({ count }) => {
+      toast.success(`${count} movimiento${count === 1 ? "" : "s"} aplicado${count === 1 ? "" : "s"}`);
+    },
+    onError: (err) => {
+      toast.error("No se pudo aplicar la reprogramación", { description: (err as Error).message });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["status_events"] });
+    },
+  });
+}
+
+/** Full event history for a single ODF — newest first. */
+export function useJobHistory(jobId: string | null) {
+  return useQuery({
+    queryKey: ["status_events", jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("status_events")
+        .select("id, job_id, event_kind, delay_hours, reason, created_at, from_status, to_status")
+        .eq("job_id", jobId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 }
