@@ -3,7 +3,7 @@ import { STATUS_PIPELINE, STATUS_LABEL, STATUS_COLOR, type JobStatus } from "@/l
 import { Card } from "@/components/ui/card";
 import { useUpdateJobStatus } from "@/hooks/useFactData";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { ChevronRight, GripVertical } from "lucide-react";
 
 const STATUS_HELP: Record<JobStatus, string> = {
@@ -46,9 +46,8 @@ export function StatusBoard({ jobs }: { jobs: Job[] }) {
           const isOver = dragOver === status;
           const color = STATUS_COLOR[status];
           return (
-            <>
+            <Fragment key={status}>
             <div
-              key={status}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
@@ -138,11 +137,11 @@ export function StatusBoard({ jobs }: { jobs: Job[] }) {
               </div>
             </div>
             {idx < STATUS_PIPELINE.length - 1 && (
-              <div key={`arr-${status}`} className="flex items-center justify-center px-0.5 text-muted-foreground/50">
+              <div className="flex items-center justify-center px-0.5 text-muted-foreground/50">
                 <ChevronRight className="h-4 w-4" />
               </div>
             )}
-            </>
+            </Fragment>
           );
         })}
       </div>
