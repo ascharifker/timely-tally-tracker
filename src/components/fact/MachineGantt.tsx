@@ -211,6 +211,21 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     });
   };
 
+  // Visual state = jobs with pending moves applied on top.
+  const effectiveJobs = useMemo(() => {
+    if (pending.size === 0) return jobs;
+    return jobs.map((j) => {
+      const p = pending.get(j.id);
+      if (!p) return j;
+      return {
+        ...j,
+        planned_start: p.planned_start,
+        planned_end: p.planned_end,
+        machine_id: p.machine_id,
+      };
+    });
+  }, [jobs, pending]);
+
   // Move/nudge a bar to a different shift without dragging.
   // Same machine, same calendar day, snap to shift start.
   const moveJobToShift = (jobId: string, targetShiftIdx: number, dayDelta = 0) => {
@@ -254,21 +269,6 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     }
     return counts;
   }, [effectiveJobs, start, end]);
-
-  // Visual state = jobs with pending moves applied on top.
-  const effectiveJobs = useMemo(() => {
-    if (pending.size === 0) return jobs;
-    return jobs.map((j) => {
-      const p = pending.get(j.id);
-      if (!p) return j;
-      return {
-        ...j,
-        planned_start: p.planned_start,
-        planned_end: p.planned_end,
-        machine_id: p.machine_id,
-      };
-    });
-  }, [jobs, pending]);
 
   return (
     <>
