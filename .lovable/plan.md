@@ -1,84 +1,43 @@
+## Sembrar datos demo: cronograma saturado
 
-## Qué pasa hoy (por qué confunde)
+Llenar las 4 MAZAK con trabajos consecutivos durante las próximas ~3 semanas para que el Gantt se vea cargado y podamos role-playear movimientos, ausencias, change orders y averías.
 
-- El diálogo se llama "Registrar retraso" y sólo acepta horas positivas → no sirve si querés adelantar un ODF.
-- El motivo es texto libre → no se puede filtrar/leer después por causa.
-- Arrastrar una barra en el Gantt **mueve sólo ese ODF** y se guarda al instante. Si caés encima de otro, se solapan en silencio.
-- No hay forma de "probar" varios movimientos antes de confirmar — cada drag es definitivo.
-- El historial de eventos existe en la tabla `status_events` pero no se ve en la UI.
+### Qué se va a sembrar
 
-## Qué vamos a construir
+**~32 ODFs nuevos** (8 por cada MAZAK 1-4) más algunos en talleres externos:
 
-### 1. Tipos de evento (reemplaza "retraso" libre)
+- **MAZAK 1-4**: 8 ODFs cada una, encadenados sin huecos, duración 1-3 días por trabajo, arrancando hoy y cubriendo ~21 días
+- **Estados variados** a lo largo del pipeline:
+  - 1-2 en `MAZAK` (en curso, los más cercanos a hoy)
+  - 2-3 en `PLANNED` (próximos)
+  - 1 en `MAQUINADO_LISTO`, 1 en `CEMENTACION`, 1 en `EXPO` (más adelante o pasados)
+  - 1 en `YA_SE_ENVIO` (ya pasado, para ver el verde)
+- **Prioridades mezcladas**: ~70% normal, 20% high, 10% urgent (uno por máquina urgente para tener candidatos a "priority_shift")
+- **Specs realistas**: tube specs tipo `2-7/8" L-80`, `3-1/2" P-110`, `4-1/2" J-55`, etc.
+- **Fechas de cliente** (`customer_date`) ~2-4 días después del `planned_end` para que el OTD tracker tenga señal
+- **PO/PIR** ficticios pero con formato consistente (`PO-MUSA-2026-xxxx`, `PIR-xxxx`)
+- **Talleres externos** (GEMAK/MAQYRO/TECMAC): 2-3 ODFs cada uno para mostrar fila externa también
 
-Nueva categoría obligatoria al reprogramar. Cada una determina cómo se aplica la cascada:
+### Eventos demo opcionales (para tener historial)
 
-| Categoría | Comportamiento de cascada |
-|---|---|
-| **Retraso de producción** | Empuja ODF + todos los siguientes en la misma máquina |
-| **Prioridad cambiada** (orden urgente entra) | Inserta el ODF en una posición/fecha y empuja los desplazados hacia adelante |
-| **Ausencia de personal** | Selecciona un turno (mañana/tarde/noche) en una fecha → empuja todos los ODFs activos de ese turno en TODAS las máquinas internas |
-| **Cambio de orden del cliente** | Recalcula duración (qty × hours_per_piece de `part_times`) y reprograma sólo ese ODF + cascada normal |
-| **Avería de máquina** | Selecciona máquina + horas fuera de servicio → empuja todo lo de esa máquina |
+Insertar 3-4 `status_events` pasados así el side panel de historial no está vacío:
+- 1 `delay` (retraso de producción de 8h en una ODF)
+- 1 `priority_shift` (urgente que se metió la semana pasada)
+- 1 `breakdown` (avería corta en MAZAK 2)
 
-Migración DB: agregar columna `event_kind` a `status_events` (enum: `delay`, `priority_shift`, `absence`, `change_order`, `breakdown`).
+### Cómo se ejecuta
 
-### 2. Pull-in (adelantar) + Push (retrasar)
+Una sola llamada al insert tool con todos los `INSERT INTO jobs (...)` y `INSERT INTO status_events (...)`. **No** se borran los 9 ODFs existentes — se agregan encima. Si después querés empezar limpio te paso un script para vaciar.
 
-El campo de horas acepta negativos. La cascada con shift negativo sólo se aplica si no genera solapamiento con ODFs anteriores; si genera conflicto, se avisa antes de confirmar.
+### Después de sembrar
 
-### 3. Modo borrador con botón "Aprobar movimientos"
+Vas a poder:
+1. Ver las 4 MAZAK llenas en vista 14d
+2. Arrastrar un urgente y aprobar el movimiento (priority_shift)
+3. Marcar ausencia de personal en un turno y ver el cascade
+4. Cambiar un change order y ver el ghost bar
+5. Revisar historial en el side panel
 
-Cambio importante en UX del Gantt. Hoy cada drag es instantáneo → reemplazar por:
+### Pregunta antes de ejecutar
 
-- Arrastrar marca el movimiento como **pendiente** (barra con borde punteado dorado, posición nueva visible, posición vieja como ghost).
-- Aparece una **barra de acciones flotante** abajo del Gantt: `3 movimientos pendientes · [Descartar] [Aprobar movimientos]`.
-- Cada movimiento pendiente puede tener su propia categoría (default "Retraso de producción", editable en un mini popover sobre la barra pendiente).
-- "Aprobar" abre un único diálogo con resumen: lista de cambios + selector global de categoría (si todos comparten) + motivo opcional + preview de cascada combinada → confirma todo en una transacción.
-- "Descartar" revierte las posiciones visuales sin tocar la DB.
-
-Estado de pendientes vive en React (no en DB) — `Map<jobId, { planned_start, planned_end, machine_id, event_kind }>`.
-
-### 4. Historial lateral por ODF
-
-Nuevo panel deslizable (Sheet de shadcn) accesible desde el `JobDetailDialog` con botón "Ver historial". Lista cronológica de `status_events` para ese ODF mostrando:
-- Icono + color por `event_kind`
-- Fecha/hora del evento
-- Shift en horas (+/-)
-- Motivo
-- Diff de fechas (de X a Y)
-
-### 5. Renombrar y clarificar
-
-- Diálogo: "Registrar retraso" → **"Reprogramar ODF"**
-- Toast del drag: explica qué pasó ("Movido a MAZAK 2 · pendiente de aprobar")
-- Tooltip permanente en barra Gantt explicando: arrastrá para mover, click para editar, los movimientos se aprueban en lote.
-
-## Detalles técnicos
-
-**Archivos:**
-- `supabase/migrations/<ts>_event_kind.sql` — agrega enum `event_kind` y columna en `status_events` (default `'delay'` para filas existentes).
-- `src/lib/fact-types.ts` — `EventKind` type + `EVENT_KIND_LABEL` + `EVENT_KIND_COLOR`.
-- `src/lib/scheduling/cascade.ts` — nuevas funciones `cascadeAbsence(jobs, machineIds, shiftDate, slot, hours)` y `cascadePriorityInsert(jobs, jobId, targetMachine, targetDate)`. La `cascade` existente sigue siendo el motor común (suma horas en máquinas relevantes).
-- `src/hooks/useFactData.ts`:
-  - `useApplyReschedule({ moves: PendingMove[], event_kind, reason })` — reemplaza el patrón actual de `useRescheduleJob` directo; itera moves, calcula cascada por tipo, escribe `status_events` + `jobs` en bloque.
-  - Mantener `useRescheduleJob` sólo para uso interno (drag inicial / optimistic preview).
-- `src/components/fact/MachineGantt.tsx`:
-  - Estado `pendingMoves: Map<string, PendingMove>` (no se persiste).
-  - Drag handler ya no llama mutación — sólo actualiza `pendingMoves` y posición visual.
-  - Barras renderizan posición pendiente si existe, con borde dorado punteado + ghost en posición original.
-  - Footer flotante con `PendingMovesBar` (componente nuevo).
-- `src/components/fact/PendingMovesBar.tsx` (nuevo) — contador + descartar + aprobar.
-- `src/components/fact/ApproveMovesDialog.tsx` (nuevo) — selector de categoría, inputs específicos por tipo (turno/máquina/etc.), preview de cascada, confirmar.
-- `src/components/fact/JobHistorySheet.tsx` (nuevo) — Sheet con `status_events` filtrados por job_id.
-- `src/components/fact/JobDetailDialog.tsx` — botón "Ver historial" abre el sheet; el bloque de "Registrar retraso" se reemplaza por el nuevo flujo de reprogramación con categoría.
-
-**Fuera de alcance (lo dejamos para después):**
-- Detección de conflictos visuales en tiempo real durante drag (sólo se muestra al aprobar).
-- Resize de barras desde los extremos.
-- Drag multi-selección.
-- Notificaciones a operarios.
-
-## Resultado esperado
-
-El usuario ve el Gantt, arrastra 2-3 ODFs por urgencia + marca un turno sin personal, revisa la cascada combinada, elige categorías, aprueba todo de una vez. Después puede abrir cualquier ODF y ver exactamente qué pasó y por qué.
+¿Querés que **borre los 9 ODFs existentes** primero para tener un set limpio, o los dejo y agrego encima?
