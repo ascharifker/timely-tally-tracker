@@ -1,94 +1,64 @@
-# Phase 1 — Mego Afek Production Planning (FACT Platform)
+# Fix: delays don't move the Gantt
 
-Build a Lovable Cloud app that replaces the current Excel-based MAZAK schedule for Luis Ángel's team. All scheduling math is deterministic. AI is used **only** for narrative summaries / analysis and routed through a BrainMate proxy edge function — never for calculations, recalcs, OTD %, or cascade logic.
+## What's broken today
 
-## Architecture principle (load-bearing)
+The "Job Detail" dialog has a **Simulador de cascada** with a number input and an "Aplicar a N trabajos" button. Two things go wrong:
 
-```text
-┌─ Deterministic core (TypeScript, no AI) ──────────────┐
-│  • Cascade recalc on delay                            │
-│  • Shift availability math                            │
-│  • OTD % calculation                                  │
-│  • Part-time (hrs/piece) lookups                      │
-│  • Status pipeline transitions                        │
-│  • Change-impact dependency graph                     │
-└────────────────────────────────────────────────────────┘
-                         │
-                         ▼ (read-only feed)
-┌─ AI narrative layer (BrainMate proxy edge fn) ────────┐
-│  • Daily briefing in Spanish                          │
-│  • "Explain this delay" summaries                     │
-│  • OTD risk commentary                                │
-│  NO writes, NO calculations, NO scheduling decisions  │
-└────────────────────────────────────────────────────────┘
-```
+1. **It's a simulator, not a log action.** Typing a number just previews the cascade. The Gantt only moves if the user explicitly clicks "Aplicar" — and even then nothing is recorded in `status_events`, so there's no audit trail of "ODF 347 got delayed 4h on 5/27 because…".
+2. **Even when applied, the visual shift is invisible.** A 4-hour delay on a 14-day Gantt is ~1% of the row width. The bar moves a couple of pixels and looks identical. There's no "before/after" indicator, no badge, no toast detail.
+3. **No optimistic update.** The mutation waits for Supabase round-trip + invalidate + refetch before the bar moves. On a slow link it feels like nothing happened.
 
-Hard rule enforced in code review: anything under `src/lib/scheduling/` is pure TS with unit-testable functions. AI calls live only in `src/lib/ai/` and only consume already-computed values.
+## What we'll build
 
-## Scope
+Replace the simulator pattern with a real **Registrar retraso** flow that does four things in one click:
 
-### Data model (Lovable Cloud / Supabase)
+1. Write a row to `status_events` (job_id, delay_hours, reason, timestamp) — the audit trail.
+2. Run the deterministic cascade engine (already exists in `src/lib/scheduling/cascade.ts`).
+3. Update `planned_start` / `planned_end` for the anchor + every downstream job on the same machine in a single transaction.
+4. Optimistically patch the React Query cache so the Gantt bars slide **immediately**, then reconcile with the DB result.
 
-- `machines` — MAZAK 1-4, Gemak, Maqyro, TecMac (rows on the Gantt). Type: internal | external_shop.
-- `shifts` — atomic unit: date + machine + slot (mañana/tarde/noche), availability flag.
-- `jobs` — ODF, PO MUSA, PO Halliburton, PIR, tube spec, qty, export_date, customer_date, machine_id, priority, notes, status.
-- `job_steps` — multi-step routing (MAZAK → MAQUINADO LISTO → CEMENTACION → EXPO → YA SE ENVIO), incl. external shop steps.
-- `part_times` — hrs/piece per PIR per machine (lookup table).
-- `status_events` — append-only log of status changes + delay reasons (feeds cascade + AI summaries).
-- `briefings` — cached AI-generated daily narratives (Spanish), with source snapshot.
+### Dialog redesign (`JobDetailDialog.tsx`)
 
-All tables: RLS enabled, `authenticated` role grants, `service_role` full.
+- Rename section to **Registrar retraso de producción**.
+- Inputs: delay amount (with **unit selector: horas / días / turnos**, default días since 4h shifts are invisible), free-text **motivo** (required, e.g. "se rompió herramienta MAZAK 2").
+- Live preview list stays — shows "ODF 347/26 +2d → nueva entrega 30/05 16:00" for each affected job, with old date struck through and new date highlighted.
+- Single primary button: **Registrar y reprogramar (N ODFs)**. No more two-step "simulate then apply".
+- After success: toast with summary, dialog closes, Gantt animates the shift.
 
-### Features
+### Gantt visual feedback (`MachineGantt.tsx`)
 
-1. **Gantt per machine** — shift-aware rows (MAZAK 1-4 + external shops), color-coded by status, drag to reschedule.
-2. **Create Job form** — all real fields (ODF, POs, PIR, tube spec, qty, dates, machine, priority, notes).
-3. **Auto-cascade recalc** — pure function: entering a delay on job X reshuffles downstream shifts on the same machine; visualizes the domino.
-4. **Machine availability calendar** — shifts as atomic blocks; mark unavailable (maintenance, no operator).
-5. **Part-time lookup UI** — view/edit hrs/piece per PIR per machine.
-6. **Status pipeline board** — Kanban: MAZAK → MAQUINADO LISTO → CEMENTACION → EXPO → YA SE ENVIO.
-7. **Job cards** — full routing incl. external shop legs (Gemak/Maqyro/TecMac).
-8. **OTD tracker** — deterministic % weekly/monthly (export_date vs customer_date), red flags for at-risk jobs.
-9. **Change-impact alerts** — when a job slips, show downstream affected ODFs (graph traversal, no AI).
-10. **Seed data** — the 47 active orders incl. ODF 347/26, 121/26, 043/26, 623/26, 820/26, 713/26, 680/26.
+- When a job was recently shifted (last 5s), render a faint **ghost bar** at the old position + an arrow to the new position, then fade out. This makes the movement perceivable even for small delays.
+- Add a small red corner badge on any job that has a `status_events` row with `delay_hours > 0` in the last 24h — so users can see at a glance which ODFs slipped.
 
-### AI layer (Phase 1.5, via BrainMate proxy)
+### Data layer (`useFactData.ts`)
 
-- Single edge function `brainmate-proxy` that:
-  - Accepts `{ type: "daily_briefing" | "delay_explanation" | "otd_commentary", payload: <pre-computed snapshot> }`.
-  - Forwards to BrainMate MCP endpoint with `BRAINMATE_API_KEY` server-side.
-  - Returns narrative Spanish text.
-  - Never receives a "compute X" request — only "summarize this already-computed data".
-- Frontend: a "Resumen del día" panel that calls the proxy with today's snapshot and renders the response. Read-only.
-- Cached in `briefings` table to avoid re-billing.
+- New `useLogDelay` mutation:
+  - Computes cascade preview client-side (deterministic, already built).
+  - Calls a single TanStack server function `logDelayAndCascade` (new file `src/lib/scheduling/log-delay.functions.ts`) that wraps the status_events insert + jobs bulk update in one server roundtrip, returning the new job rows.
+  - `onMutate`: optimistically patches the `["jobs"]` query cache with the predicted new dates.
+  - `onSuccess`: replaces with server response.
+  - `onError`: rolls back + toast.
+- Existing `useApplyCascade` is removed (folded into the above).
 
-### Visual design
+### Scope of cascade — confirmation needed
 
-Dark industrial theme matching v2 prototype:
-- IBM Plex Mono (data, ODF numbers, Gantt labels) + IBM Plex Sans (UI chrome).
-- Semantic status colors via design tokens (HSL in `index.css`).
-- Dense, information-first layout (this is a tool, not a marketing page).
+Today cascade only shifts **other jobs on the same machine** whose `planned_start ≥ anchor.planned_end`. That's correct for Phase 1 because `job_steps` is empty (no multi-step routing in the DB yet). When we wire job_steps in a later phase, we'll extend cascade to also push the same ODF's downstream steps (CEMENTACION → EXPO). Out of scope for this fix.
 
-## Technical details
+## Files touched
 
-- **Stack**: existing Lovable template + Lovable Cloud (Supabase) + Lovable AI Gateway (proxied through BrainMate edge fn).
-- **Cascade engine**: `src/lib/scheduling/cascade.ts` — pure function `(jobs, shifts, delayedJobId, newStart) => updatedShifts[]`. Unit-tested.
-- **OTD engine**: `src/lib/scheduling/otd.ts` — pure function over jobs in date range.
-- **Dependency graph**: `src/lib/scheduling/impact.ts` — BFS over downstream jobs on the same machine.
-- **AI boundary**: `src/lib/ai/brainmate.ts` — only function exported is `summarize(type, snapshot)`. No `compute`, no `decide`, no `schedule`.
-- **Edge function**: `supabase/functions/brainmate-proxy/index.ts` — validates payload type is one of the 3 allow-listed summary types, rejects anything else.
-- **Secret**: `BRAINMATE_API_KEY` (will request via add_secret once Cloud is enabled).
-- **Auth**: email/password login; jobs scoped per workspace (single tenant for now, Luis Ángel + team).
+- `src/components/fact/JobDetailDialog.tsx` — redesign the delay section, add unit selector + motivo, single action button.
+- `src/components/fact/MachineGantt.tsx` — ghost-bar animation for recently shifted jobs, delay badge.
+- `src/hooks/useFactData.ts` — replace `useApplyCascade` with `useLogDelay` (optimistic + status_event insert).
+- `src/lib/scheduling/log-delay.functions.ts` — new TanStack server function that atomically inserts status_event + updates affected jobs.
+- `src/lib/fact-types.ts` — add `DelayUnit` type + helper `toHours(amount, unit)`.
 
-## Out of scope for Phase 1
+## Out of scope
 
-- Mobile app (web responsive only).
-- Halliburton/MUSA portal integration (manual PO entry for now).
-- Inventory / safety stock automation (read-only display from seed).
-- Writes from AI (Phase 2+).
+- Multi-step routing cascade through `job_steps` (table is empty).
+- AI summarization of the delay (Phase 1.5, already separate).
+- Editing customer_date / export_date — those are commitments to the customer, only `planned_*` shifts.
+- Undoing a logged delay (could add later; for now the audit row in status_events is permanent and re-logging a negative delay would reverse it).
 
-## Deliverable for Friday demo
+## Approval
 
-Working Gantt + Create Job + cascade + status pipeline + seeded with real ODFs. OTD tracker and AI briefing panel as stretch — both built on the same deterministic core so they're safe to ship if time allows.
-
-Confirm and I'll switch to build mode, enable Lovable Cloud, scaffold the schema + seed, and ask for the BrainMate proxy URL + API key when needed.
+If this matches what you meant by "everything should readjust according to the delay", approve and I'll switch to build mode and ship it.
