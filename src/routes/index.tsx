@@ -53,7 +53,7 @@ function FactDashboard() {
         <MachineGantt jobs={jobs} machines={machines} onJobClick={setSelectedJob} />
       </div>
 
-      <StatusBoard jobs={jobs} />
+      <StatusBoard jobs={jobs} onJobClick={setSelectedJob} />
 
       <JobDetailDialog job={selectedJob} onClose={() => setSelectedJob(null)} />
     </AppShell>
