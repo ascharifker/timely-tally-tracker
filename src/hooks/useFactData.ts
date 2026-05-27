@@ -49,29 +49,72 @@ export function useUpdateJobStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; status: JobStatus }) => {
-      const { error } = await supabase
-        .from("jobs")
-        .update({ status: input.status })
-        .eq("id", input.id);
+      const all = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const job = all.find((j) => j.id === input.id);
+      const patch: { status: JobStatus; planned_start?: string; planned_end?: string } = {
+        status: input.status,
+      };
+      if (input.status === "MAZAK" && job && (!job.planned_start || !job.planned_end)) {
+        const start = nextShiftStart();
+        const end = new Date(start.getTime() + 2 * 24 * 60 * 60 * 1000);
+        patch.planned_start = start.toISOString();
+        patch.planned_end = end.toISOString();
+      }
+      const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
       if (error) throw error;
+      return patch;
     },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ["jobs"] });
       const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const job = previous.find((j) => j.id === id);
-      qc.setQueryData<Job[]>(["jobs"], previous.map((j) => (j.id === id ? { ...j, status } : j)));
+      let planned_start = job?.planned_start ?? null;
+      let planned_end = job?.planned_end ?? null;
+      if (status === "MAZAK" && job && (!planned_start || !planned_end)) {
+        const s = nextShiftStart();
+        const e = new Date(s.getTime() + 2 * 24 * 60 * 60 * 1000);
+        planned_start = s.toISOString();
+        planned_end = e.toISOString();
+      }
+      qc.setQueryData<Job[]>(
+        ["jobs"],
+        previous.map((j) => (j.id === id ? { ...j, status, planned_start, planned_end } : j)),
+      );
       return { previous, job };
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(["jobs"], ctx.previous);
       toast.error("No se pudo cambiar el estado", { description: (err as Error).message });
     },
-    onSuccess: (_data, vars, ctx) => {
+    onSuccess: (data, vars, ctx) => {
       const odf = ctx?.job?.odf ?? "ODF";
-      toast.success(`ODF ${odf} → ${STATUS_LABEL[vars.status]}`);
+      let extra = "";
+      if (data?.planned_start && data?.planned_end) {
+        const s = new Date(data.planned_start).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
+        const e = new Date(data.planned_end).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
+        extra = ` · programado ${s} → ${e}`;
+      }
+      toast.success(`ODF ${odf} → ${STATUS_LABEL[vars.status]}${extra}`);
+      if (vars.status === "MAZAK" && ctx?.job && !ctx.job.machine_id) {
+        toast.info("Asigná una máquina para verlo en el cronograma");
+      }
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
+}
+
+/** Round up to the next 8h shift boundary (00:00, 08:00, 16:00 local). */
+function nextShiftStart(): Date {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  const h = d.getHours();
+  if (h < 8) d.setHours(8);
+  else if (h < 16) d.setHours(16);
+  else {
+    d.setDate(d.getDate() + 1);
+    d.setHours(0);
+  }
+  return d;
 }
 
 export interface LogDelayInput {
