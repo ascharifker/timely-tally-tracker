@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { JobHistorySheet } from "./JobHistorySheet";
 import { History } from "lucide-react";
+import { SHIFTS, shiftIndexFromDate } from "@/lib/shifts";
 
 interface Props {
   job: Job | null;
@@ -93,6 +94,26 @@ export function JobDetailDialog({ job, onClose }: Props) {
           <Field label="Fecha exportación" value={job.export_date} />
           <Field label="Fecha cliente" value={job.customer_date} />
         </div>
+
+        {job.planned_start && (() => {
+          const s = SHIFTS[shiftIndexFromDate(job.planned_start)];
+          const d = new Date(job.planned_start);
+          return (
+            <div className="mt-3 flex items-center gap-2 rounded border border-border bg-sidebar/30 px-2.5 py-1.5 text-xs">
+              <span
+                className="inline-flex h-5 w-5 items-center justify-center rounded text-[11px] font-bold text-white"
+                style={{ backgroundColor: s.color }}
+              >
+                {s.label}
+              </span>
+              <span className="font-medium">Turno {s.name}</span>
+              <span className="text-muted-foreground font-mono">
+                {String(s.startHour).padStart(2, "0")}:00–{String((s.startHour + s.hours) % 24).padStart(2, "0")}:00 ·
+                inicio {d.toLocaleString("es", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+          );
+        })()}
 
         {job.notes && (
           <div className="mt-3 rounded border border-border bg-sidebar/30 p-2 text-xs text-muted-foreground">
