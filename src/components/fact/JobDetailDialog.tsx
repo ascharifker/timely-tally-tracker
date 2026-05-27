@@ -142,6 +142,65 @@ export function JobDetailDialog({ job, onClose }: Props) {
           </div>
         )}
 
+        {job.planned_start && (
+          <div className="mt-4 rounded border border-border bg-sidebar/20 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold">Cambiar turno</h3>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+                mismo día · 1 click
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2"
+                onClick={() => currentShiftIdx !== null && moveToShift(currentShiftIdx, -1)}
+                disabled={reschedule.isPending}
+                title="Día anterior, mismo turno"
+              >
+                ← Día
+              </Button>
+              <div className="flex-1 grid grid-cols-3 gap-1.5">
+                {SHIFTS.map((s, sIdx) => {
+                  const active = currentShiftIdx === sIdx;
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => moveToShift(sIdx)}
+                      disabled={reschedule.isPending || active}
+                      className={`flex flex-col items-center gap-0.5 rounded-md px-2 py-2 text-xs font-semibold transition-all ${
+                        active ? "text-white shadow-md" : "text-foreground hover:scale-[1.02]"
+                      } disabled:cursor-default`}
+                      style={{
+                        backgroundColor: active ? s.color : s.tint,
+                        boxShadow: active ? `0 0 0 2px ${s.color}` : `inset 0 0 0 1px ${s.color}40`,
+                      }}
+                      title={`Mover a turno ${s.name}`}
+                    >
+                      <span className="text-base leading-none">{s.label}</span>
+                      <span className="text-[10px] opacity-90 font-mono">
+                        {String(s.startHour).padStart(2, "0")}:00
+                      </span>
+                      <span className="text-[9px] opacity-80">{s.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2"
+                onClick={() => currentShiftIdx !== null && moveToShift(currentShiftIdx, 1)}
+                disabled={reschedule.isPending}
+                title="Día siguiente, mismo turno"
+              >
+                Día →
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 border-t border-border pt-4">
           <h3 className="text-sm font-semibold mb-1">Reprogramar ODF</h3>
           <p className="text-[11px] text-muted-foreground mb-3">
