@@ -15,6 +15,20 @@ interface Props {
 
 type ViewMode = "14d" | "month" | "quarter";
 
+// Production shifts (24h coverage)
+const SHIFTS = [
+  { key: "manana", label: "M", name: "Mañana", startHour: 6, hours: 8, tint: "rgba(250, 204, 21, 0.08)" },
+  { key: "tarde", label: "T", name: "Tarde", startHour: 14, hours: 8, tint: "rgba(56, 189, 248, 0.08)" },
+  { key: "noche", label: "N", name: "Noche", startHour: 22, hours: 8, tint: "rgba(139, 92, 246, 0.10)" },
+] as const;
+
+/** Given a Date (day) and shift index, return the absolute start ms of that shift. */
+function shiftStartMs(day: Date, shiftIdx: number): number {
+  const d = new Date(day);
+  d.setHours(SHIFTS[shiftIdx].startHour, 0, 0, 0);
+  return d.getTime();
+}
+
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
   const [dragJobId, setDragJobId] = useState<string | null>(null);
@@ -129,7 +143,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
-  const onCellDrop = (machineId: string, dayIdx: number) => {
+  const onCellDrop = (machineId: string, dayIdx: number, shiftIdx: number | null = null) => {
     if (!dragJobId) return;
     const job = effectiveJobs.find((j) => j.id === dragJobId);
     if (!job) return;
@@ -140,13 +154,15 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     if (job.planned_start && job.planned_end) {
       const oldStart = new Date(job.planned_start);
       durMs = new Date(job.planned_end).getTime() - oldStart.getTime();
-      const d = new Date(dropDay);
-      d.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0);
-      startMs = d.getTime();
+      if (shiftIdx !== null) {
+        startMs = shiftStartMs(dropDay, shiftIdx);
+      } else {
+        const d = new Date(dropDay);
+        d.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0);
+        startMs = d.getTime();
+      }
     } else {
-      const d = new Date(dropDay);
-      d.setHours(8, 0, 0, 0);
-      startMs = d.getTime();
+      startMs = shiftStartMs(dropDay, shiftIdx ?? 0);
       durMs = DEFAULT_DUR_MS;
     }
     const endMs = startMs + durMs;
@@ -187,6 +203,8 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     viewMode === "month"
       ? anchor.toLocaleDateString("es", { month: "long", year: "numeric" })
       : `${days[0].toLocaleDateString("es", { day: "2-digit", month: "short" })} → ${new Date(end - 1).toLocaleDateString("es", { day: "2-digit", month: "short" })}`;
+
+  const showShifts = viewMode === "14d";
 
   // Visual state = jobs with pending moves applied on top.
   const effectiveJobs = useMemo(() => {
@@ -244,6 +262,21 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       <div className="grid border-b border-border" style={{ gridTemplateColumns: `140px 1fr` }}>
         <div className="border-r border-border px-3 py-2 text-[10px] uppercase tracking-widest text-muted-foreground">
           Máquina
+          {showShifts && (
+            <div className="mt-1 flex items-center gap-2 normal-case tracking-normal text-[9px]">
+              {SHIFTS.map((s) => (
+                <span key={s.key} className="flex items-center gap-1">
+                  <span
+                    className="inline-flex h-3 w-3 items-center justify-center rounded-sm text-[8px] font-bold text-foreground/80"
+                    style={{ backgroundColor: s.tint.replace("0.08", "0.5").replace("0.10", "0.5") }}
+                  >
+                    {s.label}
+                  </span>
+                  <span className="text-muted-foreground">{s.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="grid font-mono text-[10px] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {days.map((d, i) => (
@@ -262,6 +295,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 <>
                   <div>{d.toLocaleDateString("es", { weekday: "short" })}</div>
                   <div className="text-foreground">{d.getDate()}</div>
+                  {showShifts && (
+                    <div className="mt-1 grid grid-cols-3 gap-px text-[8px]">
+                      {SHIFTS.map((s) => (
+                        <span key={s.key} className="text-muted-foreground/70">{s.label}</span>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -293,14 +333,43 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 {days.map((d, i) => (
                   <div
                     key={i}
-                    onDragOver={onCellDragOver}
-                    onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
-                    onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
-                    onDrop={() => onCellDrop(m.id, i)}
-                    className={`border-r border-border/40 transition-colors ${
+                    className={`relative border-r border-border/40 ${
                       d.getTime() === today.getTime() ? "bg-primary/5" : ""
-                    } ${hoverCell === `${m.id}:${i}` ? "bg-primary/20 ring-1 ring-primary ring-inset" : ""}`}
-                  />
+                    }`}
+                  >
+                    {showShifts ? (
+                      <div className="absolute inset-0 grid grid-cols-3">
+                        {SHIFTS.map((s, sIdx) => {
+                          const cellKey = `${m.id}:${i}:${sIdx}`;
+                          const isHover = hoverCell === cellKey;
+                          return (
+                            <div
+                              key={s.key}
+                              onDragOver={onCellDragOver}
+                              onDragEnter={() => dragJobId && setHoverCell(cellKey)}
+                              onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
+                              onDrop={() => onCellDrop(m.id, i, sIdx)}
+                              className={`border-r border-border/20 last:border-r-0 transition-colors ${
+                                isHover ? "bg-primary/25 ring-1 ring-primary ring-inset" : ""
+                              }`}
+                              style={!isHover ? { backgroundColor: s.tint } : undefined}
+                              title={`${s.name} · ${s.startHour}:00 – ${(s.startHour + s.hours) % 24}:00`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div
+                        onDragOver={onCellDragOver}
+                        onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
+                        onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
+                        onDrop={() => onCellDrop(m.id, i)}
+                        className={`absolute inset-0 transition-colors ${
+                          hoverCell === `${m.id}:${i}` ? "bg-primary/20 ring-1 ring-primary ring-inset" : ""
+                        }`}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
               {rowJobs.map((j) => {
