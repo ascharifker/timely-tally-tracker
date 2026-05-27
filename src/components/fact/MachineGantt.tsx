@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
 import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
-import { useRecentDelays } from "@/hooks/useFactData";
+import { useRecentDelays, useRescheduleJob } from "@/hooks/useFactData";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -16,6 +16,9 @@ type ViewMode = "14d" | "month" | "quarter";
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
+  const reschedule = useRescheduleJob();
+  const [dragJobId, setDragJobId] = useState<string | null>(null);
+  const [hoverCell, setHoverCell] = useState<string | null>(null); // `${machineId}:${dayIdx}`
   const [viewMode, setViewMode] = useState<ViewMode>("14d");
   const [anchor, setAnchor] = useState<Date>(() => {
     const t = new Date();
@@ -114,6 +117,46 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     () => jobs.filter((j) => !j.planned_start || !j.planned_end),
     [jobs],
   );
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const DEFAULT_DUR_MS = 2 * DAY_MS;
+
+  const onCellDragOver = (e: React.DragEvent) => {
+    if (!dragJobId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onCellDrop = (machineId: string, dayIdx: number) => {
+    if (!dragJobId) return;
+    const job = jobs.find((j) => j.id === dragJobId);
+    if (!job) return;
+    const dropDay = days[dayIdx];
+    // preserve time-of-day + duration if previously scheduled; else default
+    let startMs: number;
+    let durMs: number;
+    if (job.planned_start && job.planned_end) {
+      const oldStart = new Date(job.planned_start);
+      durMs = new Date(job.planned_end).getTime() - oldStart.getTime();
+      const d = new Date(dropDay);
+      d.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0);
+      startMs = d.getTime();
+    } else {
+      const d = new Date(dropDay);
+      d.setHours(8, 0, 0, 0);
+      startMs = d.getTime();
+      durMs = DEFAULT_DUR_MS;
+    }
+    // quarter view = each cell is a week, snap to start of week
+    const endMs = startMs + durMs;
+    reschedule.mutate({
+      id: job.id,
+      planned_start: new Date(startMs).toISOString(),
+      planned_end: new Date(endMs).toISOString(),
+      machine_id: job.machine_id === machineId ? undefined : machineId,
+    });
+    setDragJobId(null);
+    setHoverCell(null);
+  };
 
   const shift = (dir: 1 | -1) => {
     const d = new Date(anchor);
@@ -222,9 +265,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 {days.map((d, i) => (
                   <div
                     key={i}
-                    className={`border-r border-border/40 ${
+                    onDragOver={onCellDragOver}
+                    onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
+                    onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
+                    onDrop={() => onCellDrop(m.id, i)}
+                    className={`border-r border-border/40 transition-colors ${
                       d.getTime() === today.getTime() ? "bg-primary/5" : ""
-                    }`}
+                    } ${hoverCell === `${m.id}:${i}` ? "bg-primary/20 ring-1 ring-primary ring-inset" : ""}`}
                   />
                 ))}
               </div>
@@ -251,8 +298,16 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                       );
                     })()}
                   <button
+                    draggable
+                    onDragStart={(e) => {
+                      setDragJobId(j.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
                     onClick={() => onJobClick?.(j)}
-                    className="absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md"
+                    className={`absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md cursor-grab active:cursor-grabbing ${
+                      dragJobId === j.id ? "opacity-50" : ""
+                    }`}
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
@@ -288,9 +343,17 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
             {unscheduled.map((j) => (
               <button
                 key={j.id}
+                draggable
+                onDragStart={(e) => {
+                  setDragJobId(j.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
                 onClick={() => onJobClick?.(j)}
-                className="rounded border border-border bg-card px-2 py-1 text-[11px] hover:border-primary hover:bg-primary/5 transition-colors flex items-center gap-1.5"
-                title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · click para asignar fechas`}
+                className={`rounded border border-border bg-card px-2 py-1 text-[11px] hover:border-primary hover:bg-primary/5 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
+                  dragJobId === j.id ? "opacity-50" : ""
+                }`}
+                title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma o click para editar`}
               >
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
                 <span className="font-mono font-semibold">ODF {j.odf}</span>
