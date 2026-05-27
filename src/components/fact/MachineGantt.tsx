@@ -550,8 +550,12 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 const hasDelay = delayedJobIds.has(j.id);
                 const pendingMove = pending.get(j.id);
                 const shiftMeta = SHIFTS[jobShiftIdx];
+                const spannedShifts = showShifts
+                  ? shiftSpan(j.planned_start as string, j.planned_end as string)
+                  : [jobShiftIdx];
+                const isHovered = hoverJobId === j.id;
                 return (
-                  <div key={j.id}>
+                  <div key={j.id} className="contents">
                     {ghost && (() => {
                       const gs = new Date(ghost.start).getTime();
                       const ge = new Date(ghost.end).getTime();
@@ -585,6 +589,8 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                       e.dataTransfer.effectAllowed = "move";
                     }}
                     onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
+                    onMouseEnter={() => setHoverJobId(j.id)}
+                    onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
                     onClick={() => onJobClick?.(j)}
                     className={`absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md cursor-grab active:cursor-grabbing ${
                       dragJobId === j.id ? "opacity-50" : ""
@@ -595,23 +601,72 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                       backgroundColor: STATUS_COLOR[j.status],
                       borderLeft: showShifts ? `3px solid ${shiftMeta.color}` : undefined,
                     }}
-                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · Turno ${shiftMeta.name}${pendingMove ? " · pendiente de aprobar" : ""}`}
+                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · Turnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")}${pendingMove ? " · pendiente de aprobar" : ""}`}
                   >
                     {hasDelay && (
                       <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-card" />
                     )}
                     {showShifts && (
                       <span
-                        className="absolute top-0.5 right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white shadow-sm"
-                        style={{ backgroundColor: shiftMeta.color }}
-                        title={`Turno ${shiftMeta.name}`}
+                        className="absolute top-0.5 right-0.5 inline-flex items-center gap-px"
+                        title={`Turnos ${spannedShifts.map((i) => SHIFTS[i].name).join(" → ")}`}
                       >
-                        {shiftMeta.label}
+                        {spannedShifts.map((sIdx) => (
+                          <span
+                            key={sIdx}
+                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white shadow-sm"
+                            style={{ backgroundColor: SHIFTS[sIdx].color }}
+                          >
+                            {SHIFTS[sIdx].label}
+                          </span>
+                        ))}
                       </span>
                     )}
                     <div className="font-mono leading-tight truncate">ODF {j.odf}</div>
                     <div className="text-[10px] opacity-80 truncate">{j.tube_spec ?? ""}</div>
                   </button>
+                  {showShifts && isHovered && !dragJobId && (
+                    <div
+                      className="absolute z-20 -top-1 flex items-center gap-0.5 rounded-md border border-border bg-card px-1 py-0.5 shadow-lg"
+                      style={{ left: `calc(${left}% + ${Math.max(width, 8) / 2}%)`, transform: "translate(-50%, -100%)" }}
+                      onMouseEnter={() => setHoverJobId(j.id)}
+                      onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
+                    >
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, jobShiftIdx, -1); }}
+                        className="rounded p-0.5 hover:bg-sidebar text-muted-foreground hover:text-foreground"
+                        title="Día anterior"
+                      >
+                        <ChevronLeft className="h-3 w-3" />
+                      </button>
+                      {SHIFTS.map((s, sIdx) => {
+                        const active = jobShiftIdx === sIdx;
+                        return (
+                          <button
+                            key={s.key}
+                            onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, sIdx); }}
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold transition-all ${
+                              active ? "text-white scale-110" : "text-foreground/70 hover:text-foreground hover:scale-105"
+                            }`}
+                            style={{
+                              backgroundColor: active ? s.color : s.tint,
+                              boxShadow: active ? `0 0 0 1px ${s.color}` : undefined,
+                            }}
+                            title={`Mover a turno ${s.name} (${String(s.startHour).padStart(2, "0")}:00)`}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, jobShiftIdx, 1); }}
+                        className="rounded p-0.5 hover:bg-sidebar text-muted-foreground hover:text-foreground"
+                        title="Día siguiente"
+                      >
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                   </div>
                 );
               })}
