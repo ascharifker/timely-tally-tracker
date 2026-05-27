@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Machine, Job, JobStatus } from "@/lib/fact-types";
 import { cascade, type CascadeChange } from "@/lib/scheduling/cascade";
@@ -115,6 +116,141 @@ function nextShiftStart(): Date {
     d.setHours(0);
   }
   return d;
+}
+
+const SCHEDULED_STATUSES: JobStatus[] = [
+  "MAZAK",
+  "MAQUINADO_LISTO",
+  "CEMENTACION",
+  "EXPO",
+];
+const DEFAULT_DURATION_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * One-shot backfill: any job in MAZAK+ with a machine assigned but no
+ * planned dates gets slotted into the next free window on its machine.
+ * Runs once per session to make legacy ODFs visible on the Gantt.
+ */
+export function useBackfillSchedules(jobs: Job[]) {
+  const qc = useQueryClient();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || jobs.length === 0) return;
+    const needs = jobs.filter(
+      (j) =>
+        SCHEDULED_STATUSES.includes(j.status) &&
+        j.machine_id &&
+        (!j.planned_start || !j.planned_end),
+    );
+    if (needs.length === 0) {
+      done.current = true;
+      return;
+    }
+    done.current = true;
+    (async () => {
+      // group already-scheduled bars per machine to find next free slot
+      const tails = new Map<string, number>();
+      for (const j of jobs) {
+        if (!j.machine_id || !j.planned_end) continue;
+        const e = new Date(j.planned_end).getTime();
+        tails.set(j.machine_id, Math.max(tails.get(j.machine_id) ?? 0, e));
+      }
+      const updates: { id: string; planned_start: string; planned_end: string }[] = [];
+      for (const j of needs) {
+        const baseline = Math.max(
+          tails.get(j.machine_id!) ?? 0,
+          nextShiftStart().getTime(),
+        );
+        const start = new Date(baseline);
+        const end = new Date(baseline + DEFAULT_DURATION_MS);
+        tails.set(j.machine_id!, end.getTime());
+        updates.push({
+          id: j.id,
+          planned_start: start.toISOString(),
+          planned_end: end.toISOString(),
+        });
+      }
+      // optimistic patch
+      const prev = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const byId = new Map(updates.map((u) => [u.id, u]));
+      qc.setQueryData<Job[]>(
+        ["jobs"],
+        prev.map((j) => {
+          const u = byId.get(j.id);
+          return u ? { ...j, planned_start: u.planned_start, planned_end: u.planned_end } : j;
+        }),
+      );
+      try {
+        for (const u of updates) {
+          await supabase
+            .from("jobs")
+            .update({ planned_start: u.planned_start, planned_end: u.planned_end })
+            .eq("id", u.id);
+        }
+        toast.success(
+          `Programadas ${updates.length} ODF${updates.length === 1 ? "" : "s"} sin fecha`,
+        );
+        qc.invalidateQueries({ queryKey: ["jobs"] });
+      } catch (e) {
+        qc.setQueryData(["jobs"], prev);
+        toast.error("No se pudieron programar ODFs sin fecha", {
+          description: (e as Error).message,
+        });
+      }
+    })();
+  }, [jobs, qc]);
+}
+
+export interface RescheduleInput {
+  id: string;
+  planned_start: string;
+  planned_end: string;
+  machine_id?: string | null;
+}
+
+/** Drag-to-reschedule: move a bar to a new day and/or machine. */
+export function useRescheduleJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: RescheduleInput) => {
+      const patch: Partial<Job> = {
+        planned_start: input.planned_start,
+        planned_end: input.planned_end,
+      };
+      if (input.machine_id !== undefined) patch.machine_id = input.machine_id;
+      const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
+      if (error) throw error;
+      return input;
+    },
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ["jobs"] });
+      const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      qc.setQueryData<Job[]>(
+        ["jobs"],
+        previous.map((j) =>
+          j.id === input.id
+            ? {
+                ...j,
+                planned_start: input.planned_start,
+                planned_end: input.planned_end,
+                ...(input.machine_id !== undefined ? { machine_id: input.machine_id } : {}),
+              }
+            : j,
+        ),
+      );
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["jobs"], ctx.previous);
+      toast.error("No se pudo reprogramar", { description: (err as Error).message });
+    },
+    onSuccess: (data) => {
+      const s = new Date(data.planned_start).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
+      const e = new Date(data.planned_end).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
+      toast.success(`Reprogramado · ${s} → ${e}`);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
 }
 
 export interface LogDelayInput {
