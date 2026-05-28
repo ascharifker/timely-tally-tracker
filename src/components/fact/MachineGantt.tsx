@@ -589,14 +589,23 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                       {SHIFTS.map((s, sIdx) => {
                         const visible = shiftFilter.has(sIdx);
                         const isFocus = soloShift === sIdx;
+                        const segW =
+                          soloShift === null
+                            ? SHIFT_W
+                            : isFocus
+                              ? SHIFT_W * 2.4
+                              : COLLAPSED_SHIFT_W;
                         return (
                           <div
                             key={s.key}
-                            className="flex-1 flex items-center justify-center border-r border-zinc-800/20 last:border-r-0 transition-opacity"
+                            className="flex-none flex items-center justify-center border-r border-zinc-800/40 last:border-r-0 transition-all cursor-pointer"
+                            onClick={() => toggleShift(sIdx)}
                             style={{
-                              backgroundColor: `${s.color}${isFocus ? "33" : visible ? "26" : "0d"}`,
+                              width: segW,
+                              backgroundColor: `${s.color}${isFocus ? "40" : visible ? "26" : "0d"}`,
                               opacity: visible ? 1 : 0.5,
                             }}
+                            title={`${s.name} · click para foco`}
                           >
                             <span
                               className="text-[11px] font-black tracking-wider"
@@ -605,7 +614,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                                 opacity: visible ? (isFocus ? 1 : 0.85) : 0.3,
                               }}
                             >
-                              {s.label}
+                              {soloShift !== null && !isFocus ? "" : s.label}
                             </span>
                           </div>
                         );
