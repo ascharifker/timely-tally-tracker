@@ -634,62 +634,62 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
               const rowJobs = effectiveJobs.filter(
                 (j) => j.machine_id === m.id && j.planned_start && j.planned_end,
               );
+              const rowH = rowHeightFor(m.id);
               return (
                 <div
                   key={m.id}
                   className={`relative border-b border-zinc-800/50 group ${
                     mIdx % 2 === 0 ? "bg-zinc-900/20" : ""
                   } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
-                  style={{ height: ROW_HEIGHT }}
+                  style={{ height: rowH }}
                 >
-                  {/* Background drop grid: day x shift sub-bands */}
-                  <div className="absolute inset-0 flex">
-                    {days.map((d, i) => {
-                      const isToday = d.getTime() === today.getTime();
+                  {/* Background drop grid driven by segments (variable widths). */}
+                  <div className="absolute inset-0">
+                    {segments.map((seg) => {
+                      const day = days[seg.dayIdx];
+                      const isToday = day.getTime() === today.getTime();
+                      if (seg.isFullDay) {
+                        const cellKey = `${m.id}:${seg.dayIdx}`;
+                        const isHover = hoverCell === cellKey;
+                        return (
+                          <div
+                            key={`${seg.dayIdx}-${seg.shiftIdx}`}
+                            onDragOver={onCellDragOver}
+                            onDragEnter={() => dragJobId && setHoverCell(cellKey)}
+                            onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
+                            onDrop={() => onCellDrop(m.id, seg.dayIdx)}
+                            className={`absolute top-0 bottom-0 border-r border-zinc-800/40 transition-colors ${
+                              isToday ? "bg-yellow-500/[0.025]" : ""
+                            } ${isHover ? "bg-primary/20" : ""}`}
+                            style={{ left: seg.leftPx, width: seg.widthPx }}
+                          />
+                        );
+                      }
+                      const sh = SHIFTS[seg.shiftIdx];
+                      const cellKey = `${m.id}:${seg.dayIdx}:${seg.shiftIdx}`;
+                      const isHover = hoverCell === cellKey;
+                      const visible = shiftFilter.has(seg.shiftIdx);
+                      const isFocus = soloShift === seg.shiftIdx;
+                      const isDayEdge = seg.shiftIdx === 2;
+                      const alpha = isFocus ? "26" : visible ? (isToday ? "1c" : "12") : "06";
                       return (
                         <div
-                          key={i}
-                          className={`flex-none flex border-r border-zinc-800/40 ${
-                            isToday ? "bg-yellow-500/[0.02]" : ""
+                          key={`${seg.dayIdx}-${seg.shiftIdx}`}
+                          onDragOver={onCellDragOver}
+                          onDragEnter={() => dragJobId && setHoverCell(cellKey)}
+                          onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
+                          onDrop={() => onCellDrop(m.id, seg.dayIdx, seg.shiftIdx)}
+                          className={`absolute top-0 bottom-0 transition-all ${
+                            isDayEdge ? "border-r border-zinc-700/60" : "border-r border-zinc-800/30"
                           }`}
-                          style={{ width: COL_WIDTH[viewMode] }}
-                        >
-                          {showShifts ? (
-                            SHIFTS.map((s, sIdx) => {
-                              const cellKey = `${m.id}:${i}:${sIdx}`;
-                              const isHover = hoverCell === cellKey;
-                              const visible = shiftFilter.has(sIdx);
-                              const isFocus = soloShift === sIdx;
-                              return (
-                                <div
-                                  key={s.key}
-                                  onDragOver={onCellDragOver}
-                                  onDragEnter={() => dragJobId && setHoverCell(cellKey)}
-                                  onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
-                                  onDrop={() => onCellDrop(m.id, i, sIdx)}
-                                  className="flex-1 border-r border-zinc-800/20 last:border-r-0 transition-all"
-                                  style={{
-                                    backgroundColor: isHover
-                                      ? `${s.color}66`
-                                      : `${s.color}${isFocus ? "1f" : visible ? "12" : "06"}`,
-                                    boxShadow: isHover ? `inset 0 0 0 2px ${s.color}` : undefined,
-                                  }}
-                                  title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00 – ${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00`}
-                                />
-                              );
-                            })
-                          ) : (
-                            <div
-                              onDragOver={onCellDragOver}
-                              onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
-                              onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
-                              onDrop={() => onCellDrop(m.id, i)}
-                              className={`flex-1 transition-colors ${
-                                hoverCell === `${m.id}:${i}` ? "bg-primary/20" : ""
-                              }`}
-                            />
-                          )}
-                        </div>
+                          style={{
+                            left: seg.leftPx,
+                            width: seg.widthPx,
+                            backgroundColor: isHover ? `${sh.color}66` : `${sh.color}${alpha}`,
+                            boxShadow: isHover ? `inset 0 0 0 2px ${sh.color}` : undefined,
+                          }}
+                          title={`${sh.name} · ${String(sh.startHour).padStart(2, "0")}:00–${String((sh.startHour + sh.hours) % 24).padStart(2, "0")}:00`}
+                        />
                       );
                     })}
                   </div>
@@ -698,15 +698,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                   {rowJobs.map((j) => {
                     const s = new Date(j.planned_start as string).getTime();
                     const e = new Date(j.planned_end as string).getTime();
-                    const timelineWidth = columns * COL_WIDTH[viewMode];
-                    const leftPx = Math.max(0, ((s - start) / range) * timelineWidth);
-                    const widthPx = Math.max(
-                      24,
-                      ((Math.min(e, end) - Math.max(s, start)) / range) * timelineWidth,
-                    );
-                    if (leftPx >= timelineWidth || leftPx + widthPx <= 0) return null;
+                    if (e < start || s > end) return null;
+                    const leftPx = msToPx(Math.max(s, start));
+                    const widthPx = Math.max(28, msToPx(Math.min(e, end)) - leftPx);
+                    if (leftPx >= timelineWidth) return null;
                     const jobShiftIdx = shiftIndexFromDate(j.planned_start as string);
                     const dimmedByFilter = showShifts && !shiftFilter.has(jobShiftIdx);
+                    if (soloShift !== null && dimmedByFilter) return null;
                     const ghost = ghosts[j.id];
                     const hasDelay = delayedJobIds.has(j.id);
                     const pendingMove = pending.get(j.id);
