@@ -1,12 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Machine, Job, JobStatus } from "@/lib/fact-types";
+import type { Machine, Job, JobStatus, PartTime } from "@/lib/fact-types";
 import { cascade, type CascadeChange } from "@/lib/scheduling/cascade";
 import type { EventKind } from "@/lib/fact-types";
 import { toast } from "sonner";
 import { STATUS_LABEL } from "@/lib/fact-types";
-import { nextShiftBoundary, addShifts } from "@/lib/shifts";
+import { nextShiftBoundary } from "@/lib/shifts";
+import { jobDurationHours } from "@/lib/scheduling/duration";
+import { scheduleJob } from "@/lib/scheduling/schedule";
 
 export function useMachines() {
   return useQuery({
@@ -32,6 +34,80 @@ export function useJobs() {
         .order("planned_start", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return (data ?? []) as Job[];
+    },
+  });
+}
+
+export function usePartTimes() {
+  return useQuery({
+    queryKey: ["part_times"],
+    queryFn: async (): Promise<PartTime[]> => {
+      const { data, error } = await supabase
+        .from("part_times")
+        .select("*")
+        .order("pir", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as PartTime[];
+    },
+  });
+}
+
+export function useUpdateMachineHoursPerShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, hours_per_shift }: { id: string; hours_per_shift: number }) => {
+      const { error } = await supabase
+        .from("machines")
+        .update({ hours_per_shift } as never)
+        .eq("id", id);
+      if (error) throw error;
+      return { id, hours_per_shift };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Horas por turno actualizadas");
+    },
+    onError: (err) => toast.error("No se pudo actualizar", { description: (err as Error).message }),
+  });
+}
+
+export function useUpsertPartTime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string; pir: string; machine_id: string; hours_per_piece: number }) => {
+      if (input.id) {
+        const { error } = await supabase
+          .from("part_times")
+          .update({ pir: input.pir, machine_id: input.machine_id, hours_per_piece: input.hours_per_piece } as never)
+          .eq("id", input.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("part_times")
+          .insert({ pir: input.pir, machine_id: input.machine_id, hours_per_piece: input.hours_per_piece } as never);
+        if (error) throw error;
+      }
+      return input;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["part_times"] });
+      toast.success("Tiempo de pieza guardado");
+    },
+    onError: (err) => toast.error("No se pudo guardar", { description: (err as Error).message }),
+  });
+}
+
+export function useDeletePartTime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("part_times").delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["part_times"] });
+      toast.success("Entrada eliminada");
     },
   });
 }
