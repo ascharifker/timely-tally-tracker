@@ -1,90 +1,57 @@
 
-# Distribución realista en 3 turnos + asignación más fácil
+# Rediseño del Cronograma por Máquina
 
-## Por qué se ve "todo en un turno"
+Reemplazo visual del `MachineGantt` siguiendo la dirección elegida: cada día se sub-divide en 3 sub-columnas M/T/N siempre visibles con color de fondo fuerte, header reorganizado en 2 filas con zonas claras, columna sticky de máquinas con jerarquía, y barras de ODF con borde-izquierdo de color de turno + chip de turno.
 
-Confirmado en DB: 46/54 ODFs arrancan a las 08:00, 4 a las 16:00, 1 a las 21:00. Causas:
+## Cambios visuales
 
-1. `nextShiftStart()` en `useFactData.ts` usa límites legacy 00 / 08 / 16, pero los turnos reales son **06 / 14 / 22**. Por eso casi todo cae a las 08:00.
-2. `useBackfillSchedules` encadena ODFs cabeza-cola por máquina con duración fija de 48h, así que cada ODF arranca exactamente donde terminó el anterior → la cadena entera "hereda" el primer horario.
-3. La insignia de turno (M/T/N) en cada barra usa solo `planned_start`, así que aunque la barra cruce los 3 turnos visualmente, todas muestran el mismo turno y el ojo lee "todo es del mismo turno".
+**Header (2 filas)**
+- Fila 1: título + pill de rango de fechas · derecha: botón "Redistribuir" amarillo sólido, segmented control 14d/Mes/Trimestre, navegación ‹ Hoy ›
+- Fila 2 (separada por divider): izquierda "Carga: M:Xh T:Xh N:Xh" en mono · derecha "Filtro Turnos:" con 3 pills redondeadas grandes (M amarillo, T celeste, N violeta). Click para solo / volver a ver todos.
 
-## 1. Programación realista por turnos (datos)
+**Grid**
+- Columna sticky izquierda 160px con fondo más oscuro y sombra a la derecha. Cada máquina: nombre en blanco bold + ID en mono gris. Filas alternadas zebra suave. Taller externo con estilo italic acento amarillo.
+- Headers de día: 2 sub-filas. Arriba `mar 26` (uppercase mono). Abajo 3 sub-columnas iguales con tints `M #eab308/15`, `T #38bdf8/8`, `N #8b5cf6/8` y letra grande de turno. Hoy: ring amarillo + tint extra.
+- Filas de máquina: 96px alto. Overlay de sub-bandas M/T/N que se prolonga verticalmente desde los headers (mismas tints atenuadas a /5) — esto crea las "columnas de turno" que dominan visualmente. Borde divisor entre días más visible que entre sub-turnos.
 
-Reescribir el backfill + el helper `nextShiftStart` para que reflejen producción 24h:
+**Barras de ODF**
+- Fondo `bg-card` oscuro + border-left de 4px con color del turno donde arranca. Altura 48px, redondeo solo a la derecha. ODF en blanco font-black + sub-spec en gris uppercase. Chip a la derecha con el turno (`M`/`T`/`N`) tintado. Sombra al hover, cursor grab.
 
-- `nextShiftStart()` → próximo límite de **06 / 14 / 22** (no 00/08/16). Centralizar reusando `SHIFTS` de `src/lib/shifts.ts`.
-- En `useBackfillSchedules`: en vez de duración fija de 48h, usar **1–3 turnos** (8h, 16h o 24h) por ODF según prioridad/cantidad. ODFs grandes ocupan 2–3 turnos; ODFs chicos uno solo. Esto crea bandas visibles M/T/N en vez de barras enormes.
-- Llenado por máquina: arrancar en el próximo turno libre y avanzar turno por turno (`startMs + n*8h`). Distribuye automáticamente.
-- Botón opcional **"Redistribuir cronograma"** en el header del Gantt que dispara un re-spread: para cada máquina recalcula starts en bloques de 8h consecutivos desde "ahora", respetando duración estimada. Esto arregla los datos actuales sin necesidad de borrar.
+**Filtro de turno solo**
+- Cuando un turno queda solo, las sub-bandas de los otros 2 turnos colapsan a opacidad muy baja y las barras que no tocan ese turno se atenúan a 30%. El turno foco intensifica su tint a /25.
 
-## 2. Insignia de turno por ODF más honesta
+**Footer**
+- Leyenda de 3 turnos con horarios + capacidad total mono a la derecha.
 
-Cuando un ODF cruza más de un turno, mostrar **rango**: `M→T` (ej. arranca 06h, termina 22h del día) o `M→N+1`. La sub-pieza en la esquina pasa a ser dos chips chiquitos: `M T` o `M T N`. Así de un vistazo se entiende "ocupa toda Mañana y Tarde".
+## Lo que NO cambia (preservar)
 
-## 3. Asignación / movimiento más fácil
-
-Tres mejoras concretas:
-
-**a) Mini-controles M/T/N en cada barra del Gantt (al hacer hover)**
-Aparece una mini-toolbar flotante sobre la barra con `← M T N →`:
-- Click en M/T/N: mueve el start al turno elegido del **mismo día**, manteniendo duración. Crea un pending move (igual que el drag).
-- `←` / `→`: nudge ±1 turno (8h).
-No reemplaza el drag, lo complementa para movimientos pequeños sin precisión.
-
-**b) Asignar turno desde el card del kanban / sin programar**
-En `StatusBoard` y en la barra "Sin programar", click derecho (o un pequeño botón `⋯`) abre un popover con:
-- Selector de máquina (4 Mazak)
-- Día (date picker)
-- 3 botones grandes M / T / N con sus colores
-- Botón "Programar"
-
-Esto resuelve "asignar sin tener que arrastrar al Gantt", útil cuando no se sabe a qué fila ir.
-
-**c) En el JobDetailDialog: bloque "Cambiar turno"**
-Agregar arriba del bloque "Reprogramar ODF" tres botones grandes M/T/N que mueven el ODF al turno elegido del mismo día con un solo click + un selector de día para mover de día sin tocar el turno. Esto es el camino más directo cuando ya hiciste click en una barra y querés moverla.
-
-## 4. Indicador "Carga por turno" en el Gantt header
-
-Una mini barra de 3 segmentos por encima del cronograma que muestra `M: 12 · T: 18 · N: 9` ODFs activos visibles. Así se ve si los turnos están desbalanceados y se sabe a qué turno mandar los próximos.
+- Lógica de drag-and-drop, `pending` moves, `ApproveMovesDialog`
+- `useRedistributeSchedules`, `useRecentDelays`
+- Cálculo de `shiftLoad`, `shiftSpan`, `effectiveJobs`
+- `viewMode` (14d/Mes/Trimestre) y navegación de fechas
+- Sub-toolbar de turno on-hover (`moveJobToShift`)
+- Click → `onJobClick` abre `JobDetailDialog`
+- Ghosts de delay
+- En modo Mes/Trimestre las sub-bandas M/T/N se ocultan (no caben), solo aplica a 14d
 
 ## Archivos a tocar
 
-- `src/hooks/useFactData.ts` — fix `nextShiftStart` (usar 06/14/22), reescribir `useBackfillSchedules` para spread por turnos, agregar `useRedistributeSchedules`.
-- `src/lib/shifts.ts` — agregar helpers `nextShiftBoundary(from)`, `shiftSpan(start, end)` (devuelve `[idx0, idx1, ...]`), `addShifts(date, n)`.
-- `src/components/fact/MachineGantt.tsx` — mini-toolbar de turnos en hover, insignia multi-turno (`M T`), botón "Redistribuir", indicador de carga por turno.
-- `src/components/fact/JobDetailDialog.tsx` — bloque "Cambiar turno" con M/T/N + date picker.
-- `src/components/fact/StatusBoard.tsx` — popover de asignación rápida en card.
-- (opcional) `src/components/fact/QuickAssignPopover.tsx` — componente compartido entre kanban y "Sin programar".
+- `src/components/fact/MachineGantt.tsx` — rewrite estructural del JSX manteniendo todos los hooks/handlers existentes. Sin cambios de comportamiento.
+- `src/styles.css` — agregar tokens si hace falta para tints de turno (probablemente no, los colores ya están en `SHIFTS`).
 
-## Detalles técnicos
+## Detalle técnico
 
-- Helper central:
-  ```ts
-  // shifts.ts
-  export function nextShiftBoundary(from = new Date()): Date {
-    const d = new Date(from); d.setMinutes(0,0,0);
-    const h = d.getHours();
-    const boundaries = [6, 14, 22];
-    const next = boundaries.find(b => h < b);
-    if (next !== undefined) d.setHours(next);
-    else { d.setDate(d.getDate()+1); d.setHours(6); }
-    return d;
-  }
-  export function addShifts(d: Date, n: number): Date {
-    return new Date(d.getTime() + n * 8 * 3600 * 1000);
-  }
-  export function shiftSpan(startISO: string, endISO: string): number[] {
-    // returns unique shift indices touched, e.g. [0,1] = M+T
-  }
-  ```
-- Backfill spread: por máquina mantener `cursor = max(tails[m], nextShiftBoundary())`. Para cada ODF: `duration = ({low:1, normal:2, urgent:3}[priority]) * 8h`, escribir `start=cursor, end=cursor+duration`, `cursor=end`.
-- "Redistribuir cronograma": idéntico pero arrancando todos los `cursor` desde `nextShiftBoundary(now)`, sobrescribiendo `planned_start/end` de todos los ODFs en estados MAZAK+.
-- Mini-toolbar de turnos: aparece sobre la barra con `position: absolute; top: -22px`, solo en `viewMode === "14d"`. Click llama a `setPending` igual que `onCellDrop`.
+- Layout cambia de `grid` global a `flex` con columna sticky + timeline scrollable, exactamente como el prototipo (`<div class="flex overflow-x-auto">` + `<div class="sticky left-0">`).
+- Cada día = `w-[180px]` en modo 14d (`w-[80px]` en Mes, `w-[120px]` en Trimestre). Sub-bandas M/T/N dentro del día con `flex-1` cada una.
+- Barras de ODF se posicionan absolutas usando los mismos cálculos actuales (`(startMs - rangeStart) / range * timelineWidth`). El ancho del timeline pasa a ser `dayCount * dayWidthPx` en vez de fracción del contenedor — necesario para sub-bandas pixel-perfect.
+- Drop targets: una grilla invisible de `dayCount * 3` celdas (sub-turnos) en modo 14d, `dayCount` celdas (día entero) en Mes/Trimestre. Reusa `onCellDrop(machineId, dayIdx, shiftIdx)`.
+- Border color de la barra: `SHIFTS[shiftIndexFromDate(planned_start)].color`.
+- Chip de turno en la barra: misma lógica + `bg-{color}/10 text-{color}`.
 
-## Fuera de scope (por ahora)
+## Fuera de scope
 
-- Capacidad por turno (cuántos operarios por turno). Lo agregamos cuando definamos el modelo de operarios.
-- Turnos diferentes por máquina (todas usan M/T/N idénticos).
+- No tocar `StatusBoard`, `OTDTracker`, `BriefingPanel` ni el resto del shell.
+- No cambiar el modelo de datos ni los hooks de Supabase.
+- No agregar el modo "solo M ó T ó N gigante" como vista separada — el filtro existente cumple esa función con el rediseño.
 
-¿Avanzo con los 4 puntos? Si querés sacar alguno (ej. el indicador de carga), avisame.
+¿Avanzo con la implementación?
