@@ -97,6 +97,7 @@ export type Database = {
           created_at: string
           customer_date: string | null
           export_date: string | null
+          hours_override: number | null
           id: string
           machine_id: string | null
           notes: string | null
@@ -116,6 +117,7 @@ export type Database = {
           created_at?: string
           customer_date?: string | null
           export_date?: string | null
+          hours_override?: number | null
           id?: string
           machine_id?: string | null
           notes?: string | null
@@ -135,6 +137,7 @@ export type Database = {
           created_at?: string
           customer_date?: string | null
           export_date?: string | null
+          hours_override?: number | null
           id?: string
           machine_id?: string | null
           notes?: string | null
@@ -164,6 +167,7 @@ export type Database = {
         Row: {
           created_at: string
           display_order: number
+          hours_per_shift: number
           id: string
           name: string
           type: Database["public"]["Enums"]["machine_type"]
@@ -171,6 +175,7 @@ export type Database = {
         Insert: {
           created_at?: string
           display_order?: number
+          hours_per_shift?: number
           id?: string
           name: string
           type?: Database["public"]["Enums"]["machine_type"]
@@ -178,6 +183,7 @@ export type Database = {
         Update: {
           created_at?: string
           display_order?: number
+          hours_per_shift?: number
           id?: string
           name?: string
           type?: Database["public"]["Enums"]["machine_type"]
@@ -191,6 +197,7 @@ export type Database = {
           id: string
           machine_id: string
           pir: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -198,6 +205,7 @@ export type Database = {
           id?: string
           machine_id: string
           pir: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -205,6 +213,7 @@ export type Database = {
           id?: string
           machine_id?: string
           pir?: string
+          updated_at?: string
         }
         Relationships: [
           {

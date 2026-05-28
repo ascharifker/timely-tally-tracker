@@ -1,12 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Machine, Job, JobStatus } from "@/lib/fact-types";
+import type { Machine, Job, JobStatus, PartTime } from "@/lib/fact-types";
 import { cascade, type CascadeChange } from "@/lib/scheduling/cascade";
 import type { EventKind } from "@/lib/fact-types";
 import { toast } from "sonner";
 import { STATUS_LABEL } from "@/lib/fact-types";
-import { nextShiftBoundary, addShifts } from "@/lib/shifts";
+import { nextShiftBoundary } from "@/lib/shifts";
+import { jobDurationHours } from "@/lib/scheduling/duration";
+import { scheduleJob } from "@/lib/scheduling/schedule";
 
 export function useMachines() {
   return useQuery({
@@ -36,6 +38,80 @@ export function useJobs() {
   });
 }
 
+export function usePartTimes() {
+  return useQuery({
+    queryKey: ["part_times"],
+    queryFn: async (): Promise<PartTime[]> => {
+      const { data, error } = await supabase
+        .from("part_times")
+        .select("*")
+        .order("pir", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as PartTime[];
+    },
+  });
+}
+
+export function useUpdateMachineHoursPerShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, hours_per_shift }: { id: string; hours_per_shift: number }) => {
+      const { error } = await supabase
+        .from("machines")
+        .update({ hours_per_shift } as never)
+        .eq("id", id);
+      if (error) throw error;
+      return { id, hours_per_shift };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Horas por turno actualizadas");
+    },
+    onError: (err) => toast.error("No se pudo actualizar", { description: (err as Error).message }),
+  });
+}
+
+export function useUpsertPartTime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string; pir: string; machine_id: string; hours_per_piece: number }) => {
+      if (input.id) {
+        const { error } = await supabase
+          .from("part_times")
+          .update({ pir: input.pir, machine_id: input.machine_id, hours_per_piece: input.hours_per_piece } as never)
+          .eq("id", input.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("part_times")
+          .insert({ pir: input.pir, machine_id: input.machine_id, hours_per_piece: input.hours_per_piece } as never);
+        if (error) throw error;
+      }
+      return input;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["part_times"] });
+      toast.success("Tiempo de pieza guardado");
+    },
+    onError: (err) => toast.error("No se pudo guardar", { description: (err as Error).message }),
+  });
+}
+
+export function useDeletePartTime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("part_times").delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["part_times"] });
+      toast.success("Entrada eliminada");
+    },
+  });
+}
+
 export function useCreateJob() {
   const qc = useQueryClient();
   return useMutation({
@@ -54,14 +130,17 @@ export function useUpdateJobStatus() {
     mutationFn: async (input: { id: string; status: JobStatus }) => {
       const all = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const job = all.find((j) => j.id === input.id);
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
       const patch: { status: JobStatus; planned_start?: string; planned_end?: string } = {
         status: input.status,
       };
       if (input.status === "MAZAK" && job && (!job.planned_start || !job.planned_end)) {
-        const start = nextShiftBoundary();
-        const end = addShifts(start, durationShifts(job));
-        patch.planned_start = start.toISOString();
-        patch.planned_end = end.toISOString();
+        const machine = machines.find((m) => m.id === job.machine_id);
+        const { hours } = jobDurationHours(job, partTimes);
+        const span = scheduleJob(Date.now(), hours, machine ?? { hours_per_shift: 8 });
+        patch.planned_start = span.planned_start;
+        patch.planned_end = span.planned_end;
       }
       const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
       if (error) throw error;
@@ -71,13 +150,16 @@ export function useUpdateJobStatus() {
       await qc.cancelQueries({ queryKey: ["jobs"] });
       const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const job = previous.find((j) => j.id === id);
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
       let planned_start = job?.planned_start ?? null;
       let planned_end = job?.planned_end ?? null;
       if (status === "MAZAK" && job && (!planned_start || !planned_end)) {
-        const s = nextShiftBoundary();
-        const e = addShifts(s, durationShifts(job));
-        planned_start = s.toISOString();
-        planned_end = e.toISOString();
+        const machine = machines.find((m) => m.id === job.machine_id);
+        const { hours } = jobDurationHours(job, partTimes);
+        const span = scheduleJob(Date.now(), hours, machine ?? { hours_per_shift: 8 });
+        planned_start = span.planned_start;
+        planned_end = span.planned_end;
       }
       qc.setQueryData<Job[]>(
         ["jobs"],
@@ -104,14 +186,6 @@ export function useUpdateJobStatus() {
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
-}
-
-/** How many 8h shifts a job realistically occupies, based on priority + qty. */
-function durationShifts(job: Pick<Job, "priority" | "qty">): number {
-  // urgent runs fast (1 shift), low-priority/large runs span longer.
-  const base = { urgent: 1, high: 1, normal: 2, low: 3 }[job.priority] ?? 2;
-  const qtyBoost = job.qty >= 10 ? 1 : 0;
-  return Math.min(4, base + qtyBoost); // cap at 4 shifts (~32h)
 }
 
 const SCHEDULED_STATUSES: JobStatus[] = [
@@ -143,7 +217,9 @@ export function useBackfillSchedules(jobs: Job[]) {
     }
     done.current = true;
     (async () => {
-      const updates = computeSpreadSchedule(needs, jobs);
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
+      const updates = computeSpreadSchedule(needs, jobs, machines, partTimes);
       // optimistic patch
       const prev = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const byId = new Map(updates.map((u) => [u.id, u]));
@@ -184,6 +260,8 @@ export function useBackfillSchedules(jobs: Job[]) {
 function computeSpreadSchedule(
   jobsToSchedule: Job[],
   existingJobs: Job[],
+  machines: Machine[],
+  partTimes: PartTime[],
 ): { id: string; planned_start: string; planned_end: string }[] {
   const base = nextShiftBoundary().getTime();
   const cursors = new Map<string, number>();
@@ -197,13 +275,14 @@ function computeSpreadSchedule(
   for (const j of jobsToSchedule) {
     const mId = j.machine_id!;
     const cursor = cursors.get(mId) ?? base;
-    const start = new Date(cursor);
-    const end = addShifts(start, durationShifts(j));
-    cursors.set(mId, end.getTime());
+    const machine = machines.find((m) => m.id === mId) ?? { hours_per_shift: 8 };
+    const { hours } = jobDurationHours(j, partTimes);
+    const span = scheduleJob(cursor, hours, machine);
+    cursors.set(mId, span.cursorMs);
     out.push({
       id: j.id,
-      planned_start: start.toISOString(),
-      planned_end: end.toISOString(),
+      planned_start: span.planned_start,
+      planned_end: span.planned_end,
     });
   }
   return out;
@@ -221,6 +300,8 @@ export function useRedistributeSchedules() {
       const jobs = (qc.getQueryData<Job[]>(["jobs"]) ?? []).filter(
         (j) => SCHEDULED_STATUSES.includes(j.status) && j.machine_id,
       );
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
       // Sort per-machine by current planned_start (nulls last) then by odf.
       const sorted = [...jobs].sort((a, b) => {
         const am = a.machine_id ?? "";
@@ -237,13 +318,14 @@ export function useRedistributeSchedules() {
       for (const j of sorted) {
         const mId = j.machine_id!;
         const cursor = cursors.get(mId) ?? base;
-        const start = new Date(cursor);
-        const end = addShifts(start, durationShifts(j));
-        cursors.set(mId, end.getTime());
+        const machine = machines.find((m) => m.id === mId) ?? { hours_per_shift: 8 };
+        const { hours } = jobDurationHours(j, partTimes);
+        const span = scheduleJob(cursor, hours, machine);
+        cursors.set(mId, span.cursorMs);
         updates.push({
           id: j.id,
-          planned_start: start.toISOString(),
-          planned_end: end.toISOString(),
+          planned_start: span.planned_start,
+          planned_end: span.planned_end,
         });
       }
       for (const u of updates) {

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Settings } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -18,7 +19,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
-            <span>MAZAK 1–4 + GEMAK · MAQYRO · TECMAC</span>
+            <span className="hidden md:inline">MAZAK 1–4 + GEMAK · MAQYRO · TECMAC</span>
+            <Link
+              to="/configuracion"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+              activeProps={{ className: "border-primary text-primary" }}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-widest">Config</span>
+            </Link>
             <span className="h-2 w-2 rounded-full bg-[color:var(--status-listo)]" />
             <span>online</span>
           </div>

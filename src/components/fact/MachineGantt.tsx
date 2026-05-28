@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
 import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
-import { useRecentDelays, useRedistributeSchedules } from "@/hooks/useFactData";
+import { useRecentDelays, useRedistributeSchedules, usePartTimes } from "@/hooks/useFactData";
+import { jobDurationHours } from "@/lib/scheduling/duration";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
@@ -28,6 +29,7 @@ const ROW_HEIGHT = 96;
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
+  const { data: partTimes = [] } = usePartTimes();
   const redistribute = useRedistributeSchedules();
   const [dragJobId, setDragJobId] = useState<string | null>(null);
   const [hoverJobId, setHoverJobId] = useState<string | null>(null);
@@ -605,6 +607,15 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                       ? shiftSpan(j.planned_start as string, j.planned_end as string)
                       : [jobShiftIdx];
                     const isHovered = hoverJobId === j.id;
+                    const dur = jobDurationHours(j, partTimes);
+                    const machineHps = machines.find((mm) => mm.id === j.machine_id)?.hours_per_shift ?? 8;
+                    const realHours = ((new Date(j.planned_end as string).getTime() - new Date(j.planned_start as string).getTime()) / 3_600_000);
+                    const sourceLabel =
+                      dur.source === "catalog"
+                        ? `${dur.hoursPerPiece}h/pza × ${j.qty}`
+                        : dur.source === "override"
+                          ? "manual"
+                          : "estimado";
                     return (
                       <div key={j.id}>
                         {ghost && (() => {
@@ -658,10 +669,18 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             borderLeft: `4px solid ${shiftMeta.color}`,
                             boxShadow: `inset 3px 0 0 ${STATUS_COLOR[j.status]}33, 0 2px 8px rgba(0,0,0,0.4)`,
                           }}
-                          title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · Turnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")}${pendingMove ? " · pendiente de aprobar" : ""}`}
+                          title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}\n${dur.hours.toFixed(1)}h trabajo · ${machineHps}h/turno · ocupa ${realHours.toFixed(1)}h reloj\nTurnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")} · ${sourceLabel}${pendingMove ? "\n⚠ pendiente de aprobar" : ""}`}
                         >
                           {hasDelay && (
                             <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-[#121214]" />
+                          )}
+                          {dur.source === "heuristic" && (
+                            <span
+                              className="absolute -top-1 -left-1 h-3 px-1 rounded-sm bg-amber-500 text-[8px] font-black text-black uppercase tracking-tight leading-3 flex items-center"
+                              title="Duración estimada — cargá h/pieza en Configuración"
+                            >
+                              est
+                            </span>
                           )}
                           <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-[11px] font-black text-white leading-none truncate">

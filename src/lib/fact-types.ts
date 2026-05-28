@@ -17,6 +17,7 @@ export interface Machine {
   name: string;
   type: MachineType;
   display_order: number;
+  hours_per_shift: number;
 }
 
 export interface Job {
@@ -35,6 +36,7 @@ export interface Job {
   planned_start: string | null;
   planned_end: string | null;
   notes: string | null;
+  hours_override: number | null;
 }
 
 export interface PartTime {
