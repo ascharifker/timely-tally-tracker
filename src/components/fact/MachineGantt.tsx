@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
-import { STATUS_COLOR, STATUS_LABEL, type EventKind } from "@/lib/fact-types";
+import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
 import { useRecentDelays, useRedistributeSchedules } from "@/hooks/useFactData";
 import { Button } from "@/components/ui/button";
