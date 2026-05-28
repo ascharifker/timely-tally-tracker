@@ -722,36 +722,33 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                         : dur.source === "override"
                           ? "manual"
                           : "estimado";
+                    const lane = laneByJob.get(j.id) ?? 0;
+                    const topPx = BASE_ROW_PADDING / 2 + lane * (LANE_HEIGHT + LANE_GAP);
                     return (
                       <div key={j.id}>
                         {ghost && (() => {
                           const gs = new Date(ghost.start).getTime();
                           const ge = new Date(ghost.end).getTime();
-                          const gl = Math.max(0, ((gs - start) / range) * timelineWidth);
-                          const gw = Math.max(
-                            24,
-                            ((Math.min(ge, end) - Math.max(gs, start)) / range) * timelineWidth,
-                          );
+                          if (ge < start || gs > end) return null;
+                          const gl = msToPx(Math.max(gs, start));
+                          const gw = Math.max(28, msToPx(Math.min(ge, end)) - gl);
                           return (
                             <div
-                              className="absolute top-6 h-12 rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
-                              style={{ left: gl, width: gw, opacity: 0.35 }}
+                              className="absolute rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
+                              style={{ left: gl, width: gw, top: topPx, height: LANE_HEIGHT, opacity: 0.35 }}
                             />
                           );
                         })()}
                         {pendingMove && pendingMove.original_start && pendingMove.original_end && (() => {
                           const os = new Date(pendingMove.original_start).getTime();
                           const oe = new Date(pendingMove.original_end).getTime();
-                          const ol = Math.max(0, ((os - start) / range) * timelineWidth);
-                          const ow = Math.max(
-                            24,
-                            ((Math.min(oe, end) - Math.max(os, start)) / range) * timelineWidth,
-                          );
-                          if (ol >= timelineWidth || ol + ow <= 0) return null;
+                          if (oe < start || os > end) return null;
+                          const ol = msToPx(Math.max(os, start));
+                          const ow = Math.max(28, msToPx(Math.min(oe, end)) - ol);
                           return (
                             <div
-                              className="absolute top-6 h-12 rounded border border-dashed border-zinc-500/50 bg-zinc-700/20 pointer-events-none"
-                              style={{ left: ol, width: ow }}
+                              className="absolute rounded border border-dashed border-zinc-500/50 bg-zinc-700/20 pointer-events-none"
+                              style={{ left: ol, width: ow, top: topPx, height: LANE_HEIGHT }}
                               title="Posición original"
                             />
                           );
@@ -766,14 +763,16 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                           onMouseEnter={() => setHoverJobId(j.id)}
                           onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
                           onClick={() => onJobClick?.(j)}
-                          className={`absolute top-6 h-12 rounded-r-md pl-2 pr-1.5 text-left flex items-center bg-zinc-800 hover:bg-zinc-700 shadow-lg z-10 transition-all duration-200 hover:-translate-y-px hover:shadow-xl cursor-grab active:cursor-grabbing ${
+                          className={`absolute rounded-md pl-2 pr-1.5 text-left flex items-center bg-[#23232b] hover:bg-[#2a2a34] z-10 transition-all duration-200 hover:-translate-y-px cursor-grab active:cursor-grabbing ${
                             dragJobId === j.id ? "opacity-50" : ""
                           } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[#121214]" : ""} ${dimmedByFilter ? "opacity-30" : ""}`}
                           style={{
                             left: leftPx,
                             width: widthPx,
+                            top: topPx,
+                            height: LANE_HEIGHT,
                             borderLeft: `4px solid ${shiftMeta.color}`,
-                            boxShadow: `inset 3px 0 0 ${STATUS_COLOR[j.status]}33, 0 2px 8px rgba(0,0,0,0.4)`,
+                            boxShadow: `0 0 0 1px rgba(82,82,91,0.5), 0 4px 14px rgba(0,0,0,0.55)`,
                           }}
                           title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}\n${dur.hours.toFixed(1)}h trabajo · ${machineHps}h/turno · ocupa ${realHours.toFixed(1)}h reloj\nTurnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")} · ${sourceLabel}${pendingMove ? "\n⚠ pendiente de aprobar" : ""}`}
                         >
@@ -825,7 +824,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             className="absolute z-20 flex items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900 px-1 py-0.5 shadow-xl"
                             style={{
                               left: leftPx + Math.max(widthPx, 24) / 2,
-                              top: 0,
+                              top: Math.max(0, topPx - 22),
                               transform: "translate(-50%, 0)",
                             }}
                             onMouseEnter={() => setHoverJobId(j.id)}
