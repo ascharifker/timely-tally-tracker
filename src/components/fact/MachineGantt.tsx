@@ -4,8 +4,9 @@ import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
 import { useRecentDelays, useRedistributeSchedules, usePartTimes } from "@/hooks/useFactData";
 import { jobDurationHours } from "@/lib/scheduling/duration";
+import { packLanesByMachine } from "@/lib/scheduling/lanes";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Shuffle } from "lucide-react";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
 import { SHIFTS, shiftStartMs, shiftIndexFromDate, shiftSpan, snapToShift } from "@/lib/shifts";
 
@@ -17,15 +18,20 @@ interface Props {
 
 type ViewMode = "14d" | "month" | "quarter";
 
-// Pixel width per column for each view mode. Keeps the day grid and shift
-// sub-bands pixel-aligned with the absolutely-positioned ODF bars.
-const COL_WIDTH: Record<ViewMode, number> = {
-  "14d": 180,
-  month: 56,
-  quarter: 110,
-};
+// Base pixel widths. In 14d mode each day = 3 × SHIFT_W; in month/quarter
+// a day is one cell that fills DAY_W.
+const SHIFT_W = 64;
+const DAY_W_NORMAL = SHIFT_W * 3; // 192
+const COLLAPSED_SHIFT_W = 14; // width of off-focus shift columns in focus mode
+const DAY_W_FOCUS = COLLAPSED_SHIFT_W * 2 + SHIFT_W * 2.4; // ~181 — keep day width stable
+const DAY_W_MONTH = 56;
+const DAY_W_QUARTER = 110;
 const MACHINE_COL_WIDTH = 160;
-const ROW_HEIGHT = 96;
+const BASE_ROW_PADDING = 16; // top+bottom padding around lanes
+const LANE_HEIGHT = 48;
+const LANE_GAP = 6;
+const HOUR_MS = 60 * 60 * 1000;
+const SHIFT_MS = 8 * HOUR_MS;
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
@@ -39,6 +45,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   // "single-shift mode": each day collapses to that 8h band, other bars hide.
   const [shiftFilter, setShiftFilter] = useState<Set<number>>(new Set([0, 1, 2]));
   const soloShift = shiftFilter.size === 1 ? [...shiftFilter][0] : null;
+  const [unschedOpen, setUnschedOpen] = useState(false);
   const [anchor, setAnchor] = useState<Date>(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -135,6 +142,105 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const end = start + dayCount * 24 * 60 * 60 * 1000;
   const range = end - start;
 
+  const showShifts = viewMode === "14d";
+
+  // --------------------------------------------------------------------------
+  // Variable-width segment model. In 14d mode each day is split into 3 shift
+  // segments; in focus mode, two of those collapse to COLLAPSED_SHIFT_W.
+  // In month/quarter the whole day is a single segment.
+  // --------------------------------------------------------------------------
+  type Segment = {
+    dayIdx: number;
+    shiftIdx: number; // 0/1/2 in 14d, or 0 when not showing shifts
+    startMs: number;
+    endMs: number;
+    leftPx: number;
+    widthPx: number;
+    isFullDay: boolean;
+  };
+
+  const { segments, timelineWidth, dayWidths } = useMemo(() => {
+    const segs: Segment[] = [];
+    const dWidths: number[] = [];
+    let cursor = 0;
+    for (let i = 0; i < days.length; i++) {
+      const d = days[i];
+      if (showShifts) {
+        let dayWidth = 0;
+        for (let s = 0; s < 3; s++) {
+          let w = SHIFT_W;
+          if (soloShift !== null) {
+            w = s === soloShift ? SHIFT_W * 2.4 : COLLAPSED_SHIFT_W;
+          }
+          const segStart = shiftStartMs(d, s);
+          segs.push({
+            dayIdx: i,
+            shiftIdx: s,
+            startMs: segStart,
+            endMs: segStart + SHIFT_MS,
+            leftPx: cursor,
+            widthPx: w,
+            isFullDay: false,
+          });
+          cursor += w;
+          dayWidth += w;
+        }
+        dWidths.push(dayWidth);
+      } else {
+        const w = viewMode === "month" ? DAY_W_MONTH : DAY_W_QUARTER;
+        const cellMs = viewMode === "quarter" ? 7 * 24 * HOUR_MS : 24 * HOUR_MS;
+        segs.push({
+          dayIdx: i,
+          shiftIdx: 0,
+          startMs: d.getTime(),
+          endMs: d.getTime() + cellMs,
+          leftPx: cursor,
+          widthPx: w,
+          isFullDay: true,
+        });
+        cursor += w;
+        dWidths.push(w);
+      }
+    }
+    return { segments: segs, timelineWidth: cursor, dayWidths: dWidths };
+  }, [days, showShifts, soloShift, viewMode]);
+
+  /** Map an absolute ms timestamp to a pixel x within the timeline. */
+  const msToPx = (ms: number): number => {
+    if (segments.length === 0) return 0;
+    if (ms <= segments[0].startMs) return 0;
+    const last = segments[segments.length - 1];
+    if (ms >= last.endMs) return last.leftPx + last.widthPx;
+    // binary search for the segment containing ms
+    let lo = 0, hi = segments.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (segments[mid].endMs <= ms) lo = mid + 1;
+      else hi = mid;
+    }
+    const seg = segments[lo];
+    const frac = (ms - seg.startMs) / (seg.endMs - seg.startMs);
+    return seg.leftPx + frac * seg.widthPx;
+  };
+
+  // Lane packing per machine over currently scheduled jobs.
+  const { byMachine: lanesByMachine, laneByJob } = useMemo(() => {
+    return packLanesByMachine(
+      jobs.map((j) => {
+        const p = pending.get(j.id);
+        return p
+          ? { ...j, planned_start: p.planned_start, planned_end: p.planned_end, machine_id: p.machine_id }
+          : j;
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, pending]);
+
+  const rowHeightFor = (machineId: string): number => {
+    const lc = lanesByMachine.get(machineId)?.laneCount ?? 1;
+    return BASE_ROW_PADDING + lc * LANE_HEIGHT + Math.max(0, lc - 1) * LANE_GAP;
+  };
+
   const unscheduled = useMemo(
     () => jobs.filter((j) => !j.planned_start || !j.planned_end),
     [jobs],
@@ -209,7 +315,6 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       ? anchor.toLocaleDateString("es", { month: "long", year: "numeric" })
       : `${days[0].toLocaleDateString("es", { day: "2-digit", month: "short" })} → ${new Date(end - 1).toLocaleDateString("es", { day: "2-digit", month: "short" })}`;
 
-  const showShifts = viewMode === "14d";
   const toggleShift = (idx: number) => {
     setShiftFilter((prev) => {
       const next = new Set(prev);
