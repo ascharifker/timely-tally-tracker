@@ -16,6 +16,16 @@ interface Props {
 
 type ViewMode = "14d" | "month" | "quarter";
 
+// Pixel width per column for each view mode. Keeps the day grid and shift
+// sub-bands pixel-aligned with the absolutely-positioned ODF bars.
+const COL_WIDTH: Record<ViewMode, number> = {
+  "14d": 180,
+  month: 56,
+  quarter: 110,
+};
+const MACHINE_COL_WIDTH = 160;
+const ROW_HEIGHT = 96;
+
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
   const redistribute = useRedistributeSchedules();
