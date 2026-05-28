@@ -521,7 +521,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 className={`px-4 flex flex-col justify-center ${
                   idx % 2 === 0 ? "bg-zinc-900/30" : ""
                 } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
-                style={{ height: ROW_HEIGHT }}
+                style={{ height: rowHeightFor(m.id) }}
               >
                 {m.type === "external_shop" && (
                   <div className="text-[10px] font-bold text-yellow-500/80 uppercase italic tracking-wide">
@@ -532,19 +532,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 <div className="text-[10px] text-zinc-500 font-mono uppercase">
                   {m.type === "internal" ? "interna" : "externo"}
                 </div>
+                {(lanesByMachine.get(m.id)?.laneCount ?? 0) > 1 && (
+                  <div className="text-[9px] text-amber-500/80 font-mono uppercase mt-0.5">
+                    {lanesByMachine.get(m.id)!.laneCount} lanes
+                  </div>
+                )}
               </div>
             ))}
-            {unscheduled.length > 0 && (
-              <div
-                className="px-4 flex flex-col justify-center bg-zinc-950/40 border-t-2 border-dashed border-zinc-700"
-                style={{ height: ROW_HEIGHT }}
-              >
-                <div className="text-sm font-bold text-zinc-400">Sin programar</div>
-                <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
-                  {unscheduled.length} ODF{unscheduled.length === 1 ? "" : "s"}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
