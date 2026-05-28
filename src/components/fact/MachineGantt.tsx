@@ -282,443 +282,523 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
 
   return (
     <>
-    <Card className="overflow-hidden border-border bg-card p-0">
-      <div className="border-b border-border bg-sidebar/40 px-4 py-2 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold">Cronograma por Máquina</h2>
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-            {headerLabel}
-          </span>
-          {showShifts && (
-            <div className="flex items-center gap-1 text-[10px] font-mono">
-              <span className="text-muted-foreground">Carga:</span>
-              {SHIFTS.map((s, i) => (
-                <span
-                  key={s.key}
-                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5"
-                  style={{ backgroundColor: s.tint }}
-                  title={`${shiftLoad[i]} ODF${shiftLoad[i] === 1 ? "" : "s"} en ${s.name}`}
+    <Card className="overflow-hidden border-zinc-800 bg-[#121214] p-0 font-sans text-zinc-300 shadow-2xl">
+      {/* ============== HEADER ============== */}
+      <div className="border-b border-zinc-800 bg-[#18181b]/60 p-4 space-y-3">
+        {/* Row 1: title + actions */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-white tracking-tight">Cronograma por Máquina</h2>
+            <span className="px-2.5 py-0.5 bg-zinc-800 rounded-full text-[10px] font-medium text-zinc-400 border border-zinc-700 uppercase tracking-widest">
+              {headerLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => redistribute.mutate()}
+              disabled={redistribute.isPending}
+              title="Redistribuye automáticamente todos los ODFs programados en bloques M/T/N"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black text-[11px] font-bold rounded uppercase tracking-wider transition-colors"
+            >
+              <Shuffle className="h-3.5 w-3.5" />
+              {redistribute.isPending ? "Redistribuyendo…" : "Redistribuir"}
+            </button>
+            <div className="flex bg-zinc-800 p-1 rounded-lg border border-zinc-700">
+              {(["14d", "month", "quarter"] as ViewMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setViewMode(m)}
+                  className={`px-3 py-1 text-[11px] font-semibold uppercase tracking-tight rounded-md transition-colors ${
+                    viewMode === m
+                      ? "bg-zinc-700 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
                 >
-                  <span
-                    className="inline-flex h-3 w-3 items-center justify-center rounded-sm text-[8px] font-bold text-white"
-                    style={{ backgroundColor: s.color }}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="font-semibold">{shiftLoad[i]}</span>
-                </span>
+                  {m === "14d" ? "14 Días" : m === "month" ? "Mes" : "Trimestre"}
+                </button>
               ))}
             </div>
-          )}
+            <div className="flex gap-1 ml-1">
+              <button
+                onClick={() => shift(-1)}
+                className="p-1.5 hover:bg-zinc-800 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={goToday}
+                className="px-3 py-1.5 hover:bg-zinc-800 rounded border border-zinc-700 text-[11px] font-bold uppercase tracking-tight text-zinc-300 hover:text-white transition-colors"
+              >
+                Hoy
+              </button>
+              <button
+                onClick={() => shift(1)}
+                className="p-1.5 hover:bg-zinc-800 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 text-[10px] uppercase tracking-widest font-mono mr-1"
-            onClick={() => redistribute.mutate()}
-            disabled={redistribute.isPending}
-            title="Redistribuye automáticamente todos los ODFs programados en bloques M/T/N"
-          >
-            <Shuffle className="h-3.5 w-3.5" />
-            {redistribute.isPending ? "Redistribuyendo…" : "Redistribuir"}
-          </Button>
+
+        {/* Row 2: carga + shift filter */}
+        <div className="flex items-center justify-between gap-4 pt-2 border-t border-zinc-800/60 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Carga:</span>
+            <div className="flex items-center gap-3">
+              {SHIFTS.map((s, i) => (
+                <div key={s.key} className="flex items-center gap-1.5 text-[11px] font-mono">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="text-zinc-400">{s.label}:</span>
+                  <span className="text-white font-bold">{shiftLoad[i]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {showShifts && (
-            <div className="flex items-center gap-1 mr-2 rounded border border-border bg-card px-1 py-0.5">
-              <span className="px-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
-                Turnos
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">
+                Filtro Turnos:
               </span>
-              {SHIFTS.map((s, i) => {
-                const active = shiftFilter.has(i);
-                return (
-                  <button
-                    key={s.key}
-                    onClick={() => toggleShift(i)}
-                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${
-                      active ? "text-foreground" : "text-muted-foreground/60 opacity-50"
-                    }`}
-                    style={{
-                      backgroundColor: active ? s.tint : "transparent",
-                      boxShadow: active ? `inset 0 0 0 1px ${s.color}` : undefined,
-                    }}
-                    title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00–${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00${active ? " · click para ocultar" : " · click para mostrar"}`}
-                  >
-                    <span
-                      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white"
-                      style={{ backgroundColor: s.color }}
+              <div className="flex gap-2">
+                {SHIFTS.map((s, i) => {
+                  const active = shiftFilter.has(i);
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => toggleShift(i)}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-bold transition-all ${
+                        active ? "" : "opacity-40 hover:opacity-70"
+                      }`}
+                      style={{
+                        backgroundColor: `${s.color}1a`,
+                        borderColor: `${s.color}4d`,
+                        color: s.color,
+                      }}
+                      title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00–${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00`}
                     >
-                      {s.label}
-                    </span>
-                    <span>{s.name}</span>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                      {s.name}
+                    </button>
+                  );
+                })}
+                {soloShift !== null && (
+                  <button
+                    onClick={() => setShiftFilter(new Set([0, 1, 2]))}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300 underline-offset-2 hover:underline px-2"
+                  >
+                    ver todos
                   </button>
-                );
-              })}
-              {soloShift !== null && (
-                <button
-                  onClick={() => setShiftFilter(new Set([0, 1, 2]))}
-                  className="ml-1 text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-                >
-                  ver todos
-                </button>
-              )}
+                )}
+              </div>
             </div>
           )}
-          <div className="flex rounded border border-border overflow-hidden mr-2">
-            {(["14d", "month", "quarter"] as ViewMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setViewMode(m)}
-                className={`px-2 py-1 text-[10px] uppercase tracking-widest font-mono transition-colors ${
-                  viewMode === m
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-muted-foreground hover:bg-sidebar"
-                }`}
-              >
-                {m === "14d" ? "14 días" : m === "month" ? "Mes" : "Trimestre"}
-              </button>
-            ))}
-          </div>
-          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => shift(-1)}>
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] uppercase tracking-widest font-mono" onClick={goToday}>
-            Hoy
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => shift(1)}>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
         </div>
       </div>
 
-      {soloShift !== null && showShifts && (
+      {/* ============== GANTT GRID ============== */}
+      <div className="relative flex overflow-x-auto bg-[#121214]">
+        {/* Left sticky machine column */}
         <div
-          className="border-b border-border px-4 py-1.5 text-[11px] flex items-center gap-2"
-          style={{ backgroundColor: SHIFTS[soloShift].tint }}
+          className="sticky left-0 z-30 bg-[#121214] border-r border-zinc-800 shadow-[4px_0_15px_rgba(0,0,0,0.5)]"
+          style={{ width: MACHINE_COL_WIDTH, minWidth: MACHINE_COL_WIDTH }}
         >
-          <span
-            className="inline-flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold text-white"
-            style={{ backgroundColor: SHIFTS[soloShift].color }}
-          >
-            {SHIFTS[soloShift].label}
-          </span>
-          <span className="font-medium">Viendo solo turno {SHIFTS[soloShift].name}</span>
-          <span className="text-muted-foreground">
-            ({String(SHIFTS[soloShift].startHour).padStart(2, "0")}:00 – {String((SHIFTS[soloShift].startHour + SHIFTS[soloShift].hours) % 24).padStart(2, "0")}:00) ·
-            las ODFs fuera de este turno aparecen atenuadas
-          </span>
+          <div className="h-16 flex items-center px-4 border-b border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+            Máquina
+          </div>
+          <div className="divide-y divide-zinc-800/60">
+            {machines.map((m, idx) => (
+              <div
+                key={m.id}
+                className={`px-4 flex flex-col justify-center ${
+                  idx % 2 === 0 ? "bg-zinc-900/30" : ""
+                } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
+                style={{ height: ROW_HEIGHT }}
+              >
+                {m.type === "external_shop" && (
+                  <div className="text-[10px] font-bold text-yellow-500/80 uppercase italic tracking-wide">
+                    Taller Externo
+                  </div>
+                )}
+                <div className="text-sm font-bold text-white">{m.name}</div>
+                <div className="text-[10px] text-zinc-500 font-mono uppercase">
+                  {m.type === "internal" ? "interna" : "externo"}
+                </div>
+              </div>
+            ))}
+            {unscheduled.length > 0 && (
+              <div
+                className="px-4 flex flex-col justify-center bg-zinc-950/40 border-t-2 border-dashed border-zinc-700"
+                style={{ height: ROW_HEIGHT }}
+              >
+                <div className="text-sm font-bold text-zinc-400">Sin programar</div>
+                <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
+                  {unscheduled.length} ODF{unscheduled.length === 1 ? "" : "s"}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
 
-      <div className="grid border-b border-border" style={{ gridTemplateColumns: `140px 1fr` }}>
-        <div className="border-r border-border px-3 py-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-          Máquina
-        </div>
-        <div className="grid font-mono text-[10px] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
-          {days.map((d, i) => (
-            <div
-              key={i}
-              className={`border-r border-border px-1 py-2 text-center ${
-                d.getTime() === today.getTime() ? "bg-primary/10 text-primary" : ""
-              }`}
-            >
-              {viewMode === "quarter" ? (
-                <>
-                  <div>S{getWeekNumber(d)}</div>
-                  <div className="text-foreground">{d.toLocaleDateString("es", { day: "2-digit", month: "short" })}</div>
-                </>
-              ) : (
-                <>
-                  <div>{d.toLocaleDateString("es", { weekday: "short" })}</div>
-                  <div className="text-foreground">{d.getDate()}</div>
-                  {showShifts && (
-                    <div
-                      className="mt-1 grid gap-px text-[9px] font-semibold"
-                      style={{ gridTemplateColumns: `repeat(${soloShift !== null ? 1 : 3}, 1fr)` }}
-                    >
+        {/* Timeline */}
+        <div style={{ width: columns * COL_WIDTH[viewMode], minWidth: columns * COL_WIDTH[viewMode] }}>
+          {/* Day headers */}
+          <div className="flex h-16 border-b border-zinc-800">
+            {days.map((d, i) => {
+              const isToday = d.getTime() === today.getTime();
+              return (
+                <div
+                  key={i}
+                  className={`flex-none flex flex-col border-r border-zinc-800/40 ${
+                    isToday ? "ring-1 ring-inset ring-yellow-500/40 bg-yellow-500/[0.03]" : ""
+                  }`}
+                  style={{ width: COL_WIDTH[viewMode] }}
+                >
+                  <div
+                    className={`h-8 flex items-center justify-center border-b border-zinc-800/30 ${
+                      isToday ? "bg-yellow-500/10" : "bg-zinc-900/30"
+                    }`}
+                  >
+                    {viewMode === "quarter" ? (
+                      <span className="text-[10px] font-bold uppercase tracking-tight text-zinc-400">
+                        S{getWeekNumber(d)}{" "}
+                        <span className="text-white ml-1">
+                          {d.toLocaleDateString("es", { day: "2-digit", month: "short" })}
+                        </span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-[11px] font-bold uppercase tracking-tight ${
+                          isToday ? "text-yellow-500" : "text-zinc-400"
+                        }`}
+                      >
+                        {d.toLocaleDateString("es", { weekday: "short" })}{" "}
+                        <span
+                          className={`ml-1 ${isToday ? "text-white font-black underline decoration-yellow-500" : "text-white"}`}
+                        >
+                          {d.getDate()}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  {/* Shift sub-bands (only 14d view) */}
+                  {showShifts ? (
+                    <div className="flex flex-1">
                       {SHIFTS.map((s, sIdx) => {
-                        if (soloShift !== null && sIdx !== soloShift) return null;
                         const visible = shiftFilter.has(sIdx);
+                        const isFocus = soloShift === sIdx;
                         return (
-                          <span
+                          <div
                             key={s.key}
-                            className="rounded-sm py-0.5 text-white"
+                            className="flex-1 flex items-center justify-center border-r border-zinc-800/20 last:border-r-0 transition-opacity"
                             style={{
-                              backgroundColor: visible ? s.color : "transparent",
-                              opacity: visible ? 0.85 : 0.25,
-                              color: visible ? "#fff" : undefined,
+                              backgroundColor: `${s.color}${isFocus ? "33" : visible ? "26" : "0d"}`,
+                              opacity: visible ? 1 : 0.5,
                             }}
-                            title={`${s.name} ${String(s.startHour).padStart(2, "0")}:00`}
                           >
-                            {s.label}
-                          </span>
+                            <span
+                              className="text-[11px] font-black tracking-wider"
+                              style={{
+                                color: s.color,
+                                opacity: visible ? (isFocus ? 1 : 0.85) : 0.3,
+                              }}
+                            >
+                              {s.label}
+                            </span>
+                          </div>
                         );
                       })}
                     </div>
+                  ) : (
+                    <div className="flex-1 bg-zinc-900/20" />
                   )}
-                </>
-              )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Machine rows */}
+          <div className="relative">
+            {machines.map((m, mIdx) => {
+              const rowJobs = effectiveJobs.filter(
+                (j) => j.machine_id === m.id && j.planned_start && j.planned_end,
+              );
+              return (
+                <div
+                  key={m.id}
+                  className={`relative border-b border-zinc-800/50 group ${
+                    mIdx % 2 === 0 ? "bg-zinc-900/20" : ""
+                  } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
+                  style={{ height: ROW_HEIGHT }}
+                >
+                  {/* Background drop grid: day x shift sub-bands */}
+                  <div className="absolute inset-0 flex">
+                    {days.map((d, i) => {
+                      const isToday = d.getTime() === today.getTime();
+                      return (
+                        <div
+                          key={i}
+                          className={`flex-none flex border-r border-zinc-800/40 ${
+                            isToday ? "bg-yellow-500/[0.02]" : ""
+                          }`}
+                          style={{ width: COL_WIDTH[viewMode] }}
+                        >
+                          {showShifts ? (
+                            SHIFTS.map((s, sIdx) => {
+                              const cellKey = `${m.id}:${i}:${sIdx}`;
+                              const isHover = hoverCell === cellKey;
+                              const visible = shiftFilter.has(sIdx);
+                              const isFocus = soloShift === sIdx;
+                              return (
+                                <div
+                                  key={s.key}
+                                  onDragOver={onCellDragOver}
+                                  onDragEnter={() => dragJobId && setHoverCell(cellKey)}
+                                  onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
+                                  onDrop={() => onCellDrop(m.id, i, sIdx)}
+                                  className="flex-1 border-r border-zinc-800/20 last:border-r-0 transition-all"
+                                  style={{
+                                    backgroundColor: isHover
+                                      ? `${s.color}66`
+                                      : `${s.color}${isFocus ? "1f" : visible ? "12" : "06"}`,
+                                    boxShadow: isHover ? `inset 0 0 0 2px ${s.color}` : undefined,
+                                  }}
+                                  title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00 – ${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00`}
+                                />
+                              );
+                            })
+                          ) : (
+                            <div
+                              onDragOver={onCellDragOver}
+                              onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
+                              onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
+                              onDrop={() => onCellDrop(m.id, i)}
+                              className={`flex-1 transition-colors ${
+                                hoverCell === `${m.id}:${i}` ? "bg-primary/20" : ""
+                              }`}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Job bars (absolute positioned over the grid) */}
+                  {rowJobs.map((j) => {
+                    const s = new Date(j.planned_start as string).getTime();
+                    const e = new Date(j.planned_end as string).getTime();
+                    const timelineWidth = columns * COL_WIDTH[viewMode];
+                    const leftPx = Math.max(0, ((s - start) / range) * timelineWidth);
+                    const widthPx = Math.max(
+                      24,
+                      ((Math.min(e, end) - Math.max(s, start)) / range) * timelineWidth,
+                    );
+                    if (leftPx >= timelineWidth || leftPx + widthPx <= 0) return null;
+                    const jobShiftIdx = shiftIndexFromDate(j.planned_start as string);
+                    const dimmedByFilter = showShifts && !shiftFilter.has(jobShiftIdx);
+                    const ghost = ghosts[j.id];
+                    const hasDelay = delayedJobIds.has(j.id);
+                    const pendingMove = pending.get(j.id);
+                    const shiftMeta = SHIFTS[jobShiftIdx];
+                    const spannedShifts = showShifts
+                      ? shiftSpan(j.planned_start as string, j.planned_end as string)
+                      : [jobShiftIdx];
+                    const isHovered = hoverJobId === j.id;
+                    return (
+                      <div key={j.id}>
+                        {ghost && (() => {
+                          const gs = new Date(ghost.start).getTime();
+                          const ge = new Date(ghost.end).getTime();
+                          const gl = Math.max(0, ((gs - start) / range) * timelineWidth);
+                          const gw = Math.max(
+                            24,
+                            ((Math.min(ge, end) - Math.max(gs, start)) / range) * timelineWidth,
+                          );
+                          return (
+                            <div
+                              className="absolute top-6 h-12 rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
+                              style={{ left: gl, width: gw, opacity: 0.35 }}
+                            />
+                          );
+                        })()}
+                        {pendingMove && pendingMove.original_start && pendingMove.original_end && (() => {
+                          const os = new Date(pendingMove.original_start).getTime();
+                          const oe = new Date(pendingMove.original_end).getTime();
+                          const ol = Math.max(0, ((os - start) / range) * timelineWidth);
+                          const ow = Math.max(
+                            24,
+                            ((Math.min(oe, end) - Math.max(os, start)) / range) * timelineWidth,
+                          );
+                          if (ol >= timelineWidth || ol + ow <= 0) return null;
+                          return (
+                            <div
+                              className="absolute top-6 h-12 rounded border border-dashed border-zinc-500/50 bg-zinc-700/20 pointer-events-none"
+                              style={{ left: ol, width: ow }}
+                              title="Posición original"
+                            />
+                          );
+                        })()}
+                        <button
+                          draggable
+                          onDragStart={(ev) => {
+                            setDragJobId(j.id);
+                            ev.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
+                          onMouseEnter={() => setHoverJobId(j.id)}
+                          onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
+                          onClick={() => onJobClick?.(j)}
+                          className={`absolute top-6 h-12 rounded-r-md pl-2 pr-1.5 text-left flex items-center bg-zinc-800 hover:bg-zinc-700 shadow-lg z-10 transition-all duration-200 hover:-translate-y-px hover:shadow-xl cursor-grab active:cursor-grabbing ${
+                            dragJobId === j.id ? "opacity-50" : ""
+                          } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[#121214]" : ""} ${dimmedByFilter ? "opacity-30" : ""}`}
+                          style={{
+                            left: leftPx,
+                            width: widthPx,
+                            borderLeft: `4px solid ${shiftMeta.color}`,
+                            boxShadow: `inset 3px 0 0 ${STATUS_COLOR[j.status]}33, 0 2px 8px rgba(0,0,0,0.4)`,
+                          }}
+                          title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · Turnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")}${pendingMove ? " · pendiente de aprobar" : ""}`}
+                        >
+                          {hasDelay && (
+                            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-[#121214]" />
+                          )}
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-[11px] font-black text-white leading-none truncate">
+                              ODF {j.odf}
+                            </span>
+                            {j.tube_spec && (
+                              <span className="text-[9px] text-zinc-400 font-medium uppercase mt-0.5 truncate">
+                                {j.tube_spec}
+                              </span>
+                            )}
+                          </div>
+                          {showShifts && widthPx > 80 && (
+                            <div className="ml-auto flex items-center gap-px shrink-0">
+                              {spannedShifts.map((sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded-sm text-[9px] font-black"
+                                  style={{
+                                    backgroundColor: `${SHIFTS[sIdx].color}26`,
+                                    color: SHIFTS[sIdx].color,
+                                  }}
+                                  title={SHIFTS[sIdx].name}
+                                >
+                                  {SHIFTS[sIdx].label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div
+                            className="absolute bottom-0 left-0 h-0.5 rounded-bl-sm"
+                            style={{ width: "100%", backgroundColor: STATUS_COLOR[j.status] }}
+                          />
+                        </button>
+                        {showShifts && isHovered && !dragJobId && (
+                          <div
+                            className="absolute z-20 flex items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900 px-1 py-0.5 shadow-xl"
+                            style={{
+                              left: leftPx + Math.max(widthPx, 24) / 2,
+                              top: 0,
+                              transform: "translate(-50%, 0)",
+                            }}
+                            onMouseEnter={() => setHoverJobId(j.id)}
+                            onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
+                          >
+                            <button
+                              onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, jobShiftIdx, -1); }}
+                              className="rounded p-0.5 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
+                              title="Día anterior"
+                            >
+                              <ChevronLeft className="h-3 w-3" />
+                            </button>
+                            {SHIFTS.map((s, sIdx) => {
+                              const active = jobShiftIdx === sIdx;
+                              return (
+                                <button
+                                  key={s.key}
+                                  onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, sIdx); }}
+                                  className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold transition-all ${
+                                    active ? "text-white scale-110" : "text-zinc-400 hover:text-white hover:scale-105"
+                                  }`}
+                                  style={{
+                                    backgroundColor: active ? s.color : `${s.color}26`,
+                                    boxShadow: active ? `0 0 0 1px ${s.color}` : undefined,
+                                  }}
+                                  title={`Mover a ${s.name}`}
+                                >
+                                  {s.label}
+                                </button>
+                              );
+                            })}
+                            <button
+                              onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, jobShiftIdx, 1); }}
+                              className="rounded p-0.5 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
+                              title="Día siguiente"
+                            >
+                              <ChevronRight className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Unscheduled row */}
+            {unscheduled.length > 0 && (
+              <div
+                className="relative border-t-2 border-dashed border-zinc-700 bg-zinc-950/40"
+                style={{ height: ROW_HEIGHT }}
+              >
+                <div className="absolute inset-0 p-2 flex flex-wrap gap-1.5 content-start overflow-auto">
+                  {unscheduled.map((j) => (
+                    <button
+                      key={j.id}
+                      draggable
+                      onDragStart={(ev) => {
+                        setDragJobId(j.id);
+                        ev.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
+                      onClick={() => onJobClick?.(j)}
+                      className={`rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] hover:border-yellow-500/60 hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
+                        dragJobId === j.id ? "opacity-50" : ""
+                      }`}
+                      title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
+                      <span className="font-mono font-bold text-white">ODF {j.odf}</span>
+                      {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ============== FOOTER LEGEND ============== */}
+      <div className="p-3 border-t border-zinc-800 bg-[#0c0c0e] flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-5 flex-wrap">
+          {SHIFTS.map((s) => (
+            <div key={s.key} className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.color }} />
+              <span className="text-[10px] uppercase font-bold text-zinc-500">
+                {s.name} ({String(s.startHour).padStart(2, "0")}:00 –{" "}
+                {String((s.startHour + s.hours) % 24).padStart(2, "0")}:00)
+              </span>
             </div>
           ))}
         </div>
-      </div>
-
-      {machines.map((m) => {
-        const rowJobs = effectiveJobs.filter(
-          (j) => j.machine_id === m.id && j.planned_start && j.planned_end,
-        );
-        return (
-          <div
-            key={m.id}
-            className="grid border-b border-border/60 hover:bg-sidebar/30"
-            style={{ gridTemplateColumns: `140px 1fr` }}
-          >
-            <div className="border-r border-border px-3 py-3 flex flex-col justify-center">
-              <div className="text-sm font-semibold">{m.name}</div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-                {m.type === "internal" ? "interna" : "taller externo"}
-              </div>
-            </div>
-            <div className="relative h-14">
-              <div
-                className="absolute inset-0 grid"
-                style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
-              >
-                {days.map((d, i) => (
-                  <div
-                    key={i}
-                    className={`relative border-r border-border ${
-                      d.getTime() === today.getTime() ? "bg-primary/5" : ""
-                    }`}
-                  >
-                    {showShifts ? (
-                      <div
-                        className="absolute inset-0 grid"
-                        style={{ gridTemplateColumns: `repeat(${soloShift !== null ? 1 : 3}, 1fr)` }}
-                      >
-                        {SHIFTS.map((s, sIdx) => {
-                          if (soloShift !== null && sIdx !== soloShift) return null;
-                          const cellKey = `${m.id}:${i}:${sIdx}`;
-                          const isHover = hoverCell === cellKey;
-                          const isDragging = dragJobId !== null;
-                          return (
-                            <div
-                              key={s.key}
-                              onDragOver={onCellDragOver}
-                              onDragEnter={() => dragJobId && setHoverCell(cellKey)}
-                              onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
-                              onDrop={() => onCellDrop(m.id, i, sIdx)}
-                              className={`relative border-r border-border/60 last:border-r-0 transition-all ${
-                                isHover ? "ring-2 ring-inset" : ""
-                              }`}
-                              style={{
-                                backgroundColor: isHover ? s.color + "55" : s.tint,
-                                // @ts-expect-error css var
-                                "--tw-ring-color": s.color,
-                              }}
-                              title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00 – ${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00`}
-                            >
-                              {isHover && isDragging && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                  <span
-                                    className="inline-flex h-5 w-5 items-center justify-center rounded text-[11px] font-bold text-white shadow"
-                                    style={{ backgroundColor: s.color }}
-                                  >
-                                    {s.label}
-                                  </span>
-                                  <span className="mt-0.5 text-[8px] font-semibold text-foreground/90 leading-tight">
-                                    {String(s.startHour).padStart(2, "0")}h
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div
-                        onDragOver={onCellDragOver}
-                        onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
-                        onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
-                        onDrop={() => onCellDrop(m.id, i)}
-                        className={`absolute inset-0 transition-colors ${
-                          hoverCell === `${m.id}:${i}` ? "bg-primary/20 ring-1 ring-primary ring-inset" : ""
-                        }`}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              {rowJobs.map((j) => {
-                const s = new Date(j.planned_start as string).getTime();
-                const e = new Date(j.planned_end as string).getTime();
-                const left = Math.max(0, ((s - start) / range) * 100);
-                const width = Math.max(2, ((Math.min(e, end) - Math.max(s, start)) / range) * 100);
-                if (left >= 100 || left + width <= 0) return null;
-                const jobShiftIdx = shiftIndexFromDate(j.planned_start as string);
-                const dimmedByFilter = showShifts && !shiftFilter.has(jobShiftIdx);
-                const ghost = ghosts[j.id];
-                const hasDelay = delayedJobIds.has(j.id);
-                const pendingMove = pending.get(j.id);
-                const shiftMeta = SHIFTS[jobShiftIdx];
-                const spannedShifts = showShifts
-                  ? shiftSpan(j.planned_start as string, j.planned_end as string)
-                  : [jobShiftIdx];
-                const isHovered = hoverJobId === j.id;
-                return (
-                  <div key={j.id} className="contents">
-                    {ghost && (() => {
-                      const gs = new Date(ghost.start).getTime();
-                      const ge = new Date(ghost.end).getTime();
-                      const gl = Math.max(0, ((gs - start) / range) * 100);
-                      const gw = Math.max(2, ((Math.min(ge, end) - Math.max(gs, start)) / range) * 100);
-                      return (
-                        <div
-                          className="absolute top-2 h-10 rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
-                          style={{ left: `${gl}%`, width: `${gw}%`, opacity: 0.35 }}
-                        />
-                          );
-                    })()}
-                    {pendingMove && pendingMove.original_start && pendingMove.original_end && (() => {
-                      const os = new Date(pendingMove.original_start).getTime();
-                      const oe = new Date(pendingMove.original_end).getTime();
-                      const ol = Math.max(0, ((os - start) / range) * 100);
-                      const ow = Math.max(2, ((Math.min(oe, end) - Math.max(os, start)) / range) * 100);
-                      if (ol >= 100 || ol + ow <= 0) return null;
-                      return (
-                        <div
-                          className="absolute top-2 h-10 rounded border border-dashed border-muted-foreground/50 bg-muted/20 pointer-events-none"
-                          style={{ left: `${ol}%`, width: `${ow}%` }}
-                          title="Posición original"
-                        />
-                      );
-                    })()}
-                  <button
-                    draggable
-                    onDragStart={(e) => {
-                      setDragJobId(j.id);
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
-                    onMouseEnter={() => setHoverJobId(j.id)}
-                    onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
-                    onClick={() => onJobClick?.(j)}
-                    className={`absolute top-2 h-10 rounded px-2 text-left text-[11px] text-background font-medium shadow-sm transition-all duration-500 hover:translate-y-[-1px] hover:shadow-md cursor-grab active:cursor-grabbing ${
-                      dragJobId === j.id ? "opacity-50" : ""
-                    } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-card" : ""} ${dimmedByFilter ? "opacity-25" : ""}`}
-                    style={{
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      backgroundColor: STATUS_COLOR[j.status],
-                      borderLeft: showShifts ? `3px solid ${shiftMeta.color}` : undefined,
-                    }}
-                    title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · Turnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")}${pendingMove ? " · pendiente de aprobar" : ""}`}
-                  >
-                    {hasDelay && (
-                      <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-card" />
-                    )}
-                    {showShifts && (
-                      <span
-                        className="absolute top-0.5 right-0.5 inline-flex items-center gap-px"
-                        title={`Turnos ${spannedShifts.map((i) => SHIFTS[i].name).join(" → ")}`}
-                      >
-                        {spannedShifts.map((sIdx) => (
-                          <span
-                            key={sIdx}
-                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold text-white shadow-sm"
-                            style={{ backgroundColor: SHIFTS[sIdx].color }}
-                          >
-                            {SHIFTS[sIdx].label}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                    <div className="font-mono leading-tight truncate">ODF {j.odf}</div>
-                    <div className="text-[10px] opacity-80 truncate">{j.tube_spec ?? ""}</div>
-                  </button>
-                  {showShifts && isHovered && !dragJobId && (
-                    <div
-                      className="absolute z-20 -top-1 flex items-center gap-0.5 rounded-md border border-border bg-card px-1 py-0.5 shadow-lg"
-                      style={{ left: `calc(${left}% + ${Math.max(width, 8) / 2}%)`, transform: "translate(-50%, -100%)" }}
-                      onMouseEnter={() => setHoverJobId(j.id)}
-                      onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
-                    >
-                      <button
-                        onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, jobShiftIdx, -1); }}
-                        className="rounded p-0.5 hover:bg-sidebar text-muted-foreground hover:text-foreground"
-                        title="Día anterior"
-                      >
-                        <ChevronLeft className="h-3 w-3" />
-                      </button>
-                      {SHIFTS.map((s, sIdx) => {
-                        const active = jobShiftIdx === sIdx;
-                        return (
-                          <button
-                            key={s.key}
-                            onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, sIdx); }}
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold transition-all ${
-                              active ? "text-white scale-110" : "text-foreground/70 hover:text-foreground hover:scale-105"
-                            }`}
-                            style={{
-                              backgroundColor: active ? s.color : s.tint,
-                              boxShadow: active ? `0 0 0 1px ${s.color}` : undefined,
-                            }}
-                            title={`Mover a turno ${s.name} (${String(s.startHour).padStart(2, "0")}:00)`}
-                          >
-                            {s.label}
-                          </button>
-                        );
-                      })}
-                      <button
-                        onClick={(ev) => { ev.stopPropagation(); moveJobToShift(j.id, jobShiftIdx, 1); }}
-                        className="rounded p-0.5 hover:bg-sidebar text-muted-foreground hover:text-foreground"
-                        title="Día siguiente"
-                      >
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-      {unscheduled.length > 0 && (
-        <div
-          className="grid border-t-2 border-dashed border-border bg-sidebar/20"
-          style={{ gridTemplateColumns: `140px 1fr` }}
-        >
-          <div className="border-r border-border px-3 py-3 flex flex-col justify-center">
-            <div className="text-sm font-semibold text-muted-foreground">Sin programar</div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-              {unscheduled.length} ODF{unscheduled.length === 1 ? "" : "s"}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5 p-2">
-            {unscheduled.map((j) => (
-              <button
-                key={j.id}
-                draggable
-                onDragStart={(e) => {
-                  setDragJobId(j.id);
-                  e.dataTransfer.effectAllowed = "move";
-                }}
-                onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
-                onClick={() => onJobClick?.(j)}
-                className={`rounded border border-border bg-card px-2 py-1 text-[11px] hover:border-primary hover:bg-primary/5 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
-                  dragJobId === j.id ? "opacity-50" : ""
-                }`}
-                title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma o click para editar`}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
-                <span className="font-mono font-semibold">ODF {j.odf}</span>
-                <span className="text-muted-foreground">{j.tube_spec ?? ""}</span>
-              </button>
-            ))}
-          </div>
+        <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
+          {machines.length} máquina{machines.length === 1 ? "" : "s"} · {effectiveJobs.filter(j => j.planned_start).length} ODFs programadas
         </div>
-      )}
+      </div>
     </Card>
     {pending.size > 0 && (
       <div className="sticky bottom-3 z-30 mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/60 bg-amber-50/95 dark:bg-amber-950/40 px-4 py-2.5 shadow-lg">
