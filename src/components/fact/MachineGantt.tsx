@@ -543,7 +543,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
         </div>
 
         {/* Timeline */}
-        <div style={{ width: columns * COL_WIDTH[viewMode], minWidth: columns * COL_WIDTH[viewMode] }}>
+        <div style={{ width: timelineWidth, minWidth: timelineWidth }}>
           {/* Day headers */}
           <div className="flex h-16 border-b border-zinc-800">
             {days.map((d, i) => {
@@ -554,7 +554,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                   className={`flex-none flex flex-col border-r border-zinc-800/40 ${
                     isToday ? "ring-1 ring-inset ring-yellow-500/40 bg-yellow-500/[0.03]" : ""
                   }`}
-                  style={{ width: COL_WIDTH[viewMode] }}
+                  style={{ width: dayWidths[i] }}
                 >
                   <div
                     className={`h-8 flex items-center justify-center border-b border-zinc-800/30 ${
