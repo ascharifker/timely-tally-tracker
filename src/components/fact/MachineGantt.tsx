@@ -872,39 +872,48 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
               );
             })}
 
-            {/* Unscheduled row */}
-            {unscheduled.length > 0 && (
-              <div
-                className="relative border-t-2 border-dashed border-zinc-700 bg-zinc-950/40"
-                style={{ height: ROW_HEIGHT }}
-              >
-                <div className="absolute inset-0 p-2 flex flex-wrap gap-1.5 content-start overflow-auto">
-                  {unscheduled.map((j) => (
-                    <button
-                      key={j.id}
-                      draggable
-                      onDragStart={(ev) => {
-                        setDragJobId(j.id);
-                        ev.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
-                      onClick={() => onJobClick?.(j)}
-                      className={`rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] hover:border-yellow-500/60 hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
-                        dragJobId === j.id ? "opacity-50" : ""
-                      }`}
-                      title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
-                    >
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
-                      <span className="font-mono font-bold text-white">ODF {j.odf}</span>
-                      {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Unscheduled drawer */}
+      {unscheduled.length > 0 && (
+        <div className="border-t border-zinc-800 bg-[#0c0c0e]">
+          <button
+            onClick={() => setUnschedOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-zinc-900/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Sin programar</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[10px] font-mono font-bold">
+                {unscheduled.length}
+              </span>
+            </div>
+            {unschedOpen ? <ChevronUp className="h-4 w-4 text-zinc-500" /> : <ChevronDown className="h-4 w-4 text-zinc-500" />}
+          </button>
+          {unschedOpen && (
+            <div className="p-3 flex flex-wrap gap-1.5 border-t border-zinc-800/60 max-h-40 overflow-auto">
+              {unscheduled.map((j) => (
+                <button
+                  key={j.id}
+                  draggable
+                  onDragStart={(ev) => { setDragJobId(j.id); ev.dataTransfer.effectAllowed = "move"; }}
+                  onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
+                  onClick={() => onJobClick?.(j)}
+                  className={`rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] hover:border-yellow-500/60 hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
+                    dragJobId === j.id ? "opacity-50" : ""
+                  }`}
+                  title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
+                  <span className="font-mono font-bold text-white">ODF {j.odf}</span>
+                  {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ============== FOOTER LEGEND ============== */}
       <div className="p-3 border-t border-zinc-800 bg-[#0c0c0e] flex items-center justify-between flex-wrap gap-2">
