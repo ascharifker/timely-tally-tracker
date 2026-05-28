@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Machine } from "@/lib/fact-types";
 import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
-import { useRecentDelays, useRedistributeSchedules } from "@/hooks/useFactData";
+import { useRecentDelays, useRedistributeSchedules, usePartTimes } from "@/hooks/useFactData";
+import { jobDurationHours } from "@/lib/scheduling/duration";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
@@ -28,6 +29,7 @@ const ROW_HEIGHT = 96;
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
+  const { data: partTimes = [] } = usePartTimes();
   const redistribute = useRedistributeSchedules();
   const [dragJobId, setDragJobId] = useState<string | null>(null);
   const [hoverJobId, setHoverJobId] = useState<string | null>(null);
