@@ -4,8 +4,9 @@ import { STATUS_COLOR, STATUS_LABEL } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
 import { useRecentDelays, useRedistributeSchedules, usePartTimes } from "@/hooks/useFactData";
 import { jobDurationHours } from "@/lib/scheduling/duration";
+import { packLanesByMachine } from "@/lib/scheduling/lanes";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Shuffle } from "lucide-react";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
 import { SHIFTS, shiftStartMs, shiftIndexFromDate, shiftSpan, snapToShift } from "@/lib/shifts";
 
@@ -17,15 +18,20 @@ interface Props {
 
 type ViewMode = "14d" | "month" | "quarter";
 
-// Pixel width per column for each view mode. Keeps the day grid and shift
-// sub-bands pixel-aligned with the absolutely-positioned ODF bars.
-const COL_WIDTH: Record<ViewMode, number> = {
-  "14d": 180,
-  month: 56,
-  quarter: 110,
-};
+// Base pixel widths. In 14d mode each day = 3 × SHIFT_W; in month/quarter
+// a day is one cell that fills DAY_W.
+const SHIFT_W = 64;
+const DAY_W_NORMAL = SHIFT_W * 3; // 192
+const COLLAPSED_SHIFT_W = 14; // width of off-focus shift columns in focus mode
+const DAY_W_FOCUS = COLLAPSED_SHIFT_W * 2 + SHIFT_W * 2.4; // ~181 — keep day width stable
+const DAY_W_MONTH = 56;
+const DAY_W_QUARTER = 110;
 const MACHINE_COL_WIDTH = 160;
-const ROW_HEIGHT = 96;
+const BASE_ROW_PADDING = 16; // top+bottom padding around lanes
+const LANE_HEIGHT = 48;
+const LANE_GAP = 6;
+const HOUR_MS = 60 * 60 * 1000;
+const SHIFT_MS = 8 * HOUR_MS;
 
 export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const { data: delays = [] } = useRecentDelays();
@@ -39,6 +45,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   // "single-shift mode": each day collapses to that 8h band, other bars hide.
   const [shiftFilter, setShiftFilter] = useState<Set<number>>(new Set([0, 1, 2]));
   const soloShift = shiftFilter.size === 1 ? [...shiftFilter][0] : null;
+  const [unschedOpen, setUnschedOpen] = useState(false);
   const [anchor, setAnchor] = useState<Date>(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -135,6 +142,105 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   const end = start + dayCount * 24 * 60 * 60 * 1000;
   const range = end - start;
 
+  const showShifts = viewMode === "14d";
+
+  // --------------------------------------------------------------------------
+  // Variable-width segment model. In 14d mode each day is split into 3 shift
+  // segments; in focus mode, two of those collapse to COLLAPSED_SHIFT_W.
+  // In month/quarter the whole day is a single segment.
+  // --------------------------------------------------------------------------
+  type Segment = {
+    dayIdx: number;
+    shiftIdx: number; // 0/1/2 in 14d, or 0 when not showing shifts
+    startMs: number;
+    endMs: number;
+    leftPx: number;
+    widthPx: number;
+    isFullDay: boolean;
+  };
+
+  const { segments, timelineWidth, dayWidths } = useMemo(() => {
+    const segs: Segment[] = [];
+    const dWidths: number[] = [];
+    let cursor = 0;
+    for (let i = 0; i < days.length; i++) {
+      const d = days[i];
+      if (showShifts) {
+        let dayWidth = 0;
+        for (let s = 0; s < 3; s++) {
+          let w = SHIFT_W;
+          if (soloShift !== null) {
+            w = s === soloShift ? SHIFT_W * 2.4 : COLLAPSED_SHIFT_W;
+          }
+          const segStart = shiftStartMs(d, s);
+          segs.push({
+            dayIdx: i,
+            shiftIdx: s,
+            startMs: segStart,
+            endMs: segStart + SHIFT_MS,
+            leftPx: cursor,
+            widthPx: w,
+            isFullDay: false,
+          });
+          cursor += w;
+          dayWidth += w;
+        }
+        dWidths.push(dayWidth);
+      } else {
+        const w = viewMode === "month" ? DAY_W_MONTH : DAY_W_QUARTER;
+        const cellMs = viewMode === "quarter" ? 7 * 24 * HOUR_MS : 24 * HOUR_MS;
+        segs.push({
+          dayIdx: i,
+          shiftIdx: 0,
+          startMs: d.getTime(),
+          endMs: d.getTime() + cellMs,
+          leftPx: cursor,
+          widthPx: w,
+          isFullDay: true,
+        });
+        cursor += w;
+        dWidths.push(w);
+      }
+    }
+    return { segments: segs, timelineWidth: cursor, dayWidths: dWidths };
+  }, [days, showShifts, soloShift, viewMode]);
+
+  /** Map an absolute ms timestamp to a pixel x within the timeline. */
+  const msToPx = (ms: number): number => {
+    if (segments.length === 0) return 0;
+    if (ms <= segments[0].startMs) return 0;
+    const last = segments[segments.length - 1];
+    if (ms >= last.endMs) return last.leftPx + last.widthPx;
+    // binary search for the segment containing ms
+    let lo = 0, hi = segments.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (segments[mid].endMs <= ms) lo = mid + 1;
+      else hi = mid;
+    }
+    const seg = segments[lo];
+    const frac = (ms - seg.startMs) / (seg.endMs - seg.startMs);
+    return seg.leftPx + frac * seg.widthPx;
+  };
+
+  // Lane packing per machine over currently scheduled jobs.
+  const { byMachine: lanesByMachine, laneByJob } = useMemo(() => {
+    return packLanesByMachine(
+      jobs.map((j) => {
+        const p = pending.get(j.id);
+        return p
+          ? { ...j, planned_start: p.planned_start, planned_end: p.planned_end, machine_id: p.machine_id }
+          : j;
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, pending]);
+
+  const rowHeightFor = (machineId: string): number => {
+    const lc = lanesByMachine.get(machineId)?.laneCount ?? 1;
+    return BASE_ROW_PADDING + lc * LANE_HEIGHT + Math.max(0, lc - 1) * LANE_GAP;
+  };
+
   const unscheduled = useMemo(
     () => jobs.filter((j) => !j.planned_start || !j.planned_end),
     [jobs],
@@ -209,7 +315,6 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       ? anchor.toLocaleDateString("es", { month: "long", year: "numeric" })
       : `${days[0].toLocaleDateString("es", { day: "2-digit", month: "short" })} → ${new Date(end - 1).toLocaleDateString("es", { day: "2-digit", month: "short" })}`;
 
-  const showShifts = viewMode === "14d";
   const toggleShift = (idx: number) => {
     setShiftFilter((prev) => {
       const next = new Set(prev);
@@ -416,7 +521,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 className={`px-4 flex flex-col justify-center ${
                   idx % 2 === 0 ? "bg-zinc-900/30" : ""
                 } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
-                style={{ height: ROW_HEIGHT }}
+                style={{ height: rowHeightFor(m.id) }}
               >
                 {m.type === "external_shop" && (
                   <div className="text-[10px] font-bold text-yellow-500/80 uppercase italic tracking-wide">
@@ -427,24 +532,18 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 <div className="text-[10px] text-zinc-500 font-mono uppercase">
                   {m.type === "internal" ? "interna" : "externo"}
                 </div>
+                {(lanesByMachine.get(m.id)?.laneCount ?? 0) > 1 && (
+                  <div className="text-[9px] text-amber-500/80 font-mono uppercase mt-0.5">
+                    {lanesByMachine.get(m.id)!.laneCount} lanes
+                  </div>
+                )}
               </div>
             ))}
-            {unscheduled.length > 0 && (
-              <div
-                className="px-4 flex flex-col justify-center bg-zinc-950/40 border-t-2 border-dashed border-zinc-700"
-                style={{ height: ROW_HEIGHT }}
-              >
-                <div className="text-sm font-bold text-zinc-400">Sin programar</div>
-                <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
-                  {unscheduled.length} ODF{unscheduled.length === 1 ? "" : "s"}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Timeline */}
-        <div style={{ width: columns * COL_WIDTH[viewMode], minWidth: columns * COL_WIDTH[viewMode] }}>
+        <div style={{ width: timelineWidth, minWidth: timelineWidth }}>
           {/* Day headers */}
           <div className="flex h-16 border-b border-zinc-800">
             {days.map((d, i) => {
@@ -455,7 +554,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                   className={`flex-none flex flex-col border-r border-zinc-800/40 ${
                     isToday ? "ring-1 ring-inset ring-yellow-500/40 bg-yellow-500/[0.03]" : ""
                   }`}
-                  style={{ width: COL_WIDTH[viewMode] }}
+                  style={{ width: dayWidths[i] }}
                 >
                   <div
                     className={`h-8 flex items-center justify-center border-b border-zinc-800/30 ${
@@ -490,14 +589,23 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                       {SHIFTS.map((s, sIdx) => {
                         const visible = shiftFilter.has(sIdx);
                         const isFocus = soloShift === sIdx;
+                        const segW =
+                          soloShift === null
+                            ? SHIFT_W
+                            : isFocus
+                              ? SHIFT_W * 2.4
+                              : COLLAPSED_SHIFT_W;
                         return (
                           <div
                             key={s.key}
-                            className="flex-1 flex items-center justify-center border-r border-zinc-800/20 last:border-r-0 transition-opacity"
+                            className="flex-none flex items-center justify-center border-r border-zinc-800/40 last:border-r-0 transition-all cursor-pointer"
+                            onClick={() => toggleShift(sIdx)}
                             style={{
-                              backgroundColor: `${s.color}${isFocus ? "33" : visible ? "26" : "0d"}`,
+                              width: segW,
+                              backgroundColor: `${s.color}${isFocus ? "40" : visible ? "26" : "0d"}`,
                               opacity: visible ? 1 : 0.5,
                             }}
+                            title={`${s.name} · click para foco`}
                           >
                             <span
                               className="text-[11px] font-black tracking-wider"
@@ -506,7 +614,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                                 opacity: visible ? (isFocus ? 1 : 0.85) : 0.3,
                               }}
                             >
-                              {s.label}
+                              {soloShift !== null && !isFocus ? "" : s.label}
                             </span>
                           </div>
                         );
@@ -526,62 +634,62 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
               const rowJobs = effectiveJobs.filter(
                 (j) => j.machine_id === m.id && j.planned_start && j.planned_end,
               );
+              const rowH = rowHeightFor(m.id);
               return (
                 <div
                   key={m.id}
                   className={`relative border-b border-zinc-800/50 group ${
                     mIdx % 2 === 0 ? "bg-zinc-900/20" : ""
                   } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
-                  style={{ height: ROW_HEIGHT }}
+                  style={{ height: rowH }}
                 >
-                  {/* Background drop grid: day x shift sub-bands */}
-                  <div className="absolute inset-0 flex">
-                    {days.map((d, i) => {
-                      const isToday = d.getTime() === today.getTime();
+                  {/* Background drop grid driven by segments (variable widths). */}
+                  <div className="absolute inset-0">
+                    {segments.map((seg) => {
+                      const day = days[seg.dayIdx];
+                      const isToday = day.getTime() === today.getTime();
+                      if (seg.isFullDay) {
+                        const cellKey = `${m.id}:${seg.dayIdx}`;
+                        const isHover = hoverCell === cellKey;
+                        return (
+                          <div
+                            key={`${seg.dayIdx}-${seg.shiftIdx}`}
+                            onDragOver={onCellDragOver}
+                            onDragEnter={() => dragJobId && setHoverCell(cellKey)}
+                            onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
+                            onDrop={() => onCellDrop(m.id, seg.dayIdx)}
+                            className={`absolute top-0 bottom-0 border-r border-zinc-800/40 transition-colors ${
+                              isToday ? "bg-yellow-500/[0.025]" : ""
+                            } ${isHover ? "bg-primary/20" : ""}`}
+                            style={{ left: seg.leftPx, width: seg.widthPx }}
+                          />
+                        );
+                      }
+                      const sh = SHIFTS[seg.shiftIdx];
+                      const cellKey = `${m.id}:${seg.dayIdx}:${seg.shiftIdx}`;
+                      const isHover = hoverCell === cellKey;
+                      const visible = shiftFilter.has(seg.shiftIdx);
+                      const isFocus = soloShift === seg.shiftIdx;
+                      const isDayEdge = seg.shiftIdx === 2;
+                      const alpha = isFocus ? "26" : visible ? (isToday ? "1c" : "12") : "06";
                       return (
                         <div
-                          key={i}
-                          className={`flex-none flex border-r border-zinc-800/40 ${
-                            isToday ? "bg-yellow-500/[0.02]" : ""
+                          key={`${seg.dayIdx}-${seg.shiftIdx}`}
+                          onDragOver={onCellDragOver}
+                          onDragEnter={() => dragJobId && setHoverCell(cellKey)}
+                          onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
+                          onDrop={() => onCellDrop(m.id, seg.dayIdx, seg.shiftIdx)}
+                          className={`absolute top-0 bottom-0 transition-all ${
+                            isDayEdge ? "border-r border-zinc-700/60" : "border-r border-zinc-800/30"
                           }`}
-                          style={{ width: COL_WIDTH[viewMode] }}
-                        >
-                          {showShifts ? (
-                            SHIFTS.map((s, sIdx) => {
-                              const cellKey = `${m.id}:${i}:${sIdx}`;
-                              const isHover = hoverCell === cellKey;
-                              const visible = shiftFilter.has(sIdx);
-                              const isFocus = soloShift === sIdx;
-                              return (
-                                <div
-                                  key={s.key}
-                                  onDragOver={onCellDragOver}
-                                  onDragEnter={() => dragJobId && setHoverCell(cellKey)}
-                                  onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
-                                  onDrop={() => onCellDrop(m.id, i, sIdx)}
-                                  className="flex-1 border-r border-zinc-800/20 last:border-r-0 transition-all"
-                                  style={{
-                                    backgroundColor: isHover
-                                      ? `${s.color}66`
-                                      : `${s.color}${isFocus ? "1f" : visible ? "12" : "06"}`,
-                                    boxShadow: isHover ? `inset 0 0 0 2px ${s.color}` : undefined,
-                                  }}
-                                  title={`${s.name} · ${String(s.startHour).padStart(2, "0")}:00 – ${String((s.startHour + s.hours) % 24).padStart(2, "0")}:00`}
-                                />
-                              );
-                            })
-                          ) : (
-                            <div
-                              onDragOver={onCellDragOver}
-                              onDragEnter={() => dragJobId && setHoverCell(`${m.id}:${i}`)}
-                              onDragLeave={() => hoverCell === `${m.id}:${i}` && setHoverCell(null)}
-                              onDrop={() => onCellDrop(m.id, i)}
-                              className={`flex-1 transition-colors ${
-                                hoverCell === `${m.id}:${i}` ? "bg-primary/20" : ""
-                              }`}
-                            />
-                          )}
-                        </div>
+                          style={{
+                            left: seg.leftPx,
+                            width: seg.widthPx,
+                            backgroundColor: isHover ? `${sh.color}66` : `${sh.color}${alpha}`,
+                            boxShadow: isHover ? `inset 0 0 0 2px ${sh.color}` : undefined,
+                          }}
+                          title={`${sh.name} · ${String(sh.startHour).padStart(2, "0")}:00–${String((sh.startHour + sh.hours) % 24).padStart(2, "0")}:00`}
+                        />
                       );
                     })}
                   </div>
@@ -590,15 +698,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                   {rowJobs.map((j) => {
                     const s = new Date(j.planned_start as string).getTime();
                     const e = new Date(j.planned_end as string).getTime();
-                    const timelineWidth = columns * COL_WIDTH[viewMode];
-                    const leftPx = Math.max(0, ((s - start) / range) * timelineWidth);
-                    const widthPx = Math.max(
-                      24,
-                      ((Math.min(e, end) - Math.max(s, start)) / range) * timelineWidth,
-                    );
-                    if (leftPx >= timelineWidth || leftPx + widthPx <= 0) return null;
+                    if (e < start || s > end) return null;
+                    const leftPx = msToPx(Math.max(s, start));
+                    const widthPx = Math.max(28, msToPx(Math.min(e, end)) - leftPx);
+                    if (leftPx >= timelineWidth) return null;
                     const jobShiftIdx = shiftIndexFromDate(j.planned_start as string);
                     const dimmedByFilter = showShifts && !shiftFilter.has(jobShiftIdx);
+                    if (soloShift !== null && dimmedByFilter) return null;
                     const ghost = ghosts[j.id];
                     const hasDelay = delayedJobIds.has(j.id);
                     const pendingMove = pending.get(j.id);
@@ -616,36 +722,33 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                         : dur.source === "override"
                           ? "manual"
                           : "estimado";
+                    const lane = laneByJob.get(j.id) ?? 0;
+                    const topPx = BASE_ROW_PADDING / 2 + lane * (LANE_HEIGHT + LANE_GAP);
                     return (
                       <div key={j.id}>
                         {ghost && (() => {
                           const gs = new Date(ghost.start).getTime();
                           const ge = new Date(ghost.end).getTime();
-                          const gl = Math.max(0, ((gs - start) / range) * timelineWidth);
-                          const gw = Math.max(
-                            24,
-                            ((Math.min(ge, end) - Math.max(gs, start)) / range) * timelineWidth,
-                          );
+                          if (ge < start || gs > end) return null;
+                          const gl = msToPx(Math.max(gs, start));
+                          const gw = Math.max(28, msToPx(Math.min(ge, end)) - gl);
                           return (
                             <div
-                              className="absolute top-6 h-12 rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
-                              style={{ left: gl, width: gw, opacity: 0.35 }}
+                              className="absolute rounded border-2 border-dashed border-[color:var(--status-risk)]/60 pointer-events-none animate-pulse"
+                              style={{ left: gl, width: gw, top: topPx, height: LANE_HEIGHT, opacity: 0.35 }}
                             />
                           );
                         })()}
                         {pendingMove && pendingMove.original_start && pendingMove.original_end && (() => {
                           const os = new Date(pendingMove.original_start).getTime();
                           const oe = new Date(pendingMove.original_end).getTime();
-                          const ol = Math.max(0, ((os - start) / range) * timelineWidth);
-                          const ow = Math.max(
-                            24,
-                            ((Math.min(oe, end) - Math.max(os, start)) / range) * timelineWidth,
-                          );
-                          if (ol >= timelineWidth || ol + ow <= 0) return null;
+                          if (oe < start || os > end) return null;
+                          const ol = msToPx(Math.max(os, start));
+                          const ow = Math.max(28, msToPx(Math.min(oe, end)) - ol);
                           return (
                             <div
-                              className="absolute top-6 h-12 rounded border border-dashed border-zinc-500/50 bg-zinc-700/20 pointer-events-none"
-                              style={{ left: ol, width: ow }}
+                              className="absolute rounded border border-dashed border-zinc-500/50 bg-zinc-700/20 pointer-events-none"
+                              style={{ left: ol, width: ow, top: topPx, height: LANE_HEIGHT }}
                               title="Posición original"
                             />
                           );
@@ -660,14 +763,16 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                           onMouseEnter={() => setHoverJobId(j.id)}
                           onMouseLeave={() => setHoverJobId((id) => (id === j.id ? null : id))}
                           onClick={() => onJobClick?.(j)}
-                          className={`absolute top-6 h-12 rounded-r-md pl-2 pr-1.5 text-left flex items-center bg-zinc-800 hover:bg-zinc-700 shadow-lg z-10 transition-all duration-200 hover:-translate-y-px hover:shadow-xl cursor-grab active:cursor-grabbing ${
+                          className={`absolute rounded-md pl-2 pr-1.5 text-left flex items-center bg-[#23232b] hover:bg-[#2a2a34] z-10 transition-all duration-200 hover:-translate-y-px cursor-grab active:cursor-grabbing ${
                             dragJobId === j.id ? "opacity-50" : ""
                           } ${pendingMove ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[#121214]" : ""} ${dimmedByFilter ? "opacity-30" : ""}`}
                           style={{
                             left: leftPx,
                             width: widthPx,
+                            top: topPx,
+                            height: LANE_HEIGHT,
                             borderLeft: `4px solid ${shiftMeta.color}`,
-                            boxShadow: `inset 3px 0 0 ${STATUS_COLOR[j.status]}33, 0 2px 8px rgba(0,0,0,0.4)`,
+                            boxShadow: `0 0 0 1px rgba(82,82,91,0.5), 0 4px 14px rgba(0,0,0,0.55)`,
                           }}
                           title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}\n${dur.hours.toFixed(1)}h trabajo · ${machineHps}h/turno · ocupa ${realHours.toFixed(1)}h reloj\nTurnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")} · ${sourceLabel}${pendingMove ? "\n⚠ pendiente de aprobar" : ""}`}
                         >
@@ -719,7 +824,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             className="absolute z-20 flex items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900 px-1 py-0.5 shadow-xl"
                             style={{
                               left: leftPx + Math.max(widthPx, 24) / 2,
-                              top: 0,
+                              top: Math.max(0, topPx - 22),
                               transform: "translate(-50%, 0)",
                             }}
                             onMouseEnter={() => setHoverJobId(j.id)}
@@ -767,39 +872,48 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
               );
             })}
 
-            {/* Unscheduled row */}
-            {unscheduled.length > 0 && (
-              <div
-                className="relative border-t-2 border-dashed border-zinc-700 bg-zinc-950/40"
-                style={{ height: ROW_HEIGHT }}
-              >
-                <div className="absolute inset-0 p-2 flex flex-wrap gap-1.5 content-start overflow-auto">
-                  {unscheduled.map((j) => (
-                    <button
-                      key={j.id}
-                      draggable
-                      onDragStart={(ev) => {
-                        setDragJobId(j.id);
-                        ev.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
-                      onClick={() => onJobClick?.(j)}
-                      className={`rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] hover:border-yellow-500/60 hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
-                        dragJobId === j.id ? "opacity-50" : ""
-                      }`}
-                      title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
-                    >
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
-                      <span className="font-mono font-bold text-white">ODF {j.odf}</span>
-                      {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Unscheduled drawer */}
+      {unscheduled.length > 0 && (
+        <div className="border-t border-zinc-800 bg-[#0c0c0e]">
+          <button
+            onClick={() => setUnschedOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-zinc-900/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Sin programar</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[10px] font-mono font-bold">
+                {unscheduled.length}
+              </span>
+            </div>
+            {unschedOpen ? <ChevronUp className="h-4 w-4 text-zinc-500" /> : <ChevronDown className="h-4 w-4 text-zinc-500" />}
+          </button>
+          {unschedOpen && (
+            <div className="p-3 flex flex-wrap gap-1.5 border-t border-zinc-800/60 max-h-40 overflow-auto">
+              {unscheduled.map((j) => (
+                <button
+                  key={j.id}
+                  draggable
+                  onDragStart={(ev) => { setDragJobId(j.id); ev.dataTransfer.effectAllowed = "move"; }}
+                  onDragEnd={() => { setDragJobId(null); setHoverCell(null); }}
+                  onClick={() => onJobClick?.(j)}
+                  className={`rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] hover:border-yellow-500/60 hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
+                    dragJobId === j.id ? "opacity-50" : ""
+                  }`}
+                  title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
+                  <span className="font-mono font-bold text-white">ODF {j.odf}</span>
+                  {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ============== FOOTER LEGEND ============== */}
       <div className="p-3 border-t border-zinc-800 bg-[#0c0c0e] flex items-center justify-between flex-wrap gap-2">

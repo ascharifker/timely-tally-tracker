@@ -1,77 +1,50 @@
-# Scheduling alineado a la realidad de producción
 
-Hoy el cronograma es ficticio: cada ODF dura "1–4 turnos" según prioridad y todo arranca al próximo borde de turno sin considerar la capacidad real. Vamos a reemplazarlo por un motor basado en horas reales.
+# Rediseño del Gantt — Precision industrial grid
 
-## Modelo de datos
+El Gantt actual amontona barras superpuestas, los turnos M/T/N se ven débiles y la jerarquía visual se pierde. Lo reemplazamos por una grilla industrial precisa donde **el turno es la unidad primaria** y los ODFs nunca se superponen.
 
-### 1. `machines` — nueva columna
-- `hours_per_shift NUMERIC NOT NULL DEFAULT 8` — horas productivas por turno para esa máquina (ej. MAZAK1 = 7, externa = 6). Un valor único cubre M/T/N (según tu elección).
+## Principios
 
-### 2. `part_times` — extender catálogo existente
-- Ya tiene `pir + machine_id + hours_per_piece`. Perfecto: cada combinación PIR×máquina define cuánto tarda una pieza ahí.
-- Agregar `UNIQUE (pir, machine_id)` para evitar duplicados.
+1. **Cada turno (M/T/N) es una columna real** con sombreado vertical propio que se ve desde el header hasta el fondo de cada fila.
+2. **Cero superposición**: si dos ODFs comparten tiempo en una máquina, se apilan en sub-lanes dentro de la fila (la fila crece en alto). No más cards montadas una sobre otra.
+3. **Día seleccionado/hoy** se resalta con una banda azul vertical continua a todo lo alto.
+4. **Modo turno-foco**: al elegir un solo turno en el filtro (M, T o N), las columnas de los otros dos turnos colapsan visualmente (8px) y solo se ven las barras del turno activo a tamaño grande.
 
-### 3. `jobs` — overrides opcionales
-- `hours_override NUMERIC NULL` — si el usuario quiere fijar duración total manual, ignora el cálculo automático.
+## Cambios visuales (MachineGantt.tsx)
 
-## Lógica de duración (nuevo helper `src/lib/scheduling/duration.ts`)
+### Grid
+- Reemplazar las "sub-bandas" actuales por columnas reales M/T/N con `background-color` tintado por turno (amber/sky/indigo a ~5% opacidad, ~10% en el día actual).
+- Líneas verticales más fuertes en el borde de día (border-zinc-700) y suaves entre turnos (border-zinc-800/40).
+- Header de 2 filas: día (MAR 26) + sub-header de turno (M/T/N) con color de turno.
+- Banda azul vertical continua sobre el día "hoy" (no solo en el header).
 
-```text
-duracionHoras(job, machine, partTimes) =
-  job.hours_override                          // si está seteado
-  ?? (lookup(part_times, job.pir, job.machine_id)?.hours_per_piece * job.qty)
-  ?? fallback heurístico actual (priority+qty)  // para ODFs sin PIR cargado
-```
+### Barras de ODF — sin overlaps
+- Algoritmo de lane-packing por máquina: ordenar jobs por `planned_start`, asignar cada uno al primer lane libre (cuyo último `planned_end` ≤ nuevo `planned_start`).
+- `ROW_HEIGHT` se vuelve dinámico: `baseHeight + lanes * (barHeight + gap)`. Una máquina con 1 lane mantiene altura compacta; máquinas con conflictos crecen y muestran todos los ODFs sin tapar.
+- Card de ODF rediseñada según el prototipo: fondo `bg-slate-800`, borde lateral izquierdo de 4px en color del turno principal, header con badge EST + nombre ODF, footer con material. Hover sube el borde a amber.
 
-## Motor de scheduling (reemplaza `addShifts(start, durationShifts)`)
+### Modo turno-foco
+- Cuando `shiftFilter.size === 1`:
+  - Las columnas de los otros dos turnos se renderizan con `width: 8px` y opacidad 0.3 (siguen visibles como "separadores" pero ceden el espacio).
+  - El turno activo ocupa el ancho restante del día → barras 3× más grandes y legibles.
+  - Barras cuyo span no toca el turno activo se ocultan (ya existe la lógica, ajustar para que no consuman lane).
 
-Nuevo `scheduleJob(startMs, hoursNeeded, machine)`:
-1. Snap `startMs` al próximo borde de turno (06/14/22) — ya existe `nextShiftBoundary`.
-2. Mientras queden horas, consumir `machine.hours_per_shift` por turno:
-   - Si la ODF necesita 10h y la máquina rinde 7h/turno → ocupa turno 1 completo + 3h del turno 2.
-   - El bloque visual arranca en el borde y termina en `start + (turnosEnteros·8h) + horasRestantesProporcional`.
-3. Devuelve `{ planned_start, planned_end }` con horas reales (no múltiplos de 8).
+### Header / toolbar
+- Mantener funcionalidad actual (Redistribuir, 14d/Mes/Trimestre, Hoy, Carga M/T/N, Filtro Turnos) pero con la jerarquía del prototipo: título grande, chip de rango, pills de turno con color saturado.
+- Quitar el indicador de "soloShift" textual redundante: el colapso visual lo comunica.
 
-Esto reemplaza la lógica en:
-- `useUpdateJobStatus` (cuando pasa a MAZAK)
-- `computeSpreadSchedule` (backfill)
-- `useRedistributeSchedules` (botón Redistribuir)
-- `cascade` en `src/lib/scheduling/cascade.ts` — al recalcular downstream, usar el nuevo motor en vez de delta horario fijo.
-
-## Gantt
-
-- Las barras ya se posicionan por `planned_start`/`planned_end` reales, así que se alinean naturalmente con las sub-bandas M/T/N del rediseño anterior.
-- Agregar tooltip: `"10h · 7h/turno · MAZAK1 → M completo + 3h T"` para que el operario entienda el cálculo.
-- Badge cuando se usa `hours_override` o cuando falta cargar `part_times` (fallback heurístico) — visibilidad de "datos faltantes".
-
-## Pantalla de configuración (nueva ruta `/configuracion`)
-
-Dos secciones, link desde el AppShell:
-
-**1. Máquinas** — tabla editable inline:
-- Columnas: Nombre · Tipo · h/turno · Capacidad diaria (3×h/turno, calculado)
-- Edit directo en celda h/turno → mutación a `machines.hours_per_shift`.
-
-**2. Catálogo PIR×Máquina** — tabla con buscador:
-- Columnas: PIR · Máquina · h/pieza · Última edición
-- Botón "+ Agregar entrada" → dialog (PIR autocomplete desde jobs existentes, Máquina select, h/pieza number)
-- Edit inline de h/pieza, delete con confirm.
-- Indicador "N PIRs sin tiempo cargado" arriba, listando los PIRs usados en jobs activos sin entrada en catálogo.
+### Fila "sin programar"
+- Mover a un drawer plegable al pie de la grilla en lugar de fila inline (ocupa espacio y no aporta info temporal).
 
 ## Archivos a tocar
 
-- **Migración**: `ALTER machines ADD hours_per_shift`, `ALTER jobs ADD hours_override`, `UNIQUE` en `part_times`.
-- **Nuevo**: `src/lib/scheduling/duration.ts`, `src/lib/scheduling/schedule.ts`, `src/routes/configuracion.tsx`, `src/components/fact/MachinesConfig.tsx`, `src/components/fact/PartTimesConfig.tsx`.
-- **Editar**: `src/hooks/useFactData.ts` (scheduling hooks usan nuevo motor + queries para machines/part_times mutations), `src/lib/scheduling/cascade.ts`, `src/components/fact/MachineGantt.tsx` (tooltip + badge fallback), `src/components/fact/AppShell.tsx` (link "Configuración"), `src/lib/fact-types.ts` (campos nuevos).
+- **Editar**: `src/components/fact/MachineGantt.tsx` — toda la sección de grid + render de barras + lane packing. Header se conserva con ajustes menores.
+- **Nuevo helper**: `src/lib/scheduling/lanes.ts` — función pura `packLanes(jobs: Job[]): Map<jobId, laneIndex>` + `lanesPerMachine(jobs): Map<machineId, number>`.
+- **Sin cambios** en lógica de scheduling, drag&drop, pending moves, ApproveMovesDialog, hooks de data, ni en `shifts.ts`.
 
-## Backfill / compatibilidad
+## Qué NO incluye
 
-- ODFs existentes mantienen sus `planned_start/end` actuales; el nuevo motor solo se aplica al crear/mover/redistribuir.
-- Botón "Redistribuir" del Gantt va a recalcular todo con horas reales — ideal para alinear el estado actual una vez que cargues el catálogo.
-- Si una ODF no tiene PIR o no hay entrada en `part_times` para esa máquina, se usa el heurístico actual y se muestra badge "estimado".
-
-## Qué NO incluye este plan
-
-- Multi-turno con h/turno distinto por M/T/N (elegiste un valor único por máquina).
-- Override por ODF desde detalle (lo dejo preparado en schema con `hours_override` pero sin UI; lo agrego si lo querés).
-- Calendario de paros / mantenimiento por máquina (siguiente iteración).
+- Cambios al motor de scheduling por horas (ya implementado).
+- Cambios al modelo de datos.
+- Sub-vista por turno individual como ruta separada (el modo turno-foco lo cubre con un click).
+- Footer de stats / "próximo cambio" del prototipo (no hay datos reales para eso aún; lo dejo para otra iteración si lo querés).
