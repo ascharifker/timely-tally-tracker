@@ -1,56 +1,61 @@
-## Sincronizar Kanban ↔ Gantt (estado ↔ máquina)
+## Mejoras al StatusBoard (kanban)
 
-Hoy el kanban edita `jobs.status` y el Gantt edita `jobs.machine_id` (+ fechas). Están desconectados: pasar la card de MAZAK a Taller Externo no la mueve a la fila de GMAC en el Gantt, y arrastrar la barra de MAZAK 1 a GMAC en el Gantt no cambia su columna en el kanban.
+Todo se concentra en `src/components/fact/StatusBoard.tsx` más un par de helpers. No cambia el esquema BD ni la lógica de mutaciones.
 
-La regla es: **MAZAK ⟷ máquina interna**, **TALLER_EXTERNO ⟷ máquina `external_shop`**. Si una acción rompe esa equivalencia, la otra dimensión se sincroniza automáticamente.
+### 1. Chip de máquina en la card
 
-### 1. Kanban → Gantt (`useUpdateJobStatus` en `src/hooks/useFactData.ts`)
+Dentro de MAZAK y TALLER_EXTERNO, cada card muestra un chip compacto (`M1`…`M5`, `GMAC`) con el color de la máquina como fondo, junto al `ODF`.
 
-Al cambiar status:
+- Necesita `machines` en `StatusBoard` (hoy solo recibe `jobs`). Pasarlo desde `src/routes/index.tsx` y `src/routes/riesgo.tsx` (ambos lugares que lo renderizan).
+- Etiqueta corta: para "MAZAK N" → `MN`, para externos → primeras 4 letras del nombre (`GMAC`).
+- Color: nuevo campo opcional `color` no existe en `machines`; uso `STATUS_COLOR[job.status]` con leve variación por `display_order` (tinte HSL) para distinguirlas. Alternativa simple: paleta fija de 6 colores indexada por `display_order`.
 
-- **→ `TALLER_EXTERNO`**:
-  - Si la máquina actual NO es `external_shop`, reasignar al primer machine con `type === "external_shop"` (hoy GMAC). Recalcular `planned_start`/`planned_end` con `scheduleJob` para esa máquina.
-  - Si ya está en una externa, dejar la máquina.
-- **→ `MAZAK`**:
-  - Si la máquina actual es `external_shop`, limpiar `machine_id` y `planned_start`/`planned_end` (el usuario debe elegir MAZAK 1..5 — ya existe el toast "Asigná una máquina para verlo en el cronograma").
-  - Si ya está en interna, comportamiento actual (re-schedule si faltan fechas).
-- **Otros estados**: sin cambios.
+### 2. Agrupación por máquina dentro de columna
 
-Aplicarlo tanto en `onMutate` (optimista) como en el `mutationFn` (patch persistido), igual que el código actual.
+Dentro de las columnas MAZAK y TALLER_EXTERNO, las cards se agrupan por `machine_id` con un mini-header `── MAZAK 3 (4) ──` colapsable (estado local en el componente, `useState<Record<string, boolean>>`).
 
-### 2. Gantt → Kanban (`useRescheduleJob` y `useApplyReschedules`)
+- Sin máquina asignada → grupo `Sin asignar` arriba con estilo de warning.
+- Otras columnas (PLANNED, CEMENTACION, etc.) sin cambios.
+- Orden de grupos: por `display_order` de la máquina.
 
-En el patch que se envía a Supabase y en el optimista, si `machine_id` cambia y eso cruza la frontera interna/externa, sumar `status` al patch:
+### 3. Filtro rápido por máquina
 
-- nueva máquina `external_shop` y status era `MAZAK` → `status = "TALLER_EXTERNO"`
-- nueva máquina interna y status era `TALLER_EXTERNO` → `status = "MAZAK"`
-- otros: no tocar status (CEMENTACION/EXPO/etc. se preservan).
+Barra de chips arriba del board (encima del grid actual), uno por máquina (`M1 M2 M3 M4 M5 GMAC`) más `Todas`. Multi-toggle.
 
-Helper compartido:
+- Estado local `selectedMachines: Set<string>` (vacío = todas).
+- Las cards de máquinas no seleccionadas se renderizan con `opacity-30` (no se ocultan, para no mover layout). Los contadores de columna siguen mostrando el total real, pero suman `(X visibles)` al lado cuando hay filtro activo.
 
-```ts
-function statusForMachine(currentStatus, newMachine) {
-  if (!newMachine) return currentStatus;
-  if (newMachine.type === "external_shop" && currentStatus === "MAZAK") return "TALLER_EXTERNO";
-  if (newMachine.type === "internal"      && currentStatus === "TALLER_EXTERNO") return "MAZAK";
-  return currentStatus;
-}
-```
+### 4. Badge de urgencia/atraso visible
 
-Se llama en:
-- `useRescheduleJob.mutationFn` y `onMutate` (línea ~377 en adelante)
-- `useApplyReschedules.mutationFn` y `onMutate` (línea ~513) — itera sobre `commits[]`
+En la card, debajo del ODF:
 
-### 3. UX
+- Si `priority === "urgent"` → badge `URG` (ya está).
+- Si `customer_date` existe y faltan ≤ 3 días → badge `Vence Xd` rojo.
+- Si `customer_date < hoy` y status ≠ `YA_SE_ENVIO` → badge `ATRASO Xd` rojo intenso.
+- Helper nuevo `src/lib/job-urgency.ts` con `getUrgency(job): { kind, label, days } | null` — testeable y reusable en `OTDTracker` / `riesgo.tsx`.
 
-- Toast en el cambio implícito de status: "ODF 1234 movida a Taller Externo" cuando se origina desde el Gantt.
-- En `ApproveMovesDialog`, si una move implica cambio de status, mostrarlo en la fila (badge nuevo "→ Taller Externo" / "→ MAZAK"). Opcional/menor; lo dejo si la fila ya muestra `original_machine_id` vs `machine_id`. **Lo incluyo solo si no añade fricción**.
+### 5. Contador de horas restantes por columna
 
-### Archivos a tocar
-- `src/hooks/useFactData.ts` — único archivo con lógica de mutación. Cambios localizados a 3 funciones: `useUpdateJobStatus`, `useRescheduleJob`, `useApplyReschedules`.
-- (opcional) `src/components/fact/ApproveMovesDialog.tsx` — badge informativo si el move cambia status.
+En el header de cada columna, junto al contador de ODFs:
+
+- Suma de horas estimadas pendientes de las cards en esa columna.
+- Reusa el cálculo de duración existente (`src/lib/scheduling/duration.ts`, que conoce `hours_override` y `part_times`).
+- Formato: `4 ODF · 32h`.
+- Solo aplica a MAZAK y TALLER_EXTERNO (las otras etapas no tienen horas-máquina); en el resto sigue solo `N ODF`.
+
+### 6. Indicador visual: MAZAK sin máquina
+
+Card en columna MAZAK con `machine_id === null` → borde izquierdo rojo punteado + ícono ⚠ + tooltip "Asigná una máquina o devolvé a Planificado". Click no abre el detalle común sino que sugiere la acción (o simplemente abre el detalle con foco en el selector de máquina — más simple). Va dentro del grupo "Sin asignar" del punto 2.
+
+### Archivos
+
+- **Edit** `src/components/fact/StatusBoard.tsx` — toda la UI.
+- **Edit** `src/routes/index.tsx` y `src/routes/riesgo.tsx` — pasar `machines` al `StatusBoard`.
+- **New** `src/lib/job-urgency.ts` — helper `getUrgency(job)`.
+- **Edit** `src/lib/fact-types.ts` (opcional) — exportar paleta de colores de máquina si no usamos derivada.
 
 ### Fuera de alcance
-- Múltiples talleres externos: hoy solo GMAC. Si en el futuro hay 2+, se podrá mostrar un selector. Mientras tanto, auto-pick del primero por `display_order`.
-- Cambios al esquema BD: ninguno (status y machine_id ya existen y permiten cualquier combinación).
-- Cambios al scheduler en sí (`src/lib/scheduling/schedule.ts`).
+
+- Cambios al Gantt o a las mutaciones (kanban ↔ Gantt ya están sincronizados).
+- Persistir filtro/colapso entre sesiones (es UI efímera).
+- Nueva columna física por máquina (descartado en la discusión previa).
