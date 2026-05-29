@@ -166,33 +166,99 @@ export type Database = {
           },
         ]
       }
+      machine_runs: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          id: string
+          job_id: string
+          machine_id: string
+          notes: string | null
+          operator_name: string | null
+          pieces_completed: number
+          started_at: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          job_id: string
+          machine_id: string
+          notes?: string | null
+          operator_name?: string | null
+          pieces_completed?: number
+          started_at: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          job_id?: string
+          machine_id?: string
+          notes?: string | null
+          operator_name?: string | null
+          pieces_completed?: number
+          started_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       machines: {
         Row: {
           active_shifts: string[]
           created_at: string
           display_order: number
+          hourly_cost: number
           hours_per_shift: number
           id: string
+          image_url: string | null
+          location: string | null
+          model: string | null
           name: string
+          notes: string | null
+          purchase_date: string | null
+          serial_number: string | null
           type: Database["public"]["Enums"]["machine_type"]
+          vendor_id: string | null
+          year: number | null
         }
         Insert: {
           active_shifts?: string[]
           created_at?: string
           display_order?: number
+          hourly_cost?: number
           hours_per_shift?: number
           id?: string
+          image_url?: string | null
+          location?: string | null
+          model?: string | null
           name: string
+          notes?: string | null
+          purchase_date?: string | null
+          serial_number?: string | null
           type?: Database["public"]["Enums"]["machine_type"]
+          vendor_id?: string | null
+          year?: number | null
         }
         Update: {
           active_shifts?: string[]
           created_at?: string
           display_order?: number
+          hourly_cost?: number
           hours_per_shift?: number
           id?: string
+          image_url?: string | null
+          location?: string | null
+          model?: string | null
           name?: string
+          notes?: string | null
+          purchase_date?: string | null
+          serial_number?: string | null
           type?: Database["public"]["Enums"]["machine_type"]
+          vendor_id?: string | null
+          year?: number | null
         }
         Relationships: []
       }
@@ -320,6 +386,51 @@ export type Database = {
           },
         ]
       }
+      vendors: {
+        Row: {
+          active: boolean
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          hourly_rate: number
+          id: string
+          lead_time_days_avg: number | null
+          name: string
+          notes: string | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          hourly_rate?: number
+          id?: string
+          lead_time_days_avg?: number | null
+          name: string
+          notes?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          hourly_rate?: number
+          id?: string
+          lead_time_days_avg?: number | null
+          name?: string
+          notes?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -334,6 +445,8 @@ export type Database = {
         | "absence"
         | "change_order"
         | "breakdown"
+        | "maintenance_preventive"
+        | "maintenance_corrective"
       job_priority: "low" | "normal" | "high" | "urgent"
       job_status:
         | "PLANNED"
@@ -478,6 +591,8 @@ export const Constants = {
         "absence",
         "change_order",
         "breakdown",
+        "maintenance_preventive",
+        "maintenance_corrective",
       ],
       job_priority: ["low", "normal", "high", "urgent"],
       job_status: [
