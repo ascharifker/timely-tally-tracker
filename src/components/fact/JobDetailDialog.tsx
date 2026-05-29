@@ -114,6 +114,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
           <Field label="Prioridad" value={job.priority} />
           <Field label="Fecha exportación" value={job.export_date} />
           <Field label="Fecha cliente" value={job.customer_date} />
+          <Field label="Operador" value={job.operator_name} />
         </div>
 
         {job.planned_start && (() => {
