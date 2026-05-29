@@ -1,43 +1,56 @@
-## Compactar OTD en home + página dedicada a "Trabajos en riesgo"
+## Sincronizar Kanban ↔ Gantt (estado ↔ máquina)
 
-### 1. Compactar `OTDTracker` en la home
+Hoy el kanban edita `jobs.status` y el Gantt edita `jobs.machine_id` (+ fechas). Están desconectados: pasar la card de MAZAK a Taller Externo no la mueve a la fila de GMAC en el Gantt, y arrastrar la barra de MAZAK 1 a GMAC en el Gantt no cambia su columna en el kanban.
 
-Quitar de la card de la home:
-- El bloque "Cómo se calcula" (legend)
-- La tabla completa de Trabajos en riesgo
+La regla es: **MAZAK ⟷ máquina interna**, **TALLER_EXTERNO ⟷ máquina `external_shop`**. Si una acción rompe esa equivalencia, la otra dimensión se sincroniza automáticamente.
 
-Dejar solo:
-- Header `OTD · Entrega a Tiempo`
-- Los 4 KPIs (OTD %, A tiempo, En riesgo, Tarde)
-- Footer compacto con `Link` a `/riesgo`: "Ver trabajos en riesgo →" (mostrando el conteo `{atRisk.length} ODFs`)
+### 1. Kanban → Gantt (`useUpdateJobStatus` en `src/hooks/useFactData.ts`)
 
-Resultado: la card pasa de ~400px a ~140px de alto.
+Al cambiar status:
 
-### 2. Nueva ruta `/riesgo` (`src/routes/riesgo.tsx`)
+- **→ `TALLER_EXTERNO`**:
+  - Si la máquina actual NO es `external_shop`, reasignar al primer machine con `type === "external_shop"` (hoy GMAC). Recalcular `planned_start`/`planned_end` con `scheduleJob` para esa máquina.
+  - Si ya está en una externa, dejar la máquina.
+- **→ `MAZAK`**:
+  - Si la máquina actual es `external_shop`, limpiar `machine_id` y `planned_start`/`planned_end` (el usuario debe elegir MAZAK 1..5 — ya existe el toast "Asigná una máquina para verlo en el cronograma").
+  - Si ya está en interna, comportamiento actual (re-schedule si faltan fechas).
+- **Otros estados**: sin cambios.
 
-Página dedicada con:
-- Header con título "Trabajos en Riesgo" + breadcrumb / link "← Volver al tablero"
-- Los mismos 4 KPIs arriba (reutilizando los `Pct` cards extraídos a un sub-componente compartido)
-- El bloque "Cómo se calcula" (legend completo)
-- **Tabla expandida** de trabajos en riesgo con más columnas que la versión actual:
-  - ODF, Tubo, PIR, Cantidad, Operador, Máquina, Fecha cliente, Fecha export planeada, Días restantes, Estado
-  - Ordenable por fecha cliente (más urgente arriba por defecto)
-  - Filtro tabs: Todos / En riesgo / Tarde
-  - Click en fila abre el `JobDetailDialog` existente
-- `head()` propio con title/description
+Aplicarlo tanto en `onMutate` (optimista) como en el `mutationFn` (patch persistido), igual que el código actual.
 
-Lee los mismos datos vía el hook `useFactData` ya existente.
+### 2. Gantt → Kanban (`useRescheduleJob` y `useApplyReschedules`)
 
-### 3. Refactor mínimo
+En el patch que se envía a Supabase y en el optimista, si `machine_id` cambia y eso cruza la frontera interna/externa, sumar `status` al patch:
 
-Extraer `Pct` y la legend a `src/components/fact/otd-shared.tsx` para reusar entre la card compacta y la página completa, sin duplicar markup.
+- nueva máquina `external_shop` y status era `MAZAK` → `status = "TALLER_EXTERNO"`
+- nueva máquina interna y status era `TALLER_EXTERNO` → `status = "MAZAK"`
+- otros: no tocar status (CEMENTACION/EXPO/etc. se preservan).
+
+Helper compartido:
+
+```ts
+function statusForMachine(currentStatus, newMachine) {
+  if (!newMachine) return currentStatus;
+  if (newMachine.type === "external_shop" && currentStatus === "MAZAK") return "TALLER_EXTERNO";
+  if (newMachine.type === "internal"      && currentStatus === "TALLER_EXTERNO") return "MAZAK";
+  return currentStatus;
+}
+```
+
+Se llama en:
+- `useRescheduleJob.mutationFn` y `onMutate` (línea ~377 en adelante)
+- `useApplyReschedules.mutationFn` y `onMutate` (línea ~513) — itera sobre `commits[]`
+
+### 3. UX
+
+- Toast en el cambio implícito de status: "ODF 1234 movida a Taller Externo" cuando se origina desde el Gantt.
+- En `ApproveMovesDialog`, si una move implica cambio de status, mostrarlo en la fila (badge nuevo "→ Taller Externo" / "→ MAZAK"). Opcional/menor; lo dejo si la fila ya muestra `original_machine_id` vs `machine_id`. **Lo incluyo solo si no añade fricción**.
 
 ### Archivos a tocar
-- `src/components/fact/OTDTracker.tsx` — recortar a versión compacta
-- `src/components/fact/otd-shared.tsx` — nuevo, KPIs + legend reutilizables
-- `src/routes/riesgo.tsx` — nueva página
-- (auto) `src/routeTree.gen.ts` se regenera
+- `src/hooks/useFactData.ts` — único archivo con lógica de mutación. Cambios localizados a 3 funciones: `useUpdateJobStatus`, `useRescheduleJob`, `useApplyReschedules`.
+- (opcional) `src/components/fact/ApproveMovesDialog.tsx` — badge informativo si el move cambia status.
 
 ### Fuera de alcance
-- Cambios al cálculo OTD (`src/lib/scheduling/otd.ts`)
-- Cambios al resto del dashboard
+- Múltiples talleres externos: hoy solo GMAC. Si en el futuro hay 2+, se podrá mostrar un selector. Mientras tanto, auto-pick del primero por `display_order`.
+- Cambios al esquema BD: ninguno (status y machine_id ya existen y permiten cualquier combinación).
+- Cambios al scheduler en sí (`src/lib/scheduling/schedule.ts`).
