@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RiesgoRouteImport } from './routes/riesgo'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 
 const RiesgoRoute = RiesgoRouteImport.update({
   id: '/riesgo',
@@ -28,35 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MaquinaIdRoute = MaquinaIdRouteImport.update({
+  id: '/maquina/$id',
+  path: '/maquina/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
   '/riesgo': typeof RiesgoRoute
+  '/maquina/$id': typeof MaquinaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
   '/riesgo': typeof RiesgoRoute
+  '/maquina/$id': typeof MaquinaIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
   '/riesgo': typeof RiesgoRoute
+  '/maquina/$id': typeof MaquinaIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/configuracion' | '/riesgo'
+  fullPaths: '/' | '/configuracion' | '/riesgo' | '/maquina/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/configuracion' | '/riesgo'
-  id: '__root__' | '/' | '/configuracion' | '/riesgo'
+  to: '/' | '/configuracion' | '/riesgo' | '/maquina/$id'
+  id: '__root__' | '/' | '/configuracion' | '/riesgo' | '/maquina/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
   RiesgoRoute: typeof RiesgoRoute
+  MaquinaIdRoute: typeof MaquinaIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/maquina/$id': {
+      id: '/maquina/$id'
+      path: '/maquina/$id'
+      fullPath: '/maquina/$id'
+      preLoaderRoute: typeof MaquinaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,7 +106,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracionRoute: ConfiguracionRoute,
   RiesgoRoute: RiesgoRoute,
+  MaquinaIdRoute: MaquinaIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
