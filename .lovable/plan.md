@@ -1,50 +1,62 @@
+## Adaptar horarios de turnos y capacidad de máquinas (email Fron)
 
-# Rediseño del Gantt — Precision industrial grid
+Aplicar la realidad operativa que mandó Fron: ventanas horarias reales de los turnos, días laborables Lun–Vie, y configuración por máquina.
 
-El Gantt actual amontona barras superpuestas, los turnos M/T/N se ven débiles y la jerarquía visual se pierde. Lo reemplazamos por una grilla industrial precisa donde **el turno es la unidad primaria** y los ODFs nunca se superponen.
+### 1. Horarios de turnos (`src/lib/shifts.ts`)
 
-## Principios
+Cambiar `SHIFTS` y `shiftIndexFromHour` a las ventanas reales:
 
-1. **Cada turno (M/T/N) es una columna real** con sombreado vertical propio que se ve desde el header hasta el fondo de cada fila.
-2. **Cero superposición**: si dos ODFs comparten tiempo en una máquina, se apilan en sub-lanes dentro de la fila (la fila crece en alto). No más cards montadas una sobre otra.
-3. **Día seleccionado/hoy** se resalta con una banda azul vertical continua a todo lo alto.
-4. **Modo turno-foco**: al elegir un solo turno en el filtro (M, T o N), las columnas de los otros dos turnos colapsan visualmente (8px) y solo se ven las barras del turno activo a tamaño grande.
+- Matutino (M): **07:00 – 15:00**
+- Vespertino (T): **15:00 – 23:00**
+- Nocturno (N): **23:00 – 07:00**
 
-## Cambios visuales (MachineGantt.tsx)
+Actualizar:
+- `SHIFTS[*].startHour` → 7 / 15 / 23
+- `shiftIndexFromHour`: M `7≤h<15`, T `15≤h<23`, resto N
+- `nextShiftBoundary`: boundaries `[7, 15, 23]`
+- `formatShiftLabel`: ya muestra `startHour:00`, se beneficia automáticamente
 
-### Grid
-- Reemplazar las "sub-bandas" actuales por columnas reales M/T/N con `background-color` tintado por turno (amber/sky/indigo a ~5% opacidad, ~10% en el día actual).
-- Líneas verticales más fuertes en el borde de día (border-zinc-700) y suaves entre turnos (border-zinc-800/40).
-- Header de 2 filas: día (MAR 26) + sub-header de turno (M/T/N) con color de turno.
-- Banda azul vertical continua sobre el día "hoy" (no solo en el header).
+### 2. Días laborables (Lun–Vie)
 
-### Barras de ODF — sin overlaps
-- Algoritmo de lane-packing por máquina: ordenar jobs por `planned_start`, asignar cada uno al primer lane libre (cuyo último `planned_end` ≤ nuevo `planned_start`).
-- `ROW_HEIGHT` se vuelve dinámico: `baseHeight + lanes * (barHeight + gap)`. Una máquina con 1 lane mantiene altura compacta; máquinas con conflictos crecen y muestran todos los ODFs sin tapar.
-- Card de ODF rediseñada según el prototipo: fondo `bg-slate-800`, borde lateral izquierdo de 4px en color del turno principal, header con badge EST + nombre ODF, footer con material. Hover sube el borde a amber.
+Añadir en `shifts.ts`:
 
-### Modo turno-foco
-- Cuando `shiftFilter.size === 1`:
-  - Las columnas de los otros dos turnos se renderizan con `width: 8px` y opacidad 0.3 (siguen visibles como "separadores" pero ceden el espacio).
-  - El turno activo ocupa el ancho restante del día → barras 3× más grandes y legibles.
-  - Barras cuyo span no toca el turno activo se ocultan (ya existe la lógica, ajustar para que no consuman lane).
+```ts
+export function isWorkday(d: Date) {
+  const day = d.getDay(); // 0 = dom, 6 = sáb
+  return day >= 1 && day <= 5;
+}
+```
 
-### Header / toolbar
-- Mantener funcionalidad actual (Redistribuir, 14d/Mes/Trimestre, Hoy, Carga M/T/N, Filtro Turnos) pero con la jerarquía del prototipo: título grande, chip de rango, pills de turno con color saturado.
-- Quitar el indicador de "soloShift" textual redundante: el colapso visual lo comunica.
+Extender `nextActiveShiftBoundary` para saltar sábados y domingos: si el candidato cae en fin de semana, avanzar al lunes 07:00 y volver a evaluar el turno activo de la máquina.
 
-### Fila "sin programar"
-- Mover a un drawer plegable al pie de la grilla en lugar de fila inline (ocupa espacio y no aporta info temporal).
+Esto hace que el scheduler (`src/lib/scheduling/schedule.ts`, que ya usa `nextActiveShiftBoundary`) salte automáticamente el fin de semana sin más cambios.
 
-## Archivos a tocar
+### 3. Configuración por máquina (datos)
 
-- **Editar**: `src/components/fact/MachineGantt.tsx` — toda la sección de grid + render de barras + lane packing. Header se conserva con ajustes menores.
-- **Nuevo helper**: `src/lib/scheduling/lanes.ts` — función pura `packLanes(jobs: Job[]): Map<jobId, laneIndex>` + `lanesPerMachine(jobs): Map<machineId, number>`.
-- **Sin cambios** en lógica de scheduling, drag&drop, pending moves, ApproveMovesDialog, hooks de data, ni en `shifts.ts`.
+Migrar `machines.active_shifts` al estado real:
 
-## Qué NO incluye
+| Máquina | active_shifts |
+|---|---|
+| MAZAK 1 | `{manana,tarde,noche}` |
+| MAZAK 2 | `{manana,tarde}` |
+| MAZAK 3 | `{manana,tarde,noche}` |
+| MAZAK 4 | `{manana}` |
+| MAZAK 5 | `{manana}` |
+| GEMAK, MAQYRO, TECMAC, GMAC | sin cambios (se quedan como están hasta que Fron confirme) |
 
-- Cambios al motor de scheduling por horas (ya implementado).
-- Cambios al modelo de datos.
-- Sub-vista por turno individual como ruta separada (el modo turno-foco lo cubre con un click).
-- Footer de stats / "próximo cambio" del prototipo (no hay datos reales para eso aún; lo dejo para otra iteración si lo querés).
+Se hará con `supabase--insert` (UPDATE de datos, no migración de esquema).
+
+### 4. UI
+
+- `MachinesConfig.tsx`: los toggles M/T/N ya existen — solo verificar que las etiquetas y la capacidad diaria (`hours_per_shift × nº turnos activos`) reflejan los nuevos horarios.
+- `MachineGantt.tsx` (bandas verticales M/T/N): se re-pintan solas porque leen `SHIFTS[*].startHour`. Verificar visualmente en `/`.
+- Opcional: añadir un tooltip "Lun–Vie" debajo del nombre de cada máquina en la config para dejar el contrato explícito.
+
+### Archivos a tocar
+- `src/lib/shifts.ts` — horarios + helper `isWorkday` + skip de fin de semana
+- (datos) tabla `machines` vía `supabase--insert`
+- Verificación visual en `/configuracion` y `/`
+
+### Fuera de alcance
+- Excepciones puntuales (festivos, turno extra de fin de semana) — se podrán añadir después como override por fecha.
+- Cambios al modelo de datos (no hace falta nueva columna).

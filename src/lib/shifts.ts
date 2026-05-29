@@ -15,15 +15,15 @@ export interface ShiftDef {
 }
 
 export const SHIFTS: ShiftDef[] = [
-  { key: "manana", label: "M", name: "Mañana", startHour: 6,  hours: 8, tint: "rgba(250, 204, 21, 0.10)", color: "#eab308" },
-  { key: "tarde",  label: "T", name: "Tarde",  startHour: 14, hours: 8, tint: "rgba(56, 189, 248, 0.10)", color: "#38bdf8" },
-  { key: "noche",  label: "N", name: "Noche",  startHour: 22, hours: 8, tint: "rgba(139, 92, 246, 0.14)", color: "#8b5cf6" },
+  { key: "manana", label: "M", name: "Mañana", startHour: 7,  hours: 8, tint: "rgba(250, 204, 21, 0.10)", color: "#eab308" },
+  { key: "tarde",  label: "T", name: "Tarde",  startHour: 15, hours: 8, tint: "rgba(56, 189, 248, 0.10)", color: "#38bdf8" },
+  { key: "noche",  label: "N", name: "Noche",  startHour: 23, hours: 8, tint: "rgba(139, 92, 246, 0.14)", color: "#8b5cf6" },
 ];
 
-/** Hour of day → shift index (0=M, 1=T, 2=N). Night wraps 22→06. */
+/** Hour of day → shift index (0=M, 1=T, 2=N). Night wraps 23→07. */
 export function shiftIndexFromHour(hour: number): number {
-  if (hour >= 6 && hour < 14) return 0;
-  if (hour >= 14 && hour < 22) return 1;
+  if (hour >= 7 && hour < 15) return 0;
+  if (hour >= 15 && hour < 23) return 1;
   return 2;
 }
 
@@ -50,18 +50,35 @@ export function formatShiftLabel(iso: string | null | undefined): string {
 
 const SHIFT_LENGTH_MS = 8 * 60 * 60 * 1000;
 
-/** Next 06:00 / 14:00 / 22:00 boundary at or after `from`. */
+/** True for Mon–Fri (production runs Lun–Vie only). */
+export function isWorkday(d: Date): boolean {
+  const day = d.getDay();
+  return day >= 1 && day <= 5;
+}
+
+/** Advance a date to Monday 07:00 if it lands on Sat/Sun. No-op on weekdays. */
+function skipWeekend(d: Date): Date {
+  if (isWorkday(d)) return d;
+  const out = new Date(d);
+  while (!isWorkday(out)) {
+    out.setDate(out.getDate() + 1);
+  }
+  out.setHours(SHIFTS[0].startHour, 0, 0, 0);
+  return out;
+}
+
+/** Next 07:00 / 15:00 / 23:00 boundary at or after `from`. */
 export function nextShiftBoundary(from: Date = new Date()): Date {
   const d = new Date(from);
   d.setMinutes(0, 0, 0);
   const h = d.getHours();
-  const boundaries = [6, 14, 22];
+  const boundaries = [7, 15, 23];
   const next = boundaries.find((b) => h < b);
   if (next !== undefined) {
     d.setHours(next);
   } else {
     d.setDate(d.getDate() + 1);
-    d.setHours(6);
+    d.setHours(SHIFTS[0].startHour);
   }
   return d;
 }
@@ -76,11 +93,12 @@ export function nextActiveShiftBoundary(
   activeShifts: Array<"manana" | "tarde" | "noche">,
 ): Date {
   if (!activeShifts || activeShifts.length === 0) return nextShiftBoundary(from);
-  let d = nextShiftBoundary(from);
-  for (let i = 0; i < 9; i++) {
+  let d = skipWeekend(nextShiftBoundary(from));
+  for (let i = 0; i < 21; i++) {
     const idx = shiftIndexFromHour(d.getHours());
-    if (activeShifts.includes(SHIFTS[idx].key)) return d;
+    if (isWorkday(d) && activeShifts.includes(SHIFTS[idx].key)) return d;
     d = new Date(d.getTime() + SHIFT_LENGTH_MS);
+    d = skipWeekend(d);
   }
   return d;
 }
