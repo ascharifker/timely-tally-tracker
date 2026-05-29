@@ -596,6 +596,7 @@ export function useApplyReschedules() {
     mutationFn: async ({ moves, reason }: ApplyReschedulesInput) => {
       if (moves.length === 0) throw new Error("Sin movimientos para aplicar");
       const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       const byId = new Map(jobs.map((j) => [j.id, j]));
 
       for (const m of moves) {
@@ -605,6 +606,12 @@ export function useApplyReschedules() {
         const newEndMs = new Date(m.planned_end).getTime();
         const shiftedHours = oldEndMs ? (newEndMs - oldEndMs) / (60 * 60 * 1000) : 0;
 
+        // Status auto-sync when the move crosses internal ↔ external_shop.
+        const newMachine = machines.find((mm) => mm.id === m.machine_id);
+        const nextStatus = original
+          ? statusForMachine(original.status, newMachine ?? null)
+          : fromStatus;
+
         // 1. patch the dragged job (position + machine)
         const { error: updErr } = await supabase
           .from("jobs")
@@ -612,6 +619,7 @@ export function useApplyReschedules() {
             planned_start: m.planned_start,
             planned_end: m.planned_end,
             machine_id: m.machine_id,
+            ...(nextStatus !== fromStatus ? { status: nextStatus } : {}),
           })
           .eq("id", m.jobId);
         if (updErr) throw updErr;
@@ -639,7 +647,7 @@ export function useApplyReschedules() {
         const { error: evErr } = await supabase.from("status_events").insert({
           job_id: m.jobId,
           from_status: fromStatus,
-          to_status: fromStatus,
+          to_status: nextStatus,
           delay_hours: shiftedHours,
           reason,
           event_kind: m.eventKind,
