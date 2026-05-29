@@ -71,6 +71,25 @@ export function useUpdateMachineHoursPerShift() {
   });
 }
 
+export function useUpdateMachineActiveShifts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, active_shifts }: { id: string; active_shifts: string[] }) => {
+      const { error } = await supabase
+        .from("machines")
+        .update({ active_shifts } as never)
+        .eq("id", id);
+      if (error) throw error;
+      return { id, active_shifts };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Turnos activos actualizados");
+    },
+    onError: (err) => toast.error("No se pudo actualizar", { description: (err as Error).message }),
+  });
+}
+
 export function useUpsertPartTime() {
   const qc = useQueryClient();
   return useMutation({

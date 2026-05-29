@@ -18,6 +18,7 @@ export interface Machine {
   type: MachineType;
   display_order: number;
   hours_per_shift: number;
+  active_shifts: ShiftSlot[];
 }
 
 export interface Job {
@@ -37,6 +38,7 @@ export interface Job {
   planned_end: string | null;
   notes: string | null;
   hours_override: number | null;
+  operator_name: string | null;
 }
 
 export interface PartTime {

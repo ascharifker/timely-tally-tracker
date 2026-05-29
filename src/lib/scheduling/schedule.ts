@@ -10,7 +10,7 @@
 // actually occupied (machine isn't free again until that whole shift ends).
 
 import type { Machine } from "../fact-types";
-import { nextShiftBoundary } from "../shifts";
+import { nextActiveShiftBoundary, SHIFTS, shiftIndexFromHour } from "../shifts";
 
 const SHIFT_MS = 8 * 60 * 60 * 1000;
 
@@ -29,25 +29,40 @@ export interface ScheduleSpan {
 export function scheduleJob(
   fromMs: number,
   hoursNeeded: number,
-  machine: Pick<Machine, "hours_per_shift">,
+  machine: Pick<Machine, "hours_per_shift"> & Partial<Pick<Machine, "active_shifts">>,
 ): ScheduleSpan {
   const hps = Math.max(0.1, machine.hours_per_shift || 8);
-  const start = nextShiftBoundary(new Date(fromMs));
+  const active =
+    machine.active_shifts && machine.active_shifts.length > 0
+      ? machine.active_shifts
+      : (["manana", "tarde", "noche"] as Array<"manana" | "tarde" | "noche">);
+
+  const start = nextActiveShiftBoundary(new Date(fromMs), active);
   const startMs = start.getTime();
 
-  // How many full shifts + remainder hours within the next shift.
-  const fullShifts = Math.floor(hoursNeeded / hps);
-  const remainder = hoursNeeded - fullShifts * hps; // 0..<hps
+  // Walk shift-by-shift, skipping inactive ones (they consume wall-clock time
+  // but no productive hours).
+  let remaining = hoursNeeded;
+  let shiftStartMs = startMs;
+  let shiftsConsumed = 0;
+  let endMs = startMs;
 
-  // Proportional ms inside the next shift for the remainder.
-  const remainderMs = (remainder / hps) * SHIFT_MS;
-  const totalElapsedMs = fullShifts * SHIFT_MS + remainderMs;
+  // safety cap: 365 days of shifts
+  for (let i = 0; i < 365 * 3 && remaining > 0; i++) {
+    const idx = shiftIndexFromHour(new Date(shiftStartMs).getHours());
+    const isActive = active.includes(SHIFTS[idx].key);
+    if (isActive) {
+      const work = Math.min(remaining, hps);
+      const elapsedInShift = (work / hps) * SHIFT_MS;
+      endMs = shiftStartMs + elapsedInShift;
+      remaining -= work;
+      shiftsConsumed += 1;
+    }
+    shiftStartMs += SHIFT_MS;
+  }
 
-  const endMs = startMs + totalElapsedMs;
-
-  // Machine free at end of the shift the job last touched (ceil to next boundary).
-  const shiftsConsumed = remainder > 0 ? fullShifts + 1 : fullShifts;
-  const cursorMs = startMs + shiftsConsumed * SHIFT_MS;
+  // Cursor = end of the last active shift consumed (machine free at next boundary).
+  const cursorMs = shiftStartMs; // already advanced past last consumed shift
 
   return {
     planned_start: new Date(startMs).toISOString(),
