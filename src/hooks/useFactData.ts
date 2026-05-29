@@ -10,6 +10,21 @@ import { nextShiftBoundary } from "@/lib/shifts";
 import { jobDurationHours } from "@/lib/scheduling/duration";
 import { scheduleJob } from "@/lib/scheduling/schedule";
 
+/**
+ * Keep status ↔ machine in sync. MAZAK belongs to internal machines;
+ * TALLER_EXTERNO belongs to external_shop machines. Other statuses are
+ * unaffected (CEMENTACION, EXPO, etc. don't bind to machine type).
+ */
+function statusForMachine(
+  currentStatus: JobStatus,
+  newMachine: Machine | null | undefined,
+): JobStatus {
+  if (!newMachine) return currentStatus;
+  if (newMachine.type === "external_shop" && currentStatus === "MAZAK") return "TALLER_EXTERNO";
+  if (newMachine.type === "internal" && currentStatus === "TALLER_EXTERNO") return "MAZAK";
+  return currentStatus;
+}
+
 export function useMachines() {
   return useQuery({
     queryKey: ["machines"],
