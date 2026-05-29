@@ -20,6 +20,15 @@ export interface Machine {
   display_order: number;
   hours_per_shift: number;
   active_shifts: ShiftSlot[];
+  model?: string | null;
+  serial_number?: string | null;
+  year?: number | null;
+  purchase_date?: string | null;
+  location?: string | null;
+  image_url?: string | null;
+  notes?: string | null;
+  hourly_cost?: number;
+  vendor_id?: string | null;
 }
 
 export interface Job {
@@ -47,6 +56,34 @@ export interface PartTime {
   pir: string;
   machine_id: string;
   hours_per_piece: number;
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  tax_id: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  hourly_rate: number;
+  lead_time_days_avg: number | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MachineRun {
+  id: string;
+  job_id: string;
+  machine_id: string;
+  started_at: string;
+  ended_at: string | null;
+  pieces_completed: number;
+  operator_name: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export const STATUS_PIPELINE: JobStatus[] = [
@@ -104,7 +141,9 @@ export type EventKind =
   | "priority_shift"
   | "absence"
   | "change_order"
-  | "breakdown";
+  | "breakdown"
+  | "maintenance_preventive"
+  | "maintenance_corrective";
 
 export const EVENT_KIND_LABEL: Record<EventKind, string> = {
   delay: "Retraso de producción",
@@ -112,6 +151,8 @@ export const EVENT_KIND_LABEL: Record<EventKind, string> = {
   absence: "Ausencia de personal",
   change_order: "Cambio de orden",
   breakdown: "Avería de máquina",
+  maintenance_preventive: "Mantenimiento preventivo",
+  maintenance_corrective: "Mantenimiento correctivo",
 };
 
 export const EVENT_KIND_COLOR: Record<EventKind, string> = {
@@ -120,4 +161,15 @@ export const EVENT_KIND_COLOR: Record<EventKind, string> = {
   absence: "var(--status-listo)",
   change_order: "var(--status-cementacion)",
   breakdown: "var(--status-expo)",
+  maintenance_preventive: "var(--status-planned)",
+  maintenance_corrective: "var(--status-risk)",
 };
+
+/** Maintenance vs production split — drives UI grouping in Events tab. */
+export const MAINTENANCE_EVENT_KINDS: EventKind[] = [
+  "maintenance_preventive",
+  "maintenance_corrective",
+];
+export function isMaintenanceEvent(kind: EventKind): boolean {
+  return MAINTENANCE_EVENT_KINDS.includes(kind);
+}
