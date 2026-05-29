@@ -12,7 +12,7 @@ const STATUS_HELP: Record<JobStatus, string> = {
   TALLER_EXTERNO: "En taller externo (tercero) — maquinado fuera",
   MAQUINADO_LISTO: "Maquinado terminado, listo para tratamiento",
   CEMENTACION: "En cementación / tratamiento térmico",
-  EXPO: "En taller externo / EXPO",
+  EXPO: "Lista para exportación",
   YA_SE_ENVIO: "Despachado al cliente",
 };
 
