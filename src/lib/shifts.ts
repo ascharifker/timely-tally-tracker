@@ -66,6 +66,25 @@ export function nextShiftBoundary(from: Date = new Date()): Date {
   return d;
 }
 
+/**
+ * Next shift boundary that belongs to one of the machine's active shifts.
+ * Walks forward in 8h steps until it finds an active slot. Falls back to the
+ * generic boundary if no shifts are active (defensive).
+ */
+export function nextActiveShiftBoundary(
+  from: Date = new Date(),
+  activeShifts: Array<"manana" | "tarde" | "noche">,
+): Date {
+  if (!activeShifts || activeShifts.length === 0) return nextShiftBoundary(from);
+  let d = nextShiftBoundary(from);
+  for (let i = 0; i < 9; i++) {
+    const idx = shiftIndexFromHour(d.getHours());
+    if (activeShifts.includes(SHIFTS[idx].key)) return d;
+    d = new Date(d.getTime() + SHIFT_LENGTH_MS);
+  }
+  return d;
+}
+
 /** Add N shifts (8h each) to a date. */
 export function addShifts(d: Date, n: number): Date {
   return new Date(d.getTime() + n * SHIFT_LENGTH_MS);

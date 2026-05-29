@@ -102,6 +102,7 @@ export type Database = {
           machine_id: string | null
           notes: string | null
           odf: string
+          operator_name: string | null
           pir: string | null
           planned_end: string | null
           planned_start: string | null
@@ -122,6 +123,7 @@ export type Database = {
           machine_id?: string | null
           notes?: string | null
           odf: string
+          operator_name?: string | null
           pir?: string | null
           planned_end?: string | null
           planned_start?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           machine_id?: string | null
           notes?: string | null
           odf?: string
+          operator_name?: string | null
           pir?: string | null
           planned_end?: string | null
           planned_start?: string | null
@@ -165,6 +168,7 @@ export type Database = {
       }
       machines: {
         Row: {
+          active_shifts: string[]
           created_at: string
           display_order: number
           hours_per_shift: number
@@ -173,6 +177,7 @@ export type Database = {
           type: Database["public"]["Enums"]["machine_type"]
         }
         Insert: {
+          active_shifts?: string[]
           created_at?: string
           display_order?: number
           hours_per_shift?: number
@@ -181,6 +186,7 @@ export type Database = {
           type?: Database["public"]["Enums"]["machine_type"]
         }
         Update: {
+          active_shifts?: string[]
           created_at?: string
           display_order?: number
           hours_per_shift?: number
