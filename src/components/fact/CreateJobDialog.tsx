@@ -44,6 +44,7 @@ export function CreateJobDialog() {
         export_date: get("export_date"),
         customer_date: get("customer_date"),
         notes: get("notes"),
+        operator_name: get("operator_name"),
       });
       toast.success("ODF creado");
       setOpen(false);
@@ -87,6 +88,10 @@ export function CreateJobDialog() {
           <div>
             <Label>Especificación de tubo</Label>
             <Input name="tube_spec" placeholder='2-7/8" L80' />
+          </div>
+          <div className="col-span-2">
+            <Label>Operador asignado</Label>
+            <Input name="operator_name" placeholder="Nombre del operador (ej: Juan Pérez)" />
           </div>
           <div>
             <Label>Máquina</Label>
