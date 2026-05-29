@@ -9,9 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RiesgoRouteImport } from './routes/riesgo'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as IndexRouteImport } from './routes/index'
 
+const RiesgoRoute = RiesgoRouteImport.update({
+  id: '/riesgo',
+  path: '/riesgo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConfiguracionRoute = ConfiguracionRouteImport.update({
   id: '/configuracion',
   path: '/configuracion',
@@ -26,31 +32,42 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/riesgo': typeof RiesgoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/riesgo': typeof RiesgoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/riesgo': typeof RiesgoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/configuracion'
+  fullPaths: '/' | '/configuracion' | '/riesgo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/configuracion'
-  id: '__root__' | '/' | '/configuracion'
+  to: '/' | '/configuracion' | '/riesgo'
+  id: '__root__' | '/' | '/configuracion' | '/riesgo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
+  RiesgoRoute: typeof RiesgoRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/riesgo': {
+      id: '/riesgo'
+      path: '/riesgo'
+      fullPath: '/riesgo'
+      preLoaderRoute: typeof RiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/configuracion': {
       id: '/configuracion'
       path: '/configuracion'
@@ -71,7 +88,18 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracionRoute: ConfiguracionRoute,
+  RiesgoRoute: RiesgoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
