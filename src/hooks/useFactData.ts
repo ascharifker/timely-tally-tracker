@@ -442,30 +442,45 @@ export function useRescheduleJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: RescheduleInput) => {
+      const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const current = jobs.find((j) => j.id === input.id);
       const patch: Partial<Job> = {
         planned_start: input.planned_start,
         planned_end: input.planned_end,
       };
-      if (input.machine_id !== undefined) patch.machine_id = input.machine_id;
+      if (input.machine_id !== undefined) {
+        patch.machine_id = input.machine_id;
+        if (current) {
+          const newMachine = machines.find((m) => m.id === input.machine_id);
+          const nextStatus = statusForMachine(current.status, newMachine ?? null);
+          if (nextStatus !== current.status) patch.status = nextStatus;
+        }
+      }
       const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
       if (error) throw error;
-      return input;
+      return { ...input, status: patch.status };
     },
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: ["jobs"] });
       const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       qc.setQueryData<Job[]>(
         ["jobs"],
-        previous.map((j) =>
-          j.id === input.id
-            ? {
-                ...j,
-                planned_start: input.planned_start,
-                planned_end: input.planned_end,
-                ...(input.machine_id !== undefined ? { machine_id: input.machine_id } : {}),
-              }
-            : j,
-        ),
+        previous.map((j) => {
+          if (j.id !== input.id) return j;
+          const next: Job = {
+            ...j,
+            planned_start: input.planned_start,
+            planned_end: input.planned_end,
+          };
+          if (input.machine_id !== undefined) {
+            next.machine_id = input.machine_id;
+            const newMachine = machines.find((m) => m.id === input.machine_id);
+            next.status = statusForMachine(j.status, newMachine ?? null);
+          }
+          return next;
+        }),
       );
       return { previous };
     },
@@ -476,7 +491,8 @@ export function useRescheduleJob() {
     onSuccess: (data) => {
       const s = new Date(data.planned_start).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
       const e = new Date(data.planned_end).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
-      toast.success(`Reprogramado · ${s} → ${e}`);
+      const extra = data.status ? ` · ${STATUS_LABEL[data.status as JobStatus]}` : "";
+      toast.success(`Reprogramado · ${s} → ${e}${extra}`);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
