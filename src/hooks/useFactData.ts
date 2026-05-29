@@ -166,15 +166,43 @@ export function useUpdateJobStatus() {
       const job = all.find((j) => j.id === input.id);
       const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
-      const patch: { status: JobStatus; planned_start?: string; planned_end?: string } = {
+      const patch: {
+        status: JobStatus;
+        planned_start?: string | null;
+        planned_end?: string | null;
+        machine_id?: string | null;
+      } = {
         status: input.status,
       };
-      if (input.status === "MAZAK" && job && (!job.planned_start || !job.planned_end)) {
-        const machine = machines.find((m) => m.id === job.machine_id);
-        const { hours } = jobDurationHours(job, partTimes);
-        const span = scheduleJob(Date.now(), hours, machine ?? { hours_per_shift: 8 });
-        patch.planned_start = span.planned_start;
-        patch.planned_end = span.planned_end;
+      if (job) {
+        const currentMachine = machines.find((m) => m.id === job.machine_id);
+        if (input.status === "TALLER_EXTERNO") {
+          // Ensure assignment to an external_shop. If already external, keep it.
+          let target = currentMachine?.type === "external_shop" ? currentMachine : undefined;
+          if (!target) {
+            target = machines.find((m) => m.type === "external_shop");
+          }
+          if (target) {
+            patch.machine_id = target.id;
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, target);
+            patch.planned_start = span.planned_start;
+            patch.planned_end = span.planned_end;
+          }
+        } else if (input.status === "MAZAK") {
+          if (currentMachine?.type === "external_shop") {
+            // Coming back from external: drop machine + dates so the user
+            // re-assigns to an internal MAZAK on the Gantt.
+            patch.machine_id = null;
+            patch.planned_start = null;
+            patch.planned_end = null;
+          } else if (!job.planned_start || !job.planned_end) {
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, currentMachine ?? { hours_per_shift: 8 });
+            patch.planned_start = span.planned_start;
+            patch.planned_end = span.planned_end;
+          }
+        }
       }
       const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
       if (error) throw error;
@@ -188,16 +216,37 @@ export function useUpdateJobStatus() {
       const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
       let planned_start = job?.planned_start ?? null;
       let planned_end = job?.planned_end ?? null;
-      if (status === "MAZAK" && job && (!planned_start || !planned_end)) {
-        const machine = machines.find((m) => m.id === job.machine_id);
-        const { hours } = jobDurationHours(job, partTimes);
-        const span = scheduleJob(Date.now(), hours, machine ?? { hours_per_shift: 8 });
-        planned_start = span.planned_start;
-        planned_end = span.planned_end;
+      let machine_id = job?.machine_id ?? null;
+      if (job) {
+        const currentMachine = machines.find((m) => m.id === job.machine_id);
+        if (status === "TALLER_EXTERNO") {
+          let target = currentMachine?.type === "external_shop" ? currentMachine : undefined;
+          if (!target) target = machines.find((m) => m.type === "external_shop");
+          if (target) {
+            machine_id = target.id;
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, target);
+            planned_start = span.planned_start;
+            planned_end = span.planned_end;
+          }
+        } else if (status === "MAZAK") {
+          if (currentMachine?.type === "external_shop") {
+            machine_id = null;
+            planned_start = null;
+            planned_end = null;
+          } else if (!planned_start || !planned_end) {
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, currentMachine ?? { hours_per_shift: 8 });
+            planned_start = span.planned_start;
+            planned_end = span.planned_end;
+          }
+        }
       }
       qc.setQueryData<Job[]>(
         ["jobs"],
-        previous.map((j) => (j.id === id ? { ...j, status, planned_start, planned_end } : j)),
+        previous.map((j) =>
+          j.id === id ? { ...j, status, planned_start, planned_end, machine_id } : j,
+        ),
       );
       return { previous, job };
     },
