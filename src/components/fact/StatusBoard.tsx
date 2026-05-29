@@ -392,13 +392,18 @@ function renderCard({
             <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: "var(--status-risk)" }} />
           )}
           {showMachineChip && machine && (
-            <span
-              className="shrink-0 rounded px-1 py-0 text-[9px] font-mono font-bold leading-tight text-background"
+            <Link
+              to="/maquina/$id"
+              params={{ id: machine.id }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              draggable={false}
+              className="shrink-0 rounded px-1 py-0 text-[9px] font-mono font-bold leading-tight text-background hover:ring-2 hover:ring-primary/60"
               style={{ backgroundColor: mColor }}
-              title={machine.name}
+              title={`Ver ficha de ${machine.name}`}
             >
               {machineShortLabel(machine)}
-            </span>
+            </Link>
           )}
           <span className="font-mono font-semibold truncate">ODF {j.odf}</span>
         </div>
