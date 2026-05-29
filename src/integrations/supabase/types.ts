@@ -347,33 +347,45 @@ export type Database = {
       }
       status_events: {
         Row: {
+          cost: number | null
           created_at: string
           delay_hours: number | null
+          ended_at: string | null
           event_kind: Database["public"]["Enums"]["event_kind"]
           from_status: Database["public"]["Enums"]["job_status"] | null
           id: string
-          job_id: string
+          job_id: string | null
+          machine_id: string | null
           reason: string | null
+          started_at: string | null
           to_status: Database["public"]["Enums"]["job_status"]
         }
         Insert: {
+          cost?: number | null
           created_at?: string
           delay_hours?: number | null
+          ended_at?: string | null
           event_kind?: Database["public"]["Enums"]["event_kind"]
           from_status?: Database["public"]["Enums"]["job_status"] | null
           id?: string
-          job_id: string
+          job_id?: string | null
+          machine_id?: string | null
           reason?: string | null
+          started_at?: string | null
           to_status: Database["public"]["Enums"]["job_status"]
         }
         Update: {
+          cost?: number | null
           created_at?: string
           delay_hours?: number | null
+          ended_at?: string | null
           event_kind?: Database["public"]["Enums"]["event_kind"]
           from_status?: Database["public"]["Enums"]["job_status"] | null
           id?: string
-          job_id?: string
+          job_id?: string | null
+          machine_id?: string | null
           reason?: string | null
+          started_at?: string | null
           to_status?: Database["public"]["Enums"]["job_status"]
         }
         Relationships: [
