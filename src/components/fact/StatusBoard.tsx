@@ -5,6 +5,7 @@ import { useUpdateJobStatus, usePartTimes } from "@/hooks/useFactData";
 import { Badge } from "@/components/ui/badge";
 import { useMemo, useState, Fragment } from "react";
 import { ChevronRight, ChevronDown, GripVertical, AlertTriangle } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { getUrgency, urgencyColor } from "@/lib/job-urgency";
 import { jobDurationHours } from "@/lib/scheduling/duration";
 
