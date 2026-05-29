@@ -1,62 +1,43 @@
-## Adaptar horarios de turnos y capacidad de máquinas (email Fron)
+## Compactar OTD en home + página dedicada a "Trabajos en riesgo"
 
-Aplicar la realidad operativa que mandó Fron: ventanas horarias reales de los turnos, días laborables Lun–Vie, y configuración por máquina.
+### 1. Compactar `OTDTracker` en la home
 
-### 1. Horarios de turnos (`src/lib/shifts.ts`)
+Quitar de la card de la home:
+- El bloque "Cómo se calcula" (legend)
+- La tabla completa de Trabajos en riesgo
 
-Cambiar `SHIFTS` y `shiftIndexFromHour` a las ventanas reales:
+Dejar solo:
+- Header `OTD · Entrega a Tiempo`
+- Los 4 KPIs (OTD %, A tiempo, En riesgo, Tarde)
+- Footer compacto con `Link` a `/riesgo`: "Ver trabajos en riesgo →" (mostrando el conteo `{atRisk.length} ODFs`)
 
-- Matutino (M): **07:00 – 15:00**
-- Vespertino (T): **15:00 – 23:00**
-- Nocturno (N): **23:00 – 07:00**
+Resultado: la card pasa de ~400px a ~140px de alto.
 
-Actualizar:
-- `SHIFTS[*].startHour` → 7 / 15 / 23
-- `shiftIndexFromHour`: M `7≤h<15`, T `15≤h<23`, resto N
-- `nextShiftBoundary`: boundaries `[7, 15, 23]`
-- `formatShiftLabel`: ya muestra `startHour:00`, se beneficia automáticamente
+### 2. Nueva ruta `/riesgo` (`src/routes/riesgo.tsx`)
 
-### 2. Días laborables (Lun–Vie)
+Página dedicada con:
+- Header con título "Trabajos en Riesgo" + breadcrumb / link "← Volver al tablero"
+- Los mismos 4 KPIs arriba (reutilizando los `Pct` cards extraídos a un sub-componente compartido)
+- El bloque "Cómo se calcula" (legend completo)
+- **Tabla expandida** de trabajos en riesgo con más columnas que la versión actual:
+  - ODF, Tubo, PIR, Cantidad, Operador, Máquina, Fecha cliente, Fecha export planeada, Días restantes, Estado
+  - Ordenable por fecha cliente (más urgente arriba por defecto)
+  - Filtro tabs: Todos / En riesgo / Tarde
+  - Click en fila abre el `JobDetailDialog` existente
+- `head()` propio con title/description
 
-Añadir en `shifts.ts`:
+Lee los mismos datos vía el hook `useFactData` ya existente.
 
-```ts
-export function isWorkday(d: Date) {
-  const day = d.getDay(); // 0 = dom, 6 = sáb
-  return day >= 1 && day <= 5;
-}
-```
+### 3. Refactor mínimo
 
-Extender `nextActiveShiftBoundary` para saltar sábados y domingos: si el candidato cae en fin de semana, avanzar al lunes 07:00 y volver a evaluar el turno activo de la máquina.
-
-Esto hace que el scheduler (`src/lib/scheduling/schedule.ts`, que ya usa `nextActiveShiftBoundary`) salte automáticamente el fin de semana sin más cambios.
-
-### 3. Configuración por máquina (datos)
-
-Migrar `machines.active_shifts` al estado real:
-
-| Máquina | active_shifts |
-|---|---|
-| MAZAK 1 | `{manana,tarde,noche}` |
-| MAZAK 2 | `{manana,tarde}` |
-| MAZAK 3 | `{manana,tarde,noche}` |
-| MAZAK 4 | `{manana}` |
-| MAZAK 5 | `{manana}` |
-| GEMAK, MAQYRO, TECMAC, GMAC | sin cambios (se quedan como están hasta que Fron confirme) |
-
-Se hará con `supabase--insert` (UPDATE de datos, no migración de esquema).
-
-### 4. UI
-
-- `MachinesConfig.tsx`: los toggles M/T/N ya existen — solo verificar que las etiquetas y la capacidad diaria (`hours_per_shift × nº turnos activos`) reflejan los nuevos horarios.
-- `MachineGantt.tsx` (bandas verticales M/T/N): se re-pintan solas porque leen `SHIFTS[*].startHour`. Verificar visualmente en `/`.
-- Opcional: añadir un tooltip "Lun–Vie" debajo del nombre de cada máquina en la config para dejar el contrato explícito.
+Extraer `Pct` y la legend a `src/components/fact/otd-shared.tsx` para reusar entre la card compacta y la página completa, sin duplicar markup.
 
 ### Archivos a tocar
-- `src/lib/shifts.ts` — horarios + helper `isWorkday` + skip de fin de semana
-- (datos) tabla `machines` vía `supabase--insert`
-- Verificación visual en `/configuracion` y `/`
+- `src/components/fact/OTDTracker.tsx` — recortar a versión compacta
+- `src/components/fact/otd-shared.tsx` — nuevo, KPIs + legend reutilizables
+- `src/routes/riesgo.tsx` — nueva página
+- (auto) `src/routeTree.gen.ts` se regenera
 
 ### Fuera de alcance
-- Excepciones puntuales (festivos, turno extra de fin de semana) — se podrán añadir después como override por fecha.
-- Cambios al modelo de datos (no hace falta nueva columna).
+- Cambios al cálculo OTD (`src/lib/scheduling/otd.ts`)
+- Cambios al resto del dashboard
