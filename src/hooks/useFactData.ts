@@ -10,6 +10,21 @@ import { nextShiftBoundary } from "@/lib/shifts";
 import { jobDurationHours } from "@/lib/scheduling/duration";
 import { scheduleJob } from "@/lib/scheduling/schedule";
 
+/**
+ * Keep status ↔ machine in sync. MAZAK belongs to internal machines;
+ * TALLER_EXTERNO belongs to external_shop machines. Other statuses are
+ * unaffected (CEMENTACION, EXPO, etc. don't bind to machine type).
+ */
+function statusForMachine(
+  currentStatus: JobStatus,
+  newMachine: Machine | null | undefined,
+): JobStatus {
+  if (!newMachine) return currentStatus;
+  if (newMachine.type === "external_shop" && currentStatus === "MAZAK") return "TALLER_EXTERNO";
+  if (newMachine.type === "internal" && currentStatus === "TALLER_EXTERNO") return "MAZAK";
+  return currentStatus;
+}
+
 export function useMachines() {
   return useQuery({
     queryKey: ["machines"],
@@ -151,15 +166,43 @@ export function useUpdateJobStatus() {
       const job = all.find((j) => j.id === input.id);
       const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
-      const patch: { status: JobStatus; planned_start?: string; planned_end?: string } = {
+      const patch: {
+        status: JobStatus;
+        planned_start?: string | null;
+        planned_end?: string | null;
+        machine_id?: string | null;
+      } = {
         status: input.status,
       };
-      if (input.status === "MAZAK" && job && (!job.planned_start || !job.planned_end)) {
-        const machine = machines.find((m) => m.id === job.machine_id);
-        const { hours } = jobDurationHours(job, partTimes);
-        const span = scheduleJob(Date.now(), hours, machine ?? { hours_per_shift: 8 });
-        patch.planned_start = span.planned_start;
-        patch.planned_end = span.planned_end;
+      if (job) {
+        const currentMachine = machines.find((m) => m.id === job.machine_id);
+        if (input.status === "TALLER_EXTERNO") {
+          // Ensure assignment to an external_shop. If already external, keep it.
+          let target = currentMachine?.type === "external_shop" ? currentMachine : undefined;
+          if (!target) {
+            target = machines.find((m) => m.type === "external_shop");
+          }
+          if (target) {
+            patch.machine_id = target.id;
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, target);
+            patch.planned_start = span.planned_start;
+            patch.planned_end = span.planned_end;
+          }
+        } else if (input.status === "MAZAK") {
+          if (currentMachine?.type === "external_shop") {
+            // Coming back from external: drop machine + dates so the user
+            // re-assigns to an internal MAZAK on the Gantt.
+            patch.machine_id = null;
+            patch.planned_start = null;
+            patch.planned_end = null;
+          } else if (!job.planned_start || !job.planned_end) {
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, currentMachine ?? { hours_per_shift: 8 });
+            patch.planned_start = span.planned_start;
+            patch.planned_end = span.planned_end;
+          }
+        }
       }
       const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
       if (error) throw error;
@@ -173,16 +216,37 @@ export function useUpdateJobStatus() {
       const partTimes = qc.getQueryData<PartTime[]>(["part_times"]) ?? [];
       let planned_start = job?.planned_start ?? null;
       let planned_end = job?.planned_end ?? null;
-      if (status === "MAZAK" && job && (!planned_start || !planned_end)) {
-        const machine = machines.find((m) => m.id === job.machine_id);
-        const { hours } = jobDurationHours(job, partTimes);
-        const span = scheduleJob(Date.now(), hours, machine ?? { hours_per_shift: 8 });
-        planned_start = span.planned_start;
-        planned_end = span.planned_end;
+      let machine_id = job?.machine_id ?? null;
+      if (job) {
+        const currentMachine = machines.find((m) => m.id === job.machine_id);
+        if (status === "TALLER_EXTERNO") {
+          let target = currentMachine?.type === "external_shop" ? currentMachine : undefined;
+          if (!target) target = machines.find((m) => m.type === "external_shop");
+          if (target) {
+            machine_id = target.id;
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, target);
+            planned_start = span.planned_start;
+            planned_end = span.planned_end;
+          }
+        } else if (status === "MAZAK") {
+          if (currentMachine?.type === "external_shop") {
+            machine_id = null;
+            planned_start = null;
+            planned_end = null;
+          } else if (!planned_start || !planned_end) {
+            const { hours } = jobDurationHours(job, partTimes);
+            const span = scheduleJob(Date.now(), hours, currentMachine ?? { hours_per_shift: 8 });
+            planned_start = span.planned_start;
+            planned_end = span.planned_end;
+          }
+        }
       }
       qc.setQueryData<Job[]>(
         ["jobs"],
-        previous.map((j) => (j.id === id ? { ...j, status, planned_start, planned_end } : j)),
+        previous.map((j) =>
+          j.id === id ? { ...j, status, planned_start, planned_end, machine_id } : j,
+        ),
       );
       return { previous, job };
     },
@@ -378,30 +442,45 @@ export function useRescheduleJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: RescheduleInput) => {
+      const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const current = jobs.find((j) => j.id === input.id);
       const patch: Partial<Job> = {
         planned_start: input.planned_start,
         planned_end: input.planned_end,
       };
-      if (input.machine_id !== undefined) patch.machine_id = input.machine_id;
+      if (input.machine_id !== undefined) {
+        patch.machine_id = input.machine_id;
+        if (current) {
+          const newMachine = machines.find((m) => m.id === input.machine_id);
+          const nextStatus = statusForMachine(current.status, newMachine ?? null);
+          if (nextStatus !== current.status) patch.status = nextStatus;
+        }
+      }
       const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
       if (error) throw error;
-      return input;
+      return { ...input, status: patch.status };
     },
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: ["jobs"] });
       const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       qc.setQueryData<Job[]>(
         ["jobs"],
-        previous.map((j) =>
-          j.id === input.id
-            ? {
-                ...j,
-                planned_start: input.planned_start,
-                planned_end: input.planned_end,
-                ...(input.machine_id !== undefined ? { machine_id: input.machine_id } : {}),
-              }
-            : j,
-        ),
+        previous.map((j) => {
+          if (j.id !== input.id) return j;
+          const next: Job = {
+            ...j,
+            planned_start: input.planned_start,
+            planned_end: input.planned_end,
+          };
+          if (input.machine_id !== undefined) {
+            next.machine_id = input.machine_id;
+            const newMachine = machines.find((m) => m.id === input.machine_id);
+            next.status = statusForMachine(j.status, newMachine ?? null);
+          }
+          return next;
+        }),
       );
       return { previous };
     },
@@ -412,7 +491,8 @@ export function useRescheduleJob() {
     onSuccess: (data) => {
       const s = new Date(data.planned_start).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
       const e = new Date(data.planned_end).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
-      toast.success(`Reprogramado · ${s} → ${e}`);
+      const extra = data.status ? ` · ${STATUS_LABEL[data.status as JobStatus]}` : "";
+      toast.success(`Reprogramado · ${s} → ${e}${extra}`);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
@@ -516,6 +596,7 @@ export function useApplyReschedules() {
     mutationFn: async ({ moves, reason }: ApplyReschedulesInput) => {
       if (moves.length === 0) throw new Error("Sin movimientos para aplicar");
       const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       const byId = new Map(jobs.map((j) => [j.id, j]));
 
       for (const m of moves) {
@@ -525,6 +606,12 @@ export function useApplyReschedules() {
         const newEndMs = new Date(m.planned_end).getTime();
         const shiftedHours = oldEndMs ? (newEndMs - oldEndMs) / (60 * 60 * 1000) : 0;
 
+        // Status auto-sync when the move crosses internal ↔ external_shop.
+        const newMachine = machines.find((mm) => mm.id === m.machine_id);
+        const nextStatus = original
+          ? statusForMachine(original.status, newMachine ?? null)
+          : fromStatus;
+
         // 1. patch the dragged job (position + machine)
         const { error: updErr } = await supabase
           .from("jobs")
@@ -532,6 +619,7 @@ export function useApplyReschedules() {
             planned_start: m.planned_start,
             planned_end: m.planned_end,
             machine_id: m.machine_id,
+            ...(nextStatus !== fromStatus ? { status: nextStatus } : {}),
           })
           .eq("id", m.jobId);
         if (updErr) throw updErr;
@@ -559,7 +647,7 @@ export function useApplyReschedules() {
         const { error: evErr } = await supabase.from("status_events").insert({
           job_id: m.jobId,
           from_status: fromStatus,
-          to_status: fromStatus,
+          to_status: nextStatus,
           delay_hours: shiftedHours,
           reason,
           event_kind: m.eventKind,
