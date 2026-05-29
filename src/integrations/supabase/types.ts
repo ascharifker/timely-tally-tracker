@@ -338,6 +338,7 @@ export type Database = {
       job_status:
         | "PLANNED"
         | "MAZAK"
+        | "TALLER_EXTERNO"
         | "MAQUINADO_LISTO"
         | "CEMENTACION"
         | "EXPO"
@@ -482,6 +483,7 @@ export const Constants = {
       job_status: [
         "PLANNED",
         "MAZAK",
+        "TALLER_EXTERNO",
         "MAQUINADO_LISTO",
         "CEMENTACION",
         "EXPO",
