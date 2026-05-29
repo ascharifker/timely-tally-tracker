@@ -6,6 +6,7 @@ export type ShiftSlot = "manana" | "tarde" | "noche";
 export type JobStatus =
   | "PLANNED"
   | "MAZAK"
+  | "TALLER_EXTERNO"
   | "MAQUINADO_LISTO"
   | "CEMENTACION"
   | "EXPO"
@@ -51,6 +52,7 @@ export interface PartTime {
 export const STATUS_PIPELINE: JobStatus[] = [
   "PLANNED",
   "MAZAK",
+  "TALLER_EXTERNO",
   "MAQUINADO_LISTO",
   "CEMENTACION",
   "EXPO",
@@ -60,6 +62,7 @@ export const STATUS_PIPELINE: JobStatus[] = [
 export const STATUS_LABEL: Record<JobStatus, string> = {
   PLANNED: "Planificado",
   MAZAK: "MAZAK",
+  TALLER_EXTERNO: "Taller Externo",
   MAQUINADO_LISTO: "Maquinado Listo",
   CEMENTACION: "Cementación",
   EXPO: "Expo",
@@ -69,6 +72,7 @@ export const STATUS_LABEL: Record<JobStatus, string> = {
 export const STATUS_COLOR: Record<JobStatus, string> = {
   PLANNED: "var(--status-planned)",
   MAZAK: "var(--status-mazak)",
+  TALLER_EXTERNO: "var(--status-taller)",
   MAQUINADO_LISTO: "var(--status-listo)",
   CEMENTACION: "var(--status-cementacion)",
   EXPO: "var(--status-expo)",
