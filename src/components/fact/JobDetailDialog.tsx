@@ -24,6 +24,9 @@ import {
 import { JobHistorySheet } from "./JobHistorySheet";
 import { History } from "lucide-react";
 import { SHIFTS, shiftIndexFromDate, snapToShift } from "@/lib/shifts";
+import { MachineRunsTable } from "./MachineRunsTable";
+import { useMachineRuns } from "@/hooks/useMachineRuns";
+import { runDurationHours } from "@/lib/machine-metrics";
 
 interface Props {
   job: Job | null;
@@ -32,6 +35,7 @@ interface Props {
 
 export function JobDetailDialog({ job, onClose }: Props) {
   const { data: jobs = [] } = useJobs();
+  const { data: allRuns = [] } = useMachineRuns();
   const logDelay = useLogDelay();
   const reschedule = useRescheduleJob();
   const [amount, setAmount] = useState(1);
@@ -41,6 +45,12 @@ export function JobDetailDialog({ job, onClose }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const delayHours = toHours(amount, unit);
+
+  const jobRuns = useMemo(
+    () => (job ? allRuns.filter((r) => r.job_id === job.id) : []),
+    [allRuns, job],
+  );
+  const realHoursAcum = jobRuns.reduce((acc, r) => acc + (r.ended_at ? runDurationHours(r) : 0), 0);
 
   const preview = useMemo(() => {
     if (!job) return [];
@@ -142,6 +152,17 @@ export function JobDetailDialog({ job, onClose }: Props) {
             {job.notes}
           </div>
         )}
+
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between mb-1.5">
+            <h3 className="text-sm font-semibold">Producción real</h3>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {realHoursAcum.toFixed(1)}h reales
+              {job.hours_override !== null && ` · ${job.hours_override}h planificadas`}
+            </span>
+          </div>
+          <MachineRunsTable runs={jobRuns} jobs={jobs} fixedJob={job} />
+        </div>
 
         {job.planned_start && (
           <div className="mt-4 rounded border border-border bg-sidebar/20 p-3">

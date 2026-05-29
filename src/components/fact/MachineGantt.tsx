@@ -7,6 +7,7 @@ import { jobDurationHours } from "@/lib/scheduling/duration";
 import { packLanesByMachine } from "@/lib/scheduling/lanes";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Shuffle } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
 import { SHIFTS, shiftStartMs, shiftIndexFromDate, shiftSpan, snapToShift } from "@/lib/shifts";
 
@@ -516,12 +517,15 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
           </div>
           <div className="divide-y divide-zinc-800/60">
             {machines.map((m, idx) => (
-              <div
+              <Link
                 key={m.id}
-                className={`px-4 flex flex-col justify-center ${
+                to="/maquina/$id"
+                params={{ id: m.id }}
+                className={`px-4 flex flex-col justify-center cursor-pointer hover:bg-zinc-800/60 transition-colors ${
                   idx % 2 === 0 ? "bg-zinc-900/30" : ""
                 } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
                 style={{ height: rowHeightFor(m.id) }}
+                title={`Ver ficha de ${m.name}`}
               >
                 {m.type === "external_shop" && (
                   <div className="text-[10px] font-bold text-yellow-500/80 uppercase italic tracking-wide">
@@ -537,7 +541,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                     {lanesByMachine.get(m.id)!.laneCount} lanes
                   </div>
                 )}
-              </div>
+              </Link>
             ))}
           </div>
         </div>

@@ -2,12 +2,14 @@ import type { Job, Machine } from "@/lib/fact-types";
 import { STATUS_PIPELINE, STATUS_LABEL, STATUS_COLOR, type JobStatus } from "@/lib/fact-types";
 import { Card } from "@/components/ui/card";
 import { useUpdateJobStatus, usePartTimes } from "@/hooks/useFactData";
+import { useMachineRuns } from "@/hooks/useMachineRuns";
 import { Badge } from "@/components/ui/badge";
 import { useMemo, useState, Fragment } from "react";
 import { ChevronRight, ChevronDown, GripVertical, AlertTriangle } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { getUrgency, urgencyColor } from "@/lib/job-urgency";
 import { jobDurationHours } from "@/lib/scheduling/duration";
+import { StartStopRunButton } from "./StartStopRunButton";
 
 const STATUS_HELP: Record<JobStatus, string> = {
   PLANNED: "Ingresada, sin asignar a máquina",
@@ -61,6 +63,7 @@ export function StatusBoard({
 }) {
   const update = useUpdateJobStatus();
   const { data: partTimes = [] } = usePartTimes();
+  const { data: runs = [] } = useMachineRuns();
   const [dragOver, setDragOver] = useState<JobStatus | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [selectedMachines, setSelectedMachines] = useState<Set<string>>(new Set());
@@ -70,6 +73,16 @@ export function StatusBoard({
     () => Object.fromEntries(machines.map((m) => [m.id, m])) as Record<string, Machine>,
     [machines],
   );
+
+  // Map job_id -> earliest open run (run with no ended_at).
+  const openRunByJob = useMemo(() => {
+    const m = new Map<string, typeof runs[number]>();
+    for (const r of runs) {
+      if (r.ended_at) continue;
+      if (!m.has(r.job_id)) m.set(r.job_id, r);
+    }
+    return m;
+  }, [runs]);
 
   const isFiltered = selectedMachines.size > 0;
   const isVisible = (j: Job): boolean => {
@@ -301,6 +314,8 @@ export function StatusBoard({
                                 dimmed: !isVisible(j),
                                 showMachineChip: true,
                                 missingMachine: !g.machine,
+                                openRun: openRunByJob.get(j.id) ?? null,
+                                showRunControl: true,
                               }),
                             )}
                         </div>
@@ -318,6 +333,8 @@ export function StatusBoard({
                         dimmed: !isVisible(j),
                         showMachineChip: false,
                         missingMachine: false,
+                        openRun: null,
+                        showRunControl: false,
                       }),
                     )}
               </div>
@@ -346,6 +363,8 @@ interface RenderCardArgs {
   dimmed: boolean;
   showMachineChip: boolean;
   missingMachine: boolean;
+  openRun: import("@/lib/fact-types").MachineRun | null;
+  showRunControl: boolean;
 }
 
 function renderCard({
@@ -359,6 +378,8 @@ function renderCard({
   dimmed,
   showMachineChip,
   missingMachine,
+  openRun,
+  showRunControl,
 }: RenderCardArgs) {
   const urgency = getUrgency(j);
   const mColor = machine ? machineColor(machine) : "var(--status-risk)";
@@ -417,6 +438,11 @@ function renderCard({
         )}
       </div>
       {j.tube_spec && <div className="text-muted-foreground truncate mt-0.5">{j.tube_spec}</div>}
+      {showRunControl && machine && (
+        <div className="mt-1.5 flex items-center justify-end">
+          <StartStopRunButton job={j} openRun={openRun} />
+        </div>
+      )}
     </div>
   );
 }
