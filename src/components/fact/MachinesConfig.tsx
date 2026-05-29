@@ -4,6 +4,9 @@ import { SHIFT_LABEL } from "@/lib/fact-types";
 import { useUpdateMachineHoursPerShift, useUpdateMachineActiveShifts } from "@/hooks/useFactData";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Link } from "@tanstack/react-router";
+import { ExternalLink } from "lucide-react";
+import { VendorsConfig } from "./VendorsConfig";
 
 const SHIFT_KEYS: ShiftSlot[] = ["manana", "tarde", "noche"];
 
@@ -35,6 +38,7 @@ export function MachinesConfig({ machines }: { machines: Machine[] }) {
   };
 
   return (
+    <div className="space-y-4">
     <Card className="border-zinc-800 bg-[#121214] p-0 overflow-hidden">
       <div className="border-b border-zinc-800 bg-[#18181b]/60 px-4 py-3">
         <h3 className="text-sm font-bold text-white tracking-tight">Máquinas — capacidad por turno</h3>
@@ -43,19 +47,20 @@ export function MachinesConfig({ machines }: { machines: Machine[] }) {
         </p>
       </div>
       <div className="divide-y divide-zinc-800/60">
-        <div className="grid grid-cols-[1fr_100px_110px_180px_140px] gap-3 px-4 py-2 text-[10px] uppercase tracking-widest font-bold text-zinc-500 bg-zinc-900/40">
+        <div className="grid grid-cols-[1fr_100px_110px_180px_140px_90px] gap-3 px-4 py-2 text-[10px] uppercase tracking-widest font-bold text-zinc-500 bg-zinc-900/40">
           <span>Máquina</span>
           <span>Tipo</span>
           <span>h / turno</span>
           <span>Turnos activos</span>
           <span>Capacidad diaria</span>
+          <span />
         </div>
         {machines.map((m) => {
           const draft = drafts[m.id] ?? String(m.hours_per_shift);
           const activeCount = (m.active_shifts ?? SHIFT_KEYS).length;
           const daily = (Number(draft) || 0) * activeCount;
           return (
-            <div key={m.id} className="grid grid-cols-[1fr_100px_110px_180px_140px] gap-3 px-4 py-2.5 items-center">
+            <div key={m.id} className="grid grid-cols-[1fr_100px_110px_180px_140px_90px] gap-3 px-4 py-2.5 items-center">
               <div className="flex flex-col">
                 <span className="text-sm font-bold text-white">{m.name}</span>
                 {m.type === "external_shop" && (
@@ -101,10 +106,19 @@ export function MachinesConfig({ machines }: { machines: Machine[] }) {
               <span className="text-[11px] font-mono text-zinc-400">
                 <span className="text-white font-bold">{daily.toFixed(1)}h</span> / día ({activeCount} turno{activeCount === 1 ? "" : "s"})
               </span>
+              <Link
+                to="/maquina/$id"
+                params={{ id: m.id }}
+                className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-primary hover:opacity-80"
+              >
+                Ver ficha <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
           );
         })}
       </div>
     </Card>
+    <VendorsConfig />
+    </div>
   );
 }

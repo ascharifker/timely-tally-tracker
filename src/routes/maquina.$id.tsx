@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { MachineSpecsForm } from "@/components/fact/MachineSpecsForm";
 import { VendorForm } from "@/components/fact/VendorForm";
 import { MachineRunsTable } from "@/components/fact/MachineRunsTable";
+import { MachineEventsTab } from "@/components/fact/MachineEventsTab";
 import { useJobs, useMachines, usePartTimes } from "@/hooks/useFactData";
 import { useMachineRuns } from "@/hooks/useMachineRuns";
 import { useVendors } from "@/hooks/useVendors";
@@ -238,10 +239,11 @@ function MachinePage() {
       )}
 
       {tab === "eventos" && (
-        <Card className="border-border bg-card p-4 text-sm text-muted-foreground">
-          Eventos por máquina — próximamente. La taxonomía ya incluye{" "}
-          <code>maintenance_preventive</code> y <code>maintenance_corrective</code> para clasificar correctamente desde ahora.
-        </Card>
+        <MachineEventsTab
+          machineId={machine.id}
+          jobIds={machineJobs.map((j) => j.id)}
+          isExternal={isExternal}
+        />
       )}
     </AppShell>
   );
