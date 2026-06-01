@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Job } from "@/lib/fact-types";
 import { STATUS_LABEL, toHours, type DelayUnit, type EventKind, EVENT_KIND_LABEL, EVENT_KIND_COLOR } from "@/lib/fact-types";
 import {
@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useLogDelay, useJobs, useRescheduleJob } from "@/hooks/useFactData";
+import { useLogDelay, useJobs, useRescheduleJob, useUpdateJob, useMachines } from "@/hooks/useFactData";
 import { cascade } from "@/lib/scheduling/cascade";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -35,14 +35,35 @@ interface Props {
 
 export function JobDetailDialog({ job, onClose }: Props) {
   const { data: jobs = [] } = useJobs();
+  const { data: machines = [] } = useMachines();
   const { data: allRuns = [] } = useMachineRuns();
   const logDelay = useLogDelay();
   const reschedule = useRescheduleJob();
+  const updateJob = useUpdateJob();
   const [amount, setAmount] = useState(1);
   const [unit, setUnit] = useState<DelayUnit>("days");
   const [reason, setReason] = useState("");
   const [eventKind, setEventKind] = useState<EventKind>("delay");
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Assignment editor state (machine, operator, planned dates).
+  const toLocalInput = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [machineId, setMachineId] = useState<string | null>(job?.machine_id ?? null);
+  const [operatorName, setOperatorName] = useState<string>(job?.operator_name ?? "");
+  const [plannedStart, setPlannedStart] = useState<string>(toLocalInput(job?.planned_start ?? null));
+  const [plannedEnd, setPlannedEnd] = useState<string>(toLocalInput(job?.planned_end ?? null));
+
+  useEffect(() => {
+    setMachineId(job?.machine_id ?? null);
+    setOperatorName(job?.operator_name ?? "");
+    setPlannedStart(toLocalInput(job?.planned_start ?? null));
+    setPlannedEnd(toLocalInput(job?.planned_end ?? null));
+  }, [job?.id]);
 
   const delayHours = toHours(amount, unit);
 
@@ -80,6 +101,16 @@ export function JobDetailDialog({ job, onClose }: Props) {
   };
 
   if (!job) return null;
+
+  const saveAssignment = async () => {
+    await updateJob.mutateAsync({
+      id: job.id,
+      machine_id: machineId,
+      operator_name: operatorName.trim() || null,
+      planned_start: plannedStart ? new Date(plannedStart).toISOString() : null,
+      planned_end: plannedEnd ? new Date(plannedEnd).toISOString() : null,
+    });
+  };
 
   const moveToShift = async (targetShiftIdx: number, dayDelta = 0) => {
     if (!job.planned_start || !job.planned_end) {
@@ -125,6 +156,46 @@ export function JobDetailDialog({ job, onClose }: Props) {
           <Field label="Fecha exportación" value={job.export_date} />
           <Field label="Fecha cliente" value={job.customer_date} />
           <Field label="Operador" value={job.operator_name} />
+        </div>
+
+        <div className="mt-4 rounded border border-border bg-sidebar/20 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Asignar / Editar</h3>
+            {(!job.machine_id || !job.operator_name) && (
+              <span className="text-[10px] uppercase tracking-widest font-mono text-[color:var(--status-risk)]">
+                Sin asignar
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="col-span-2">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Máquina</Label>
+              <Select value={machineId ?? "__none__"} onValueChange={(v) => setMachineId(v === "__none__" ? null : v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin máquina —</SelectItem>
+                  {machines.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Operador</Label>
+              <Input value={operatorName} onChange={(e) => setOperatorName(e.target.value)} placeholder="Nombre del operador" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Inicio planificado</Label>
+              <Input type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Fin planificado</Label>
+              <Input type="datetime-local" value={plannedEnd} onChange={(e) => setPlannedEnd(e.target.value)} />
+            </div>
+          </div>
+          <Button size="sm" className="mt-3 w-full" onClick={saveAssignment} disabled={updateJob.isPending}>
+            {updateJob.isPending ? "Guardando…" : "Guardar asignación"}
+          </Button>
         </div>
 
         {job.planned_start && (() => {
