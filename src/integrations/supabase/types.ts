@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          active: boolean
+          code: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       job_steps: {
         Row: {
           completed_at: string | null
@@ -107,6 +137,7 @@ export type Database = {
           planned_end: string | null
           planned_start: string | null
           po_halliburton: string | null
+          po_line_item_id: string | null
           po_musa: string | null
           priority: Database["public"]["Enums"]["job_priority"]
           qty: number
@@ -128,6 +159,7 @@ export type Database = {
           planned_end?: string | null
           planned_start?: string | null
           po_halliburton?: string | null
+          po_line_item_id?: string | null
           po_musa?: string | null
           priority?: Database["public"]["Enums"]["job_priority"]
           qty?: number
@@ -149,6 +181,7 @@ export type Database = {
           planned_end?: string | null
           planned_start?: string | null
           po_halliburton?: string | null
+          po_line_item_id?: string | null
           po_musa?: string | null
           priority?: Database["public"]["Enums"]["job_priority"]
           qty?: number
@@ -162,6 +195,13 @@ export type Database = {
             columns: ["machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_po_line_item_id_fkey"
+            columns: ["po_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_items"
             referencedColumns: ["id"]
           },
         ]
@@ -293,6 +333,106 @@ export type Database = {
             columns: ["machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_line_items: {
+        Row: {
+          committed_date: string | null
+          created_at: string
+          currency: string | null
+          id: string
+          line_number: number
+          notes: string | null
+          pir: string | null
+          purchase_order_id: string
+          qty_ordered: number
+          tube_spec: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          committed_date?: string | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          line_number?: number
+          notes?: string | null
+          pir?: string | null
+          purchase_order_id: string
+          qty_ordered?: number
+          tube_spec?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          committed_date?: string | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          line_number?: number
+          notes?: string | null
+          pir?: string | null
+          purchase_order_id?: string
+          qty_ordered?: number
+          tube_spec?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_line_items_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          committed_date: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          issued_date: string | null
+          notes: string | null
+          po_number: string
+          source_document_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          committed_date?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          issued_date?: string | null
+          notes?: string | null
+          po_number: string
+          source_document_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          committed_date?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          issued_date?: string | null
+          notes?: string | null
+          po_number?: string
+          source_document_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
