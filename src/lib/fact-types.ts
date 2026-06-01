@@ -34,21 +34,28 @@ export interface Machine {
 export interface Job {
   id: string;
   odf: string;
+  /** @deprecated Usar po_line_item_id + join a purchase_orders. Se mantiene por compatibilidad de UI. */
   po_musa: string | null;
+  /** @deprecated Idem po_musa. */
   po_halliburton: string | null;
+  /** @deprecated Vive ahora en po_line_items.pir. */
   pir: string | null;
+  /** @deprecated Vive ahora en po_line_items.tube_spec. */
   tube_spec: string | null;
   qty: number;
   machine_id: string | null;
   status: JobStatus;
   priority: JobPriority;
   export_date: string | null;
+  /** @deprecated Vive ahora en po_line_items.committed_date. */
   customer_date: string | null;
   planned_start: string | null;
   planned_end: string | null;
   notes: string | null;
   hours_override: number | null;
   operator_name: string | null;
+  /** FK a la línea del PO que origina esta ODF. Null = trabajo interno sin PO. */
+  po_line_item_id?: string | null;
 }
 
 export interface PartTime {
@@ -69,6 +76,55 @@ export interface Vendor {
   lead_time_days_avg: number | null;
   notes: string | null;
   active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------
+// Purchase Order model (Paso 1 del Order Lifecycle Hub)
+// ---------------------------------------------------------------
+
+export interface Customer {
+  id: string;
+  name: string;
+  code: string | null;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PurchaseOrderStatus =
+  | "received"
+  | "in_production"
+  | "partial_shipped"
+  | "completed"
+  | "cancelled";
+
+export interface PurchaseOrder {
+  id: string;
+  customer_id: string;
+  po_number: string;
+  issued_date: string | null;
+  committed_date: string | null;
+  status: PurchaseOrderStatus;
+  source_document_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface POLineItem {
+  id: string;
+  purchase_order_id: string;
+  line_number: number;
+  pir: string | null;
+  tube_spec: string | null;
+  qty_ordered: number;
+  committed_date: string | null;
+  unit_price: number | null;
+  currency: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
