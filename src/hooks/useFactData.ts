@@ -439,7 +439,6 @@ export interface RescheduleInput {
 
 /** Drag-to-reschedule: move a bar to a new day and/or machine. */
 export function useRescheduleJob() {
-  // intentionally left in place
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: RescheduleInput) => {
