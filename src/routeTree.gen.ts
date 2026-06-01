@@ -10,13 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RiesgoRouteImport } from './routes/riesgo'
+import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
 import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 
 const RiesgoRoute = RiesgoRouteImport.update({
   id: '/riesgo',
   path: '/riesgo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
+  id: '/purchase-orders',
+  path: '/purchase-orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfiguracionRoute = ConfiguracionRouteImport.update({
@@ -29,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PurchaseOrdersIdRoute = PurchaseOrdersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PurchaseOrdersRoute,
+} as any)
 const MaquinaIdRoute = MaquinaIdRouteImport.update({
   id: '/maquina/$id',
   path: '/maquina/$id',
@@ -38,33 +50,59 @@ const MaquinaIdRoute = MaquinaIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/riesgo': typeof RiesgoRoute
   '/maquina/$id': typeof MaquinaIdRoute
+  '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/riesgo': typeof RiesgoRoute
   '/maquina/$id': typeof MaquinaIdRoute
+  '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/riesgo': typeof RiesgoRoute
   '/maquina/$id': typeof MaquinaIdRoute
+  '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/configuracion' | '/riesgo' | '/maquina/$id'
+  fullPaths:
+    | '/'
+    | '/configuracion'
+    | '/purchase-orders'
+    | '/riesgo'
+    | '/maquina/$id'
+    | '/purchase-orders/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/configuracion' | '/riesgo' | '/maquina/$id'
-  id: '__root__' | '/' | '/configuracion' | '/riesgo' | '/maquina/$id'
+  to:
+    | '/'
+    | '/configuracion'
+    | '/purchase-orders'
+    | '/riesgo'
+    | '/maquina/$id'
+    | '/purchase-orders/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/configuracion'
+    | '/purchase-orders'
+    | '/riesgo'
+    | '/maquina/$id'
+    | '/purchase-orders/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
+  PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
   RiesgoRoute: typeof RiesgoRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
 }
@@ -76,6 +114,13 @@ declare module '@tanstack/react-router' {
       path: '/riesgo'
       fullPath: '/riesgo'
       preLoaderRoute: typeof RiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/purchase-orders': {
+      id: '/purchase-orders'
+      path: '/purchase-orders'
+      fullPath: '/purchase-orders'
+      preLoaderRoute: typeof PurchaseOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/configuracion': {
@@ -92,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/purchase-orders/$id': {
+      id: '/purchase-orders/$id'
+      path: '/$id'
+      fullPath: '/purchase-orders/$id'
+      preLoaderRoute: typeof PurchaseOrdersIdRouteImport
+      parentRoute: typeof PurchaseOrdersRoute
+    }
     '/maquina/$id': {
       id: '/maquina/$id'
       path: '/maquina/$id'
@@ -102,9 +154,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PurchaseOrdersRouteChildren {
+  PurchaseOrdersIdRoute: typeof PurchaseOrdersIdRoute
+}
+
+const PurchaseOrdersRouteChildren: PurchaseOrdersRouteChildren = {
+  PurchaseOrdersIdRoute: PurchaseOrdersIdRoute,
+}
+
+const PurchaseOrdersRouteWithChildren = PurchaseOrdersRoute._addFileChildren(
+  PurchaseOrdersRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracionRoute: ConfiguracionRoute,
+  PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
   RiesgoRoute: RiesgoRoute,
   MaquinaIdRoute: MaquinaIdRoute,
 }
