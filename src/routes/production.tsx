@@ -139,7 +139,7 @@ function CreateOdfDialog({
   machines: { id: string; name: string }[];
   onClose: () => void;
   onDone: () => Promise<void>;
-  createFn: (args: unknown) => Promise<{ job_id: string }>;
+  createFn: ReturnType<typeof useServerFn<typeof createJobFromPoLine>>;
 }) {
   const [machineId, setMachineId] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
