@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RiesgoRouteImport } from './routes/riesgo'
 import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
 import { Route as IntakeRouteImport } from './routes/intake'
+import { Route as EngineeringRouteImport } from './routes/engineering'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
@@ -30,6 +31,11 @@ const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
 const IntakeRoute = IntakeRouteImport.update({
   id: '/intake',
   path: '/intake',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EngineeringRoute = EngineeringRouteImport.update({
+  id: '/engineering',
+  path: '/engineering',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfiguracionRoute = ConfiguracionRouteImport.update({
@@ -56,6 +62,7 @@ const MaquinaIdRoute = MaquinaIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/riesgo': typeof RiesgoRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/riesgo': typeof RiesgoRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/riesgo': typeof RiesgoRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/configuracion'
+    | '/engineering'
     | '/intake'
     | '/purchase-orders'
     | '/riesgo'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/configuracion'
+    | '/engineering'
     | '/intake'
     | '/purchase-orders'
     | '/riesgo'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/configuracion'
+    | '/engineering'
     | '/intake'
     | '/purchase-orders'
     | '/riesgo'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
+  EngineeringRoute: typeof EngineeringRoute
   IntakeRoute: typeof IntakeRoute
   PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
   RiesgoRoute: typeof RiesgoRoute
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/intake'
       fullPath: '/intake'
       preLoaderRoute: typeof IntakeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/engineering': {
+      id: '/engineering'
+      path: '/engineering'
+      fullPath: '/engineering'
+      preLoaderRoute: typeof EngineeringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/configuracion': {
@@ -189,6 +209,7 @@ const PurchaseOrdersRouteWithChildren = PurchaseOrdersRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracionRoute: ConfiguracionRoute,
+  EngineeringRoute: EngineeringRoute,
   IntakeRoute: IntakeRoute,
   PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
   RiesgoRoute: RiesgoRoute,
