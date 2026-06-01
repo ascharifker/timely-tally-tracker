@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, FileText, Settings } from "lucide-react";
+import { Activity, FileText, Settings, Inbox, Wrench, Factory } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -19,7 +19,38 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
-            <span className="hidden md:inline">MAZAK 1–4 + GEMAK · MAQYRO · TECMAC</span>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+              activeProps={{ className: "border-primary text-primary" }}
+              activeOptions={{ exact: true }}
+            >
+              <span className="uppercase tracking-widest">Calendario</span>
+            </Link>
+            <Link
+              to="/intake"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+              activeProps={{ className: "border-primary text-primary" }}
+            >
+              <Inbox className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-widest">Intake</span>
+            </Link>
+            <Link
+              to="/engineering"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+              activeProps={{ className: "border-primary text-primary" }}
+            >
+              <Wrench className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-widest">Ingeniería</span>
+            </Link>
+            <Link
+              to="/production"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+              activeProps={{ className: "border-primary text-primary" }}
+            >
+              <Factory className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-widest">Producción</span>
+            </Link>
             <Link
               to="/purchase-orders"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
