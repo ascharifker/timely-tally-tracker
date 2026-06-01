@@ -127,6 +127,45 @@ export interface POLineItem {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  status: POLineStatus;
+  flag_reason: string | null;
+  engineering_reviewed_at: string | null;
+  engineering_reviewed_by: string | null;
+}
+
+export type POLineStatus =
+  | "pending_engineering"
+  | "engineering_approved"
+  | "engineering_flagged"
+  | "ready_for_production"
+  | "scheduled"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+export const PO_LINE_STATUS_LABEL: Record<POLineStatus, string> = {
+  pending_engineering: "Pendiente ingeniería",
+  engineering_approved: "Aprobada por ingeniería",
+  engineering_flagged: "Flagueada por ingeniería",
+  ready_for_production: "Lista para producción",
+  scheduled: "Planificada",
+  in_progress: "En curso",
+  completed: "Completada",
+  cancelled: "Cancelada",
+};
+
+export interface DateChange {
+  id: string;
+  po_line_item_id: string | null;
+  job_id: string | null;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by: string | null;
+  changed_at: string;
+  reason: string | null;
+  acknowledged_by_peter: boolean;
+  acknowledged_at: string | null;
 }
 
 export interface MachineRun {

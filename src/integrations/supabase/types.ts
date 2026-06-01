@@ -71,6 +71,63 @@ export type Database = {
         }
         Relationships: []
       }
+      date_change_log: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by_peter: boolean
+          changed_at: string
+          changed_by: string | null
+          field: string
+          id: string
+          job_id: string | null
+          new_value: string | null
+          old_value: string | null
+          po_line_item_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by_peter?: boolean
+          changed_at?: string
+          changed_by?: string | null
+          field: string
+          id?: string
+          job_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          po_line_item_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by_peter?: boolean
+          changed_at?: string
+          changed_by?: string | null
+          field?: string
+          id?: string
+          job_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          po_line_item_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "date_change_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "date_change_log_po_line_item_id_fkey"
+            columns: ["po_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_steps: {
         Row: {
           completed_at: string | null
@@ -342,12 +399,16 @@ export type Database = {
           committed_date: string | null
           created_at: string
           currency: string | null
+          engineering_reviewed_at: string | null
+          engineering_reviewed_by: string | null
+          flag_reason: string | null
           id: string
           line_number: number
           notes: string | null
           pir: string | null
           purchase_order_id: string
           qty_ordered: number
+          status: Database["public"]["Enums"]["po_line_status"]
           tube_spec: string | null
           unit_price: number | null
           updated_at: string
@@ -356,12 +417,16 @@ export type Database = {
           committed_date?: string | null
           created_at?: string
           currency?: string | null
+          engineering_reviewed_at?: string | null
+          engineering_reviewed_by?: string | null
+          flag_reason?: string | null
           id?: string
           line_number?: number
           notes?: string | null
           pir?: string | null
           purchase_order_id: string
           qty_ordered?: number
+          status?: Database["public"]["Enums"]["po_line_status"]
           tube_spec?: string | null
           unit_price?: number | null
           updated_at?: string
@@ -370,12 +435,16 @@ export type Database = {
           committed_date?: string | null
           created_at?: string
           currency?: string | null
+          engineering_reviewed_at?: string | null
+          engineering_reviewed_by?: string | null
+          flag_reason?: string | null
           id?: string
           line_number?: number
           notes?: string | null
           pir?: string | null
           purchase_order_id?: string
           qty_ordered?: number
+          status?: Database["public"]["Enums"]["po_line_status"]
           tube_spec?: string | null
           unit_price?: number | null
           updated_at?: string
@@ -609,6 +678,15 @@ export type Database = {
         | "EXPO"
         | "YA_SE_ENVIO"
       machine_type: "internal" | "external_shop"
+      po_line_status:
+        | "pending_engineering"
+        | "engineering_approved"
+        | "engineering_flagged"
+        | "ready_for_production"
+        | "scheduled"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
       shift_slot: "manana" | "tarde" | "noche"
     }
     CompositeTypes: {
@@ -757,6 +835,16 @@ export const Constants = {
         "YA_SE_ENVIO",
       ],
       machine_type: ["internal", "external_shop"],
+      po_line_status: [
+        "pending_engineering",
+        "engineering_approved",
+        "engineering_flagged",
+        "ready_for_production",
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
       shift_slot: ["manana", "tarde", "noche"],
     },
   },
