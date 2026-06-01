@@ -44,7 +44,6 @@ export const Route = createFileRoute("/production")({
 function ProductionPage() {
   const { data: lines = [], isLoading } = usePoLinesByStatus(["ready_for_production"]);
   const { data: machines = [] } = useMachines();
-  const createFn = useServerFn(createJobFromPoLine);
   const qc = useQueryClient();
 
   const [active, setActive] = useState<PoLineWithContext | null>(null);
@@ -122,7 +121,6 @@ function ProductionPage() {
           await qc.invalidateQueries({ queryKey: ["po_lines_by_status"] });
           await qc.invalidateQueries({ queryKey: ["jobs"] });
         }}
-        createFn={createFn}
       />
     </AppShell>
   );
@@ -133,14 +131,13 @@ function CreateOdfDialog({
   machines,
   onClose,
   onDone,
-  createFn,
 }: {
   line: PoLineWithContext | null;
   machines: { id: string; name: string }[];
   onClose: () => void;
   onDone: () => Promise<void>;
-  createFn: ReturnType<typeof useServerFn<typeof createJobFromPoLine>>;
 }) {
+  const createFn = useServerFn(createJobFromPoLine);
   const [machineId, setMachineId] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
 
