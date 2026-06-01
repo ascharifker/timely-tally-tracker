@@ -1,114 +1,118 @@
 
-# Paso 2 — Intake de PO por PDF con Lovable AI
+# Paso 2.5 (revisado) — Workflow por colas con roles + audit trail de fechas
 
-Objetivo: Peter sube el PDF del PO del cliente, la app extrae cliente, número, fecha, y líneas (PIR, cantidad, fecha comprometida), muestra el resultado para revisar/editar, y al confirmar crea el `purchase_order` + `po_line_items` que ya tenemos modelados en el Paso 1.
+Tu descripción del workflow es correcta y coincide con la transcripción. Reemplazo el plan anterior de "auto-crear ODFs" por un flujo de **colas con handoff entre roles**, que es lo que Peter y vos acordaron.
 
-## Flujo del usuario
+## Flujo end-to-end
 
-1. En una nueva sección "Purchase Orders" (ruta `/purchase-orders`), botón "Cargar PO".
-2. Dialog: subir PDF (drag-and-drop o file picker).
-3. PDF se sube a Storage bucket privado `po-documents`.
-4. Server function manda el PDF a Lovable AI (Gemini, soporta PDFs nativos vía base64/URL en `messages`) con un schema estructurado.
-5. UI muestra el resultado pre-llenado en un form editable:
-   - Cliente (dropdown con los existentes + "crear nuevo")
-   - Número de PO
-   - Fecha de emisión, fecha comprometida del PO
-   - Tabla editable de líneas: PIR, descripción/tube_spec, cantidad, fecha comprometida, precio unitario
-6. Botón "Confirmar y crear PO" → inserta `purchase_order` (con `source_document_url` apuntando al PDF) + `po_line_items`.
-7. Toast de éxito, redirige a `/purchase-orders/$id` (lista de líneas y, eventualmente, jobs vinculados).
+```text
+┌──────────────┐   ┌──────────────────┐   ┌─────────────────────┐   ┌──────────────┐
+│ 1. INTAKE    │ → │ 2. INGENIERÍA    │ → │ 3. PRODUCCIÓN       │ → │ 4. CALENDAR  │
+│ Peter sube   │   │ Alexis valida    │   │ Luis Angel crea ODF │   │ Gantt + OTD  │
+│ PDF del PO   │   │ PIRs vs master   │   │ asigna máquina/op   │   │              │
+└──────────────┘   └──────────────────┘   └─────────────────────┘   └──────────────┘
+                                                                            │
+                                                                            ▼
+                                                                  ┌─────────────────┐
+                                                                  │ 5. CAMBIO FECHA │
+                                                                  │ → Notif a Peter │
+                                                                  │ → Audit trail   │
+                                                                  └─────────────────┘
+```
 
-## Backend
+Cada paso es una **cola visible** con la línea de PO esperando acción del rol correspondiente.
 
-### Storage
-- Nuevo bucket `po-documents` (privado).
-- Política: lectura/escritura para anon y authenticated (mismo patrón que el resto del proyecto, sin auth aún).
-- Path convention: `po-documents/{uuid}.pdf`.
+## Parte A — Wipe de datos demo
 
-### Server function: `extractPoFromPdf`
-- Archivo: `src/lib/po-intake.functions.ts` (client-safe, lo invoca el dialog).
-- Input: `{ storagePath: string }` (path en el bucket, no el archivo crudo — el client sube primero a Storage y manda la ruta).
-- Handler:
-  1. Descarga el PDF del bucket con `supabaseAdmin` (service role, lee bucket privado).
-  2. Lo manda como `file` (base64) a Lovable AI Gateway usando el helper `createLovableAiGatewayProvider`.
-  3. Usa `generateText` + `Output.object(schema)` con un schema Zod estricto:
-     ```
-     {
-       customer_name: string,
-       po_number: string,
-       issued_date: string | null,   // ISO yyyy-mm-dd
-       committed_date: string | null,
-       line_items: Array<{
-         line_number: number,
-         pir: string | null,
-         tube_spec: string | null,
-         qty_ordered: number,
-         committed_date: string | null,
-         unit_price: number | null,
-         currency: string | null
-       }>
-     }
-     ```
-  4. Devuelve el JSON estructurado + el `storagePath` para que el client lo guarde junto al PO.
+Borrar (TRUNCATE ... CASCADE en transacción): `status_events`, `machine_runs`, `shifts`, `job_steps`, `jobs`, `po_line_items`, `purchase_orders`, `customers`, `briefings`. Mantener `machines`, `vendors`, `part_times`.
 
-Modelo: `google/gemini-3-flash-preview` (rápido, soporta PDFs nativos, default del stack).
+## Parte B — Modelo de estados por línea (no por PO)
 
-### Server function: `commitPo`
-- Input: el JSON validado del form (después de la edición del usuario) + `storagePath`.
-- Handler: crea/encuentra el customer, inserta `purchase_order` y `po_line_items` en transacción manual (RPC) o en serie con rollback manual si falla.
-- Devuelve el `id` del PO creado.
+Agregar columna `status` a `po_line_items` con enum:
+- `pending_engineering` — recién extraída del PDF, esperando a Alexis
+- `engineering_approved` — Alexis validó el PIR contra master
+- `engineering_flagged` — Alexis encontró problema (rev desactualizada, falta info, etc.) + `flag_reason text`
+- `ready_for_production` — pasa a la cola de Luis Angel (manual o automático tras approve)
+- `scheduled` — Luis Angel creó la ODF y la metió al calendario
+- `in_progress` — ODF arrancó
+- `completed` — entregada
+- `cancelled`
 
-### Helper compartido
-- `src/lib/ai-gateway.server.ts` con el provider de Lovable AI Gateway (copiar el helper canónico del knowledge `ai-sdk-lovable-gateway`).
+El `purchase_orders.status` queda como vista derivada (computado, no editable manual).
 
-## Frontend
+## Parte C — Tres vistas / colas nuevas
 
-### Nueva ruta `src/routes/purchase-orders.tsx`
-- Layout: header "Purchase Orders" + botón "Cargar PO" + tabla de POs existentes (lee `useQuery` desde `purchase_orders` joinado con `customers`, count de líneas).
-- Por cada fila: cliente, número, fecha emisión, fecha comprometida, status, # líneas, link a detalle.
+Reemplazan / complementan `/purchase-orders`:
 
-### Nueva ruta `src/routes/purchase-orders.$id.tsx`
-- Detalle de un PO: header con datos del cliente + PO, lista de line items (tabla), link al PDF original, sección "ODFs vinculadas" (jobs cuyo `po_line_item_id` esté en este PO — preparado pero puede quedar vacío hasta que migremos creación de jobs).
+### 1. `/intake` (Peter)
+- Botón "Cargar PO" (igual que hoy) → sube PDF → extrae con AI → review form → al confirmar inserta `purchase_orders` + `po_line_items` con `status='pending_engineering'`.
+- Tabla "Mis POs" con filtros por cliente/fecha/status agregado. Su "spreadsheet".
 
-### Componente `<UploadPoDialog />`
-- Estados: `idle` → `uploading` (subiendo a Storage) → `extracting` (esperando AI) → `reviewing` (form editable) → `committing` → `done`.
-- Maneja errores 429/402 del gateway con toasts claros ("Reintentá en un momento" / "Sin créditos, agregalos en Workspace > Usage").
-- Form de revisión usa los componentes shadcn ya en el proyecto (Input, Select, Table, Button).
+### 2. `/engineering` (Alexis)
+- Cola: todas las líneas con `status='pending_engineering'`, agrupadas por PO.
+- Por cada línea, Alexis ve PIR, tube_spec, qty, link al PDF original. Acciones:
+  - **Aprobar** → status pasa a `engineering_approved` y automáticamente a `ready_for_production`.
+  - **Flagear** → status `engineering_flagged` + textarea con motivo (ej: "PIR 102882625 rev C desactualizada, usar rev D"). Vuelve a la cola de Peter para resolver con el cliente.
+- Campo opcional para Alexis: corregir PIR / tube_spec si el AI los extrajo mal.
 
-### Hook `useCustomers`
-- Lee `customers` desde Supabase (analogo a `useVendors`).
+### 3. `/production` (Luis Angel)
+- Cola: líneas con `status='ready_for_production'`.
+- Por cada línea, botón "Crear ODF" → abre dialog tipo `CreateJobDialog` pre-llenado con PIR/qty/customer_date de la línea, y campos para: máquina, operador, planned_start, planned_end (sugiere fecha por part_times si existe). Al guardar:
+  - Inserta `jobs` con `po_line_item_id` apuntando a la línea
+  - Línea pasa a `status='scheduled'`
+  - Aparece en el calendario/Gantt existente
 
-### Hook `usePurchaseOrders`
-- Lee POs con su customer y count de líneas.
+## Parte D — Audit trail de fechas + notificaciones a Peter
 
-### Navegación
-- Agregar "Purchase Orders" al `AppShell` sidebar (entre la home y "Configuración").
+Nueva tabla `date_change_log`:
+- `id`, `po_line_item_id`, `job_id` (nullable)
+- `field` (ej `customer_date`, `planned_end`, `committed_date`)
+- `old_value date`, `new_value date`
+- `changed_by text`, `changed_at timestamptz`
+- `reason text` (opcional, lo escribe quien edita)
+- `acknowledged_by_peter boolean default false`, `acknowledged_at`
+
+Trigger en `jobs` y `po_line_items`: cuando cambia `planned_end`, `customer_date` o `committed_date`, inserta una fila en `date_change_log`.
+
+Nueva sección en `/intake` (vista de Peter): **"Cambios de fecha pendientes de revisar"** — bandeja arriba de su spreadsheet con todas las filas de `date_change_log` con `acknowledged_by_peter=false`. Cada fila muestra:
+- ODF / PO / cliente
+- Fecha original → fecha nueva (diff en días, rojo si se atrasa)
+- Quién y cuándo cambió
+- Botones "Marcar como visto" y "Llamar cliente" (este último solo registra la acción, no llama).
+
+En el detalle de cada línea/ODF, tab "Historial de fechas" con toda la cronología.
+
+## Parte E — Workflow en código
+
+- Migración: enum `po_line_status`, columna en `po_line_items`, tabla `date_change_log`, triggers.
+- 3 nuevas rutas (`/intake`, `/engineering`, `/production`) en `src/routes/`.
+- Reutilizar `UploadPoDialog` para `/intake`. Crear `EngineeringQueue.tsx` y `ProductionQueue.tsx`.
+- Hook `useDateChanges()` para la bandeja de Peter.
+- Server functions: `approvePoLine`, `flagPoLine`, `createJobFromPoLine`, `acknowledgeDateChange`.
+- Nav `AppShell`: tabs por rol (sin auth aún, solo navegación). Cuando llegue auth (Paso 5), cada rol ve solo su cola.
 
 ## Lo que NO hace este paso
 
-- No vincula automáticamente jobs nuevos a líneas de PO. Eso es un paso futuro (UI para "crear ODF desde línea").
-- No agrega vista Customer agrupada por PO (Paso 3 del roadmap).
-- No agrega forecast dates derivadas (Paso 4).
-- No agrega auth ni notificaciones (Paso 5).
-- No borra/migra el flujo viejo de creación de jobs (sigue funcionando contra `po_musa`/`po_halliburton`).
-
-## Detalles técnicos
-
-- El bucket es privado → el AI extractor usa `supabaseAdmin` para descargarlo; el browser nunca toca el archivo después de subirlo.
-- El PDF se sube con `supabase.storage.from('po-documents').upload(...)` desde el browser (anon key, política abierta — mismo patrón del proyecto). En un futuro con auth, se restringe a `authenticated`.
-- Para mostrar el link al PDF en el detalle, generamos una signed URL (`createSignedUrl`, 1h) en una server function al renderizar.
-- Lovable AI Gateway acepta PDFs en `messages` como `{ type: "file", data: <base64>, mimeType: "application/pdf" }`. Confirmamos formato exacto al implementar (ver docs del gateway).
-- Validación Zod del output del AI antes de mostrarlo al usuario — si falla, mensaje "No pudimos extraer el PO automáticamente, ingresalo manualmente" + form vacío.
-- Si el customer extraído por AI no matchea exactamente (ej: "Halliburton Argentina" vs "Halliburton"), el dropdown del review form pre-selecciona por fuzzy match (lowercase + contains) y permite "crear nuevo cliente" inline.
+- **Auth/roles reales**: las 3 vistas son visibles para todos. La separación por rol es organizativa, no enforced. (Paso 5 lo arregla con Lovable Cloud Auth + tabla `user_roles`.)
+- **Notificaciones por email/SMS**: la bandeja de cambios es in-app. Email sale en paso siguiente con Lovable Emails.
+- **Visibilidad de terceros (Schlumberger, acero)**: Peter mencionó que es su mayor dolor pero no hay sistema upstream que consultar. Lo dejamos para un módulo "Vendors" donde Peter manualmente registre status (futuro paso).
+- **Integración con E-Dash**: Alexis sigue cargando en E-Dash en paralelo. La app no se sincroniza con E-Dash (no hay API). Es una decisión a tomar más adelante (¿migrar fuera de E-Dash o integrar?).
+- **OR report de Halliburton/COE**: Peter dijo que sigue tirando de ahí. No lo replicamos por ahora.
 
 ## Criterio de éxito
 
-1. Subir un PDF de Musa o Halliburton real (de los que Peter ya tiene) y ver el form pre-llenado con cliente, número, fechas y al menos una línea.
-2. Editar campos, confirmar, y verificar en la base que `purchase_orders` y `po_line_items` se crearon correctamente y `source_document_url` apunta al PDF subido.
-3. Abrir `/purchase-orders/$id` y ver el detalle + link funcional al PDF.
-4. El flujo viejo de creación de jobs sigue funcionando sin cambios.
+1. Wipe → base limpia.
+2. Peter (vos haciéndote pasar) sube `4518744487.pdf` en `/intake` → quedan 4 líneas en `pending_engineering`.
+3. Cambiando de tab a `/engineering`, las 4 aparecen. Aprobás 3, flageás 1 con motivo "PIR rev desactualizada".
+4. En `/production`, las 3 aprobadas aparecen. Creás 3 ODFs asignando máquina y fechas.
+5. Las 3 ODFs aparecen en el calendario `/` con las fechas que pusiste.
+6. Cambiás `planned_end` de una ODF → en `/intake` Peter ve la bandeja con fecha vieja → nueva.
+7. La línea flageada sigue visible para Peter en `/intake` con el motivo de Alexis.
 
-## Riesgos
+## Decisiones pendientes para arrancar
 
-- **Calidad de extracción**: depende del formato del PDF. Si Musa/Halliburton mandan PDFs muy distintos entre sí, puede que el schema no capture bien. Mitigación: el form es editable, el AI es una sugerencia, no un commit automático.
-- **Costos AI Gateway**: cada PDF cuesta créditos. Gemini Flash es barato pero conviene mostrar al usuario cuándo se está extrayendo y no permitir double-clicks.
-- **PDFs escaneados**: si el PDF no tiene texto (es una imagen), Gemini igual lo OCRea, pero la fidelidad baja. Aceptable para v1.
+1. **¿Implementar todo de una?** Es grande. Sugiero dividir en dos commits: (B) wipe + estados + 3 colas básicas; luego (D) audit trail + bandeja de Peter.
+2. **Línea flageada por Alexis**: ¿vuelve a Peter o queda visible para ambos sin status especial?
+3. **Cuando Luis Angel crea la ODF, ¿la fecha "comprometida con cliente" (`customer_date`) viene del PDF y queda inmutable, o Luis Angel puede sobreescribirla?** Lo correcto operativamente sería: `customer_date` viene del PDF y NO se toca (es lo prometido al cliente); `planned_end` es lo que producción cree que va a entregar, y si `planned_end > customer_date` el sistema lo marca en rojo como "atrasado contra promesa".
+
+Si confirmás, arranco con la migración + Parte A + B.
