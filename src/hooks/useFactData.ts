@@ -510,6 +510,49 @@ export interface LogDelayResult {
   shiftedAt: number;
 }
 
+export interface UpdateJobInput {
+  id: string;
+  machine_id?: string | null;
+  operator_name?: string | null;
+  planned_start?: string | null;
+  planned_end?: string | null;
+  notes?: string | null;
+  priority?: string;
+}
+
+/**
+ * Lightweight per-field update for a job (assignment edits from JobDetailDialog).
+ * Keeps status ↔ machine type in sync just like useRescheduleJob.
+ */
+export function useUpdateJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateJobInput) => {
+      const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
+      const current = jobs.find((j) => j.id === input.id);
+      const patch: Partial<Job> = {};
+      if (input.machine_id !== undefined) patch.machine_id = input.machine_id;
+      if (input.operator_name !== undefined) patch.operator_name = input.operator_name;
+      if (input.planned_start !== undefined) patch.planned_start = input.planned_start;
+      if (input.planned_end !== undefined) patch.planned_end = input.planned_end;
+      if (input.notes !== undefined) patch.notes = input.notes;
+      if (input.priority !== undefined) patch.priority = input.priority as Job["priority"];
+      if (input.machine_id !== undefined && current) {
+        const newMachine = machines.find((m) => m.id === input.machine_id);
+        const nextStatus = statusForMachine(current.status, newMachine ?? null);
+        if (nextStatus !== current.status) patch.status = nextStatus;
+      }
+      const { error } = await supabase.from("jobs").update(patch).eq("id", input.id);
+      if (error) throw error;
+      return input;
+    },
+    onSuccess: () => toast.success("ODF actualizada"),
+    onError: (err) => toast.error("No se pudo guardar", { description: (err as Error).message }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
 /**
  * Record a production delay and cascade the schedule in one shot.
  *   1. inserts a row in status_events (audit trail)
