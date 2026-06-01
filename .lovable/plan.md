@@ -1,99 +1,114 @@
 
-# Paso 1 — Modelo de Purchase Order y Line Items
+# Paso 2 — Intake de PO por PDF con Lovable AI
 
-Cimiento del "Order Lifecycle Hub". Hoy un `job` mezcla tres cosas distintas: el pedido del cliente (PO), la línea del pedido (qué item/PIR y cuántas piezas), y la orden de fabricación interna (ODF). Las separamos sin romper lo que ya funciona.
+Objetivo: Peter sube el PDF del PO del cliente, la app extrae cliente, número, fecha, y líneas (PIR, cantidad, fecha comprometida), muestra el resultado para revisar/editar, y al confirmar crea el `purchase_order` + `po_line_items` que ya tenemos modelados en el Paso 1.
 
-## Modelo conceptual
+## Flujo del usuario
 
-```text
-customers (1) ──< purchase_orders (1) ──< po_line_items (1) ──< jobs (N)
-                                                              (jobs = ODFs internas)
-```
+1. En una nueva sección "Purchase Orders" (ruta `/purchase-orders`), botón "Cargar PO".
+2. Dialog: subir PDF (drag-and-drop o file picker).
+3. PDF se sube a Storage bucket privado `po-documents`.
+4. Server function manda el PDF a Lovable AI (Gemini, soporta PDFs nativos vía base64/URL en `messages`) con un schema estructurado.
+5. UI muestra el resultado pre-llenado en un form editable:
+   - Cliente (dropdown con los existentes + "crear nuevo")
+   - Número de PO
+   - Fecha de emisión, fecha comprometida del PO
+   - Tabla editable de líneas: PIR, descripción/tube_spec, cantidad, fecha comprometida, precio unitario
+6. Botón "Confirmar y crear PO" → inserta `purchase_order` (con `source_document_url` apuntando al PDF) + `po_line_items`.
+7. Toast de éxito, redirige a `/purchase-orders/$id` (lista de líneas y, eventualmente, jobs vinculados).
 
-- **customer**: Musa, Halliburton, futuros. Hoy implícito en qué columna está llena.
-- **purchase_order**: el PO real del cliente. Un número, una fecha de emisión, fechas comprometidas a nivel PO, un cliente.
-- **po_line_item**: cada línea del PO — un PIR + cantidad + fecha comprometida de esa línea (puede diferir del PO).
-- **job**: la orden de fabricación interna (ODF). Una línea puede generar 1+ ODFs (split de lotes, reprocesos). Hoy la relación es 1:1 implícita.
+## Backend
 
-## Tablas nuevas
+### Storage
+- Nuevo bucket `po-documents` (privado).
+- Política: lectura/escritura para anon y authenticated (mismo patrón que el resto del proyecto, sin auth aún).
+- Path convention: `po-documents/{uuid}.pdf`.
 
-### `customers`
-- `name` (único), `code` (corto: MUSA, HAL), `active`, `notes`
-- Seed inicial: Musa Argentina, Halliburton (desde los datos actuales)
+### Server function: `extractPoFromPdf`
+- Archivo: `src/lib/po-intake.functions.ts` (client-safe, lo invoca el dialog).
+- Input: `{ storagePath: string }` (path en el bucket, no el archivo crudo — el client sube primero a Storage y manda la ruta).
+- Handler:
+  1. Descarga el PDF del bucket con `supabaseAdmin` (service role, lee bucket privado).
+  2. Lo manda como `file` (base64) a Lovable AI Gateway usando el helper `createLovableAiGatewayProvider`.
+  3. Usa `generateText` + `Output.object(schema)` con un schema Zod estricto:
+     ```
+     {
+       customer_name: string,
+       po_number: string,
+       issued_date: string | null,   // ISO yyyy-mm-dd
+       committed_date: string | null,
+       line_items: Array<{
+         line_number: number,
+         pir: string | null,
+         tube_spec: string | null,
+         qty_ordered: number,
+         committed_date: string | null,
+         unit_price: number | null,
+         currency: string | null
+       }>
+     }
+     ```
+  4. Devuelve el JSON estructurado + el `storagePath` para que el client lo guarde junto al PO.
 
-### `purchase_orders`
-- `customer_id` → customers
-- `po_number` (texto, el número del PO del cliente)
-- `issued_date`, `committed_date` (fecha comprometida a nivel PO, opcional — la real vive en line_items)
-- `status`: `received` | `in_production` | `partial_shipped` | `completed` | `cancelled` (derivado de los jobs, pero cacheable)
-- `source_document_url` (storage, para el PDF original — preparamos el campo aunque la captura AI sea otro paso)
-- `notes`
-- Único: `(customer_id, po_number)`
+Modelo: `google/gemini-3-flash-preview` (rápido, soporta PDFs nativos, default del stack).
 
-### `po_line_items`
-- `purchase_order_id` → purchase_orders (cascade delete)
-- `line_number` (orden dentro del PO)
-- `pir` (texto, igual que hoy en jobs)
-- `tube_spec` (sube desde job — pertenece a la línea, no a la ODF)
-- `qty_ordered` (lo que pidió el cliente)
-- `committed_date` (fecha comprometida de esta línea — la que mueve OTD)
-- `unit_price`, `currency` (opcional, lo dejamos preparado)
-- `notes`
+### Server function: `commitPo`
+- Input: el JSON validado del form (después de la edición del usuario) + `storagePath`.
+- Handler: crea/encuentra el customer, inserta `purchase_order` y `po_line_items` en transacción manual (RPC) o en serie con rollback manual si falla.
+- Devuelve el `id` del PO creado.
 
-## Cambios en tablas existentes
+### Helper compartido
+- `src/lib/ai-gateway.server.ts` con el provider de Lovable AI Gateway (copiar el helper canónico del knowledge `ai-sdk-lovable-gateway`).
 
-### `jobs`
-- **Agregar**: `po_line_item_id` (nullable inicialmente, para permitir migración gradual)
-- **Mantener temporalmente**: `po_musa`, `po_halliburton`, `pir`, `tube_spec`, `customer_date` (deprecados pero no borrados — los lee la UI hasta que migremos consumidores)
-- **Semántica nueva**: `qty` en un job sigue siendo "piezas de esta ODF" (puede ser menor que `qty_ordered` si la línea se parte en varias ODFs)
-- No tocamos status, planned_start/end, machine_id, etc.
+## Frontend
 
-## Migración de datos
+### Nueva ruta `src/routes/purchase-orders.tsx`
+- Layout: header "Purchase Orders" + botón "Cargar PO" + tabla de POs existentes (lee `useQuery` desde `purchase_orders` joinado con `customers`, count de líneas).
+- Por cada fila: cliente, número, fecha emisión, fecha comprometida, status, # líneas, link a detalle.
 
-Script idempotente dentro de la misma migración SQL:
+### Nueva ruta `src/routes/purchase-orders.$id.tsx`
+- Detalle de un PO: header con datos del cliente + PO, lista de line items (tabla), link al PDF original, sección "ODFs vinculadas" (jobs cuyo `po_line_item_id` esté en este PO — preparado pero puede quedar vacío hasta que migremos creación de jobs).
 
-1. Crear customer "Musa" y "Halliburton".
-2. Por cada `jobs.po_musa` distinto no nulo → crear `purchase_order` (customer=Musa, po_number=valor).
-3. Idem `po_halliburton` → customer=Halliburton.
-4. Por cada job con PO → crear un `po_line_item` con `line_number=1`, `pir`, `tube_spec`, `qty_ordered=qty`, `committed_date=customer_date`.
-5. Setear `jobs.po_line_item_id` apuntando al line_item recién creado.
-6. Jobs sin PO (si los hay) quedan con `po_line_item_id = null` — son ODFs huérfanas legítimas (trabajo interno, prototipos).
+### Componente `<UploadPoDialog />`
+- Estados: `idle` → `uploading` (subiendo a Storage) → `extracting` (esperando AI) → `reviewing` (form editable) → `committing` → `done`.
+- Maneja errores 429/402 del gateway con toasts claros ("Reintentá en un momento" / "Sin créditos, agregalos en Workspace > Usage").
+- Form de revisión usa los componentes shadcn ya en el proyecto (Input, Select, Table, Button).
 
-Edge case: si dos jobs comparten el mismo `po_musa` (es decir, el PO tenía 2 líneas), hoy no podemos distinguir si son la misma línea partida o líneas distintas. Decisión: **una línea por job en la migración** (line_number incremental por PO). El usuario podrá fusionar líneas después desde la UI si fuese necesario.
+### Hook `useCustomers`
+- Lee `customers` desde Supabase (analogo a `useVendors`).
 
-## RLS y permisos
+### Hook `usePurchaseOrders`
+- Lee POs con su customer y count de líneas.
 
-Las tres tablas nuevas siguen el patrón actual del proyecto (lectura pública, escritura anon+authenticated). No se introduce auth en este paso — eso es Paso 5 del roadmap.
+### Navegación
+- Agregar "Purchase Orders" al `AppShell` sidebar (entre la home y "Configuración").
 
-## Cambios de código (mínimos en este paso)
+## Lo que NO hace este paso
 
-Este paso es **schema + migración de datos + tipos**. La UI sigue funcionando contra los campos viejos de `jobs`. Cambios estrictos:
-
-- `src/lib/fact-types.ts`: agregar interfaces `Customer`, `PurchaseOrder`, `POLineItem`. Marcar campos deprecados en `Job` con comentario.
-- `src/hooks/useFactData.ts`: nada todavía (sigue leyendo jobs como hoy).
-- Sin tocar componentes en este paso.
-
-Los siguientes pasos del roadmap (PO intake con AI, vista Customer agrupada por PO, forecast dates) ya tendrán dónde colgarse.
+- No vincula automáticamente jobs nuevos a líneas de PO. Eso es un paso futuro (UI para "crear ODF desde línea").
+- No agrega vista Customer agrupada por PO (Paso 3 del roadmap).
+- No agrega forecast dates derivadas (Paso 4).
+- No agrega auth ni notificaciones (Paso 5).
+- No borra/migra el flujo viejo de creación de jobs (sigue funcionando contra `po_musa`/`po_halliburton`).
 
 ## Detalles técnicos
 
-- Todas las FKs con `ON DELETE` explícito: `purchase_orders.customer_id` → RESTRICT (no borrar cliente con POs); `po_line_items.purchase_order_id` → CASCADE; `jobs.po_line_item_id` → SET NULL (no perder la ODF si se borra la línea — preserva historial real de fábrica).
-- Trigger `touch_updated_at` (ya existe en el proyecto) en las 3 tablas nuevas.
-- Índices: `po_line_items(purchase_order_id)`, `jobs(po_line_item_id)`, `purchase_orders(customer_id, issued_date DESC)`.
-- GRANTs explícitos para `anon`, `authenticated`, `service_role` siguiendo el patrón del resto de las tablas del proyecto.
-
-## Qué NO hace este paso
-
-- No cambia la UI (Kanban, Gantt, Job dialog siguen como están).
-- No agrega captura de PO por PDF.
-- No agrega vista Customer.
-- No borra `po_musa`/`po_halliburton`/`customer_date` de jobs (queda como deprecación pendiente para cuando todos los consumidores migren).
-- No agrega auth.
+- El bucket es privado → el AI extractor usa `supabaseAdmin` para descargarlo; el browser nunca toca el archivo después de subirlo.
+- El PDF se sube con `supabase.storage.from('po-documents').upload(...)` desde el browser (anon key, política abierta — mismo patrón del proyecto). En un futuro con auth, se restringe a `authenticated`.
+- Para mostrar el link al PDF en el detalle, generamos una signed URL (`createSignedUrl`, 1h) en una server function al renderizar.
+- Lovable AI Gateway acepta PDFs en `messages` como `{ type: "file", data: <base64>, mimeType: "application/pdf" }`. Confirmamos formato exacto al implementar (ver docs del gateway).
+- Validación Zod del output del AI antes de mostrarlo al usuario — si falla, mensaje "No pudimos extraer el PO automáticamente, ingresalo manualmente" + form vacío.
+- Si el customer extraído por AI no matchea exactamente (ej: "Halliburton Argentina" vs "Halliburton"), el dropdown del review form pre-selecciona por fuzzy match (lowercase + contains) y permite "crear nuevo cliente" inline.
 
 ## Criterio de éxito
 
-1. Migración corre sin errores y sin pérdida de datos: `count(jobs)` antes = `count(jobs)` después, y `count(po_line_items)` = `count(jobs with po)`.
-2. La app sigue funcionando exactamente igual (kanban, gantt, dialogs no se rompen).
-3. `select * from purchase_orders join po_line_items join jobs` devuelve la jerarquía esperada para inspección manual.
+1. Subir un PDF de Musa o Halliburton real (de los que Peter ya tiene) y ver el form pre-llenado con cliente, número, fechas y al menos una línea.
+2. Editar campos, confirmar, y verificar en la base que `purchase_orders` y `po_line_items` se crearon correctamente y `source_document_url` apunta al PDF subido.
+3. Abrir `/purchase-orders/$id` y ver el detalle + link funcional al PDF.
+4. El flujo viejo de creación de jobs sigue funcionando sin cambios.
 
-Cuando esto esté verde, el siguiente paso (PO intake con AI sobre Gemini) tiene un destino claro donde escribir.
+## Riesgos
+
+- **Calidad de extracción**: depende del formato del PDF. Si Musa/Halliburton mandan PDFs muy distintos entre sí, puede que el schema no capture bien. Mitigación: el form es editable, el AI es una sugerencia, no un commit automático.
+- **Costos AI Gateway**: cada PDF cuesta créditos. Gemini Flash es barato pero conviene mostrar al usuario cuándo se está extrayendo y no permitir double-clicks.
+- **PDFs escaneados**: si el PDF no tiene texto (es una imagen), Gemini igual lo OCRea, pero la fidelidad baja. Aceptable para v1.
