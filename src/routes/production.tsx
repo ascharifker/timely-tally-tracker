@@ -99,7 +99,7 @@ function ProductionPage() {
     <AppShell>
       <Toaster theme="dark" position="top-right" />
       <div className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Producción · Luis Angel</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Producción</h2>
         <p className="text-sm text-muted-foreground">
           Partí cada línea en una o más ODFs (numeración nnn/yy) asignándoles máquina, turno y vendor de cementación.
         </p>
