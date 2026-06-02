@@ -26,7 +26,8 @@ function PurchaseOrdersPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Purchase Orders</h2>
           <p className="text-sm text-muted-foreground">
-            Una fila por línea de PO, como tu planilla. Editá in-line, los cambios quedan resaltados.
+            Una fila por línea de PO. Las líneas no desaparecen al avanzar — ves todo el ciclo
+            (ingeniería → producción → export → enviado). Editá in-line, los cambios quedan resaltados.
           </p>
         </div>
         <UploadPoDialog />
