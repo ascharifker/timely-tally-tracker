@@ -1,93 +1,59 @@
-# Rediseño Intake + POs estilo planilla de Peter
+## Objetivo
 
-Engineering queda como está (confirmado). Foco: hacer que `/intake` y `/purchase-orders` se vean y se sientan como la planilla `Halliburton-COE PO's.xlsx`.
+Permitir a Luis Angel (Producción) abrir el detalle completo de una PO desde la tabla de líneas listas, sin salir del tab.
 
-## Lectura de la planilla de Peter
+## Cambios
 
-Una sola hoja, ~9.000 filas, **una fila = una línea de PO**. Sin agrupación visual por PO; Peter ordena y filtra. Columnas relevantes en orden:
+### 1. Nuevo componente `src/components/fact/PoDetailDialog.tsx`
+Diálogo reutilizable que recibe un `purchase_order_id` y muestra:
+- **Header**: PO number, cliente, status, fecha emisión, fecha comprometida.
+- **Todas las líneas de la PO** (no solo la actual): L#, PIR, Spec, Qty, fecha comprometida, status, notas.
+- **Historial de cambios** (`date_change_log`) de esa PO: campo, antes → ahora, fecha, quién.
+- **Notas** de la PO.
+- Botón cerrar. Solo lectura (no edita — para eso ya existe Intake).
 
+Datos vía un nuevo hook `usePoDetail(poId)` que hace un solo query a `purchase_orders` con `customer`, `po_line_items` y `date_change_log` (filtrado por los line ids).
+
+### 2. `src/routes/production.tsx`
+- Convertir el `po_number` mostrado en cada fila en un botón link (estilo `underline text-primary cursor-pointer`).
+- Al hacer click, abrir `<PoDetailDialog poId={...} />`.
+- Mantener intacta la columna "Crear ODF".
+
+## Detalle técnico
+
+```tsx
+// En la celda Cliente/PO:
+<button
+  type="button"
+  onClick={() => setDetailPoId(l.purchase_order!.id)}
+  className="font-mono text-xs text-primary hover:underline"
+>
+  {l.purchase_order?.po_number}
+</button>
 ```
-MEX PO | LOCATION | x | PART No. | SIZE | DESCRIPTION | REV | DRAWING |
-NOSE P/N | Type | Valve | THREAD | GRADE |
-HB DELV. DATE | MEX DELV. DATE | DATE SHIPPED | # DAYS |
-QUANTITY ORDERED | PEND | PRICE PER UNIT | MUSA | TOTAL PRICE |
-Pending $ Amount | MUSA Total | MUSA Pending |
-Date Issued | HB PO | NOTES
+
+```ts
+// src/hooks/usePoDetail.ts
+export function usePoDetail(poId: string | null) {
+  return useQuery({
+    enabled: !!poId,
+    queryKey: ["po_detail", poId],
+    queryFn: async () => {
+      const { data: po } = await supabase
+        .from("purchase_orders")
+        .select("*, customer:customers(*), lines:po_line_items(*)")
+        .eq("id", poId!)
+        .single();
+      const lineIds = po?.lines?.map(l => l.id) ?? [];
+      const { data: changes } = await supabase
+        .from("date_change_log")
+        .select("*")
+        .in("po_line_item_id", lineIds)
+        .order("changed_at", { ascending: false });
+      return { po, changes: changes ?? [] };
+    },
+  });
+}
 ```
 
-Insight clave: para Peter el grano es la **línea**, no el PO. Por eso el master-detail que había planeado antes es la abstracción equivocada — lo cambio por **una sola grilla plana de líneas** que imita su Excel.
-
-## Nuevo layout — Intake y POs
-
-```text
-┌───────────────────────────────────────────────────────────────┐
-│ [+ Subir PO]  [Cliente ▾] [Estado ▾] [🔍 PIR / PO / nota…]    │
-│ Chips: Pendientes (12) · Cambios sin ver (3) · Atrasados (5)  │
-├───────────────────────────────────────────────────────────────┤
-│ MEX │ HB PO │ Loc │ Sh │ PIR │ Size │ Descripción │ Thr │ Gr  │
-│ HB date │ MEX date │ Shipped │ #d │ Qty │ Pend │ ODF │ Notas  │
-│ ───── densas, mono 12px, bordes celda, header sticky ─────── │
-│ 1743 │ 451288.. │ EL RENO│ ✓ │ 102587573 │ 5.5 │ SHOE,FLT… │…│
-│ ▍ celda con borde amber + tooltip = cambió hace 2h           │
-└───────────────────────────────────────────────────────────────┘
-```
-
-- **Una sola tabla plana de líneas** en ambas pestañas. Mismo componente.
-- `/intake` arranca filtrado por "cargados por mí / pendientes" + chip de cambios sin ver.
-- `/purchase-orders` arranca sin filtro (todas las líneas). Es la "vista Excel" completa.
-- Diferencia: la ficha PO `/purchase-orders/$id` con tabs queda accesible vía click en `MEX` o `HB PO` (link), pero no es la vista primaria.
-
-## Columnas (mapeo a nuestro modelo)
-
-| Columna planilla | Origen en DB |
-|---|---|
-| MEX PO | `purchase_orders.po_number` cuando customer = Musa, sino mostrar `—` |
-| HB PO | `purchase_orders.po_number` cuando customer = Halliburton |
-| LOCATION | nuevo campo opcional en `po_line_items.location` (o derivar de notas por ahora; ver "fuera de alcance") |
-| Sh (shipped) | derivado: existe job con status `SHIPPED` para esa línea |
-| PIR | `po_line_items.pir` |
-| Size / Thread / Grade | derivar parseando `tube_spec` ahora, sin migración; mostrar como subtexto |
-| Descripción | `po_line_items.tube_spec` |
-| HB DELV. DATE | `po_line_items.committed_date` (cliente) |
-| MEX DELV. DATE | `jobs.customer_date` o `planned_end` agregada por línea |
-| DATE SHIPPED | de la job (`status_events` SHIPPED) |
-| # días | calculado `HB date - hoy` |
-| Qty | `qty_ordered` |
-| Pend | `qty_ordered - sum(pieces_completed)` |
-| ODF | `jobs.odf` (lista si hay varias) |
-| Notas | `po_line_items.notes` |
-
-Edición inline: PIR, Descripción, Qty, HB date, MEX date, Notas (mismo patrón que Excel: click → input → guarda en blur).
-
-## Resaltar cambios (decisión: celda + tooltip)
-
-- Cada celda cuyo valor difiere del anterior conocido (de `date_change_log` y de `updated_at` cuando aplique) → fondo `bg-amber-500/10`, borde izquierdo `border-l-2 border-amber-500`, indicador `•` arriba a la derecha.
-- Hover → tooltip: `Antes: 2026-05-10 · Ahora: 2026-05-14 · +4d · hace 2h por Peter`.
-- En la barra superior: chip `Cambios sin ver (3)`. Click → filtra la grilla a sólo líneas con cambios pendientes. Botón "Marcar todo visto" en la barra y por celda (click en `•`) — escribe `acknowledged_by_peter=true`.
-- Para campos no-fecha (PIR/Spec/Qty/Notas) reutilizamos `date_change_log` (su columna `field` es texto libre).
-
-## Archivos
-
-- **`src/components/fact/PoLinesSpreadsheet.tsx`** (nuevo) — la grilla densa con todas las columnas, edición inline, highlight de cambios, filtros y búsqueda. Recibe `lines: PoLineRow[]`, `mode: "intake" | "browse"`.
-- **`src/hooks/usePoLinesSpreadsheet.ts`** (nuevo) — query que devuelve todas las líneas con joins planos (PO, customer, jobs agregadas, last_change). Una sola llamada para la pantalla entera.
-- **`src/hooks/usePoLineHistory.ts`** (nuevo) — mapa `{lineId+field → {old, new, when, acked}}` desde `date_change_log`, para alimentar el highlight.
-- **`src/lib/po-workflow.functions.ts`** — agregar `updatePoLineField({id, field, value})` que registra el cambio anterior en `date_change_log` antes de escribir.
-- **`src/routes/intake.tsx`** — reemplazar la tabla actual por `PoLinesSpreadsheet mode="intake"`. Conservar `UploadPoDialog` arriba. Sacar el banner grande de "cambios de fecha" — pasa a chip + filtro.
-- **`src/routes/purchase-orders.index.tsx`** — reemplazar tabla de POs por `PoLinesSpreadsheet mode="browse"`. Conservar link a ficha PO `$id`.
-- **`/purchase-orders/$id`** — sin cambios estructurales; agregar breadcrumb desde la grilla.
-
-## Densidad y look (para que se sienta Excel)
-
-- Filas 26px, fuente mono 12px en datos, sans 11px en headers.
-- Bordes 1px entre todas las celdas (`divide-x divide-y`), no solo entre filas.
-- Header sticky en top del panel, primera columna (MEX) sticky a la izquierda en scroll horizontal.
-- Filas alternadas muy sutiles (`even:bg-muted/20`).
-- Hover de fila resalta toda la fila.
-- Columnas redimensionables (mínimo viable: anchos fijos sensatos por columna).
-
-## Fuera de alcance (este pase)
-
-- Migración para columnas nuevas (`location`, parsear `tube_spec` a size/thread/grade en columnas separadas). Por ahora derivar en cliente. Si Peter lo pide, hacemos una migración aparte.
-- Engineering (pedido del usuario).
-- Importar la planilla histórica de Peter.
-- Edición masiva (fill-down, copiar/pegar rango). Si lo pide después, se evalúa.
+No se modifica backend ni schema. Solo lectura.
