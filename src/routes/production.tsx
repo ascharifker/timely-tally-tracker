@@ -185,7 +185,12 @@ function ProductionPage() {
           Pasos en curso, retrasos y acciones rápidas (avanzar, pausar, reportar retraso).
         </p>
       </div>
-      <ActiveJobsTable jobs={activeJobs} machines={machines} onChange={refreshAll} />
+      <ActiveJobsTable
+        jobs={activeJobs}
+        machines={machines}
+        onChange={refreshAll}
+        onOpenPo={setDetailPoId}
+      />
 
       <CreateOdfDialog
         line={active}
@@ -207,10 +212,12 @@ function ActiveJobsTable({
   jobs,
   machines,
   onChange,
+  onOpenPo,
 }: {
   jobs: ActiveJob[];
   machines: { id: string; name: string }[];
   onChange: () => Promise<void>;
+  onOpenPo: (poId: string) => void;
 }) {
   const advance = useServerFn(advanceJobStep);
   const hold = useServerFn(holdJob);
@@ -243,6 +250,7 @@ function ActiveJobsTable({
           <TableHeader>
             <TableRow>
               <TableHead>ODF</TableHead>
+              <TableHead>PO / Cliente</TableHead>
               <TableHead>Máquina</TableHead>
               <TableHead className="text-right">Qty</TableHead>
               <TableHead>Pasos</TableHead>
@@ -262,6 +270,23 @@ function ActiveJobsTable({
                       <span className="ml-2 inline-flex items-center gap-1 rounded bg-[color:var(--status-risk)]/15 px-1.5 py-0.5 text-[10px] uppercase text-[color:var(--status-risk)]">
                         <AlertTriangle className="h-3 w-3" /> on hold
                       </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {j.po ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onOpenPo(j.po!.id)}
+                          className="font-mono text-primary hover:underline"
+                          title="Ver detalle de la PO"
+                        >
+                          {j.po.po_number}
+                        </button>
+                        <div className="text-muted-foreground">{j.po.customer_name ?? "—"}</div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
