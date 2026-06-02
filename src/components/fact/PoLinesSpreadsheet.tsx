@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Check, ExternalLink, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PO_LINE_STATUS_LABEL } from "@/lib/fact-types";
+import { PO_LINE_STATUS_LABEL, type POLineStatus } from "@/lib/fact-types";
 import type { SpreadsheetRow } from "@/hooks/usePoLinesSpreadsheet";
 import { usePoLinesSpreadsheet } from "@/hooks/usePoLinesSpreadsheet";
 import {
@@ -36,6 +36,13 @@ import {
 
 type Mode = "intake" | "browse";
 type EditableField = "pir" | "tube_spec" | "qty_ordered" | "committed_date" | "notes";
+type Preset = "all" | "pending" | "production" | "shipped" | "late";
+
+const PRESET_STATUSES: Record<Exclude<Preset, "all" | "late">, POLineStatus[]> = {
+  pending: ["pending_engineering", "engineering_flagged"],
+  production: ["engineering_approved", "ready_for_production", "scheduled", "in_progress"],
+  shipped: ["completed"],
+};
 
 interface Props {
   mode: Mode;
@@ -79,9 +86,8 @@ export function PoLinesSpreadsheet({ mode }: Props) {
 
   const [query, setQuery] = useState("");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>(
-    mode === "intake" ? "pending_engineering" : "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [preset, setPreset] = useState<Preset>("all");
   const [onlyChanges, setOnlyChanges] = useState(false);
 
   const customers = useMemo(() => {
@@ -110,11 +116,35 @@ export function PoLinesSpreadsheet({ mode }: Props) {
     [rows],
   );
 
+  const counts = useMemo(() => {
+    let active = 0,
+      pending = 0,
+      production = 0,
+      shipped = 0;
+    for (const r of rows) {
+      const s = r.line.status;
+      if (s !== "completed" && s !== "cancelled") active++;
+      if (PRESET_STATUSES.pending.includes(s as POLineStatus)) pending++;
+      if (PRESET_STATUSES.production.includes(s as POLineStatus)) production++;
+      if (s === "completed") shipped++;
+    }
+    return { active, pending, production, shipped, total: rows.length };
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return rows.filter((r) => {
+    const list = rows.filter((r) => {
       if (customerFilter !== "all" && r.customer?.id !== customerFilter) return false;
       if (statusFilter !== "all" && r.line.status !== statusFilter) return false;
+      if (preset !== "all") {
+        if (preset === "late") {
+          const d = daysUntil(r.line.committed_date);
+          if (!(d !== null && d < 0 && r.line.status !== "completed")) return false;
+        } else {
+          const allowed = PRESET_STATUSES[preset];
+          if (!allowed.includes(r.line.status as POLineStatus)) return false;
+        }
+      }
       if (onlyChanges) {
         const hasPending = ["committed_date", "pir", "tube_spec", "qty_ordered", "notes"].some(
           (f) => {
@@ -140,7 +170,24 @@ export function PoLinesSpreadsheet({ mode }: Props) {
       }
       return true;
     });
-  }, [rows, query, customerFilter, statusFilter, onlyChanges, changes]);
+    // Bitácora-style sort: active first (by committed_date asc, nulls last),
+    // then closed (by shipped_at desc).
+    const isClosed = (r: SpreadsheetRow) =>
+      r.line.status === "completed" || r.line.status === "cancelled";
+    return list.slice().sort((a, b) => {
+      const ca = isClosed(a) ? 1 : 0;
+      const cb = isClosed(b) ? 1 : 0;
+      if (ca !== cb) return ca - cb;
+      if (ca === 1) {
+        const sa = a.shipped_at ?? "";
+        const sb = b.shipped_at ?? "";
+        return sb.localeCompare(sa);
+      }
+      const da = a.line.committed_date ?? "9999-12-31";
+      const db = b.line.committed_date ?? "9999-12-31";
+      return da.localeCompare(db);
+    });
+  }, [rows, query, customerFilter, statusFilter, preset, onlyChanges, changes]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });
@@ -174,6 +221,14 @@ export function PoLinesSpreadsheet({ mode }: Props) {
 
   return (
     <TooltipProvider delayDuration={200}>
+      {/* Quick presets — bitácora style */}
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <PresetChip active={preset === "all"} onClick={() => setPreset("all")} label="Todos" count={counts.total} />
+        <PresetChip active={preset === "pending"} onClick={() => setPreset("pending")} label="Pendiente ing." count={counts.pending} tone="amber" />
+        <PresetChip active={preset === "production"} onClick={() => setPreset("production")} label="En producción" count={counts.production} tone="blue" />
+        <PresetChip active={preset === "shipped"} onClick={() => setPreset("shipped")} label="Enviados" count={counts.shipped} tone="emerald" />
+        <PresetChip active={preset === "late"} onClick={() => setPreset("late")} label="Atrasados" count={lateCount} tone="red" />
+      </div>
       {/* Toolbar */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[240px]">
@@ -200,10 +255,10 @@ export function PoLinesSpreadsheet({ mode }: Props) {
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="h-8 w-48 text-xs">
-            <SelectValue placeholder="Estado" />
+            <SelectValue placeholder="Estado exacto" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="all">Estado exacto: todos</SelectItem>
             {Object.entries(PO_LINE_STATUS_LABEL).map(([k, v]) => (
               <SelectItem key={k} value={k}>
                 {v}
@@ -225,15 +280,6 @@ export function PoLinesSpreadsheet({ mode }: Props) {
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
           Cambios sin ver ({pendingChanges})
         </button>
-        <span className="inline-flex items-center gap-1.5 rounded border border-border px-2 h-8 text-xs text-muted-foreground">
-          <span
-            className={cn(
-              "inline-block h-1.5 w-1.5 rounded-full",
-              lateCount > 0 ? "bg-red-500" : "bg-muted-foreground/40",
-            )}
-          />
-          Atrasados ({lateCount})
-        </span>
         {pendingChanges > 0 && (
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={ackAll}>
             <Check className="h-3.5 w-3.5 mr-1" /> Marcar todo visto
@@ -279,6 +325,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
             {filtered.map((r, idx) => {
               const d = daysUntil(r.line.committed_date);
               const isLate = d !== null && d < 0 && r.line.status !== "completed";
+              const isClosed = r.line.status === "completed" || r.line.status === "cancelled";
               const odfs = r.jobs.map((j) => j.odf).join(", ");
               const mexEnd = r.jobs
                 .map((j) => j.planned_end)
@@ -291,6 +338,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                   className={cn(
                     "border-t border-border hover:bg-muted/30",
                     idx % 2 === 1 && "bg-muted/10",
+                    isClosed && "text-muted-foreground",
                   )}
                 >
                   <Td>
@@ -399,10 +447,61 @@ export function PoLinesSpreadsheet({ mode }: Props) {
           </tbody>
         </table>
       </div>
-      <div className="mt-2 text-[11px] text-muted-foreground">
-        {filtered.length} de {rows.length} líneas · click en una celda para editar
+      <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>{filtered.length} visibles</span>
+        <span>·</span>
+        <span>{counts.active} activas</span>
+        <span>·</span>
+        <span>{counts.shipped} enviadas</span>
+        <span>·</span>
+        <span className={lateCount > 0 ? "text-red-400" : ""}>{lateCount} atrasadas</span>
+        <span>·</span>
+        <span>{counts.total} total</span>
+        <span className="ml-auto">click en una celda para editar</span>
       </div>
     </TooltipProvider>
+  );
+}
+
+function PresetChip({
+  active,
+  onClick,
+  label,
+  count,
+  tone = "neutral",
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  tone?: "neutral" | "amber" | "blue" | "emerald" | "red";
+}) {
+  const toneCls: Record<typeof tone, string> = {
+    neutral: "border-border text-muted-foreground hover:border-foreground/40",
+    amber: "border-amber-500/50 text-amber-300 hover:border-amber-500",
+    blue: "border-blue-500/50 text-blue-300 hover:border-blue-500",
+    emerald: "border-emerald-500/50 text-emerald-300 hover:border-emerald-500",
+    red: "border-red-500/50 text-red-300 hover:border-red-500",
+  };
+  const activeCls: Record<typeof tone, string> = {
+    neutral: "bg-foreground/10 border-foreground/60 text-foreground",
+    amber: "bg-amber-500/15 border-amber-500 text-amber-200",
+    blue: "bg-blue-500/15 border-blue-500 text-blue-200",
+    emerald: "bg-emerald-500/15 border-emerald-500 text-emerald-200",
+    red: "bg-red-500/15 border-red-500 text-red-200",
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 h-7 text-xs transition-colors",
+        active ? activeCls[tone] : toneCls[tone],
+      )}
+    >
+      {label}
+      <span className="font-mono opacity-75">{count}</span>
+    </button>
   );
 }
 
