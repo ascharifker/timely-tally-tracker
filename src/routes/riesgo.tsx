@@ -15,7 +15,7 @@ export const Route = createFileRoute("/riesgo")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Trabajos en Riesgo · FACT" },
+      { title: "Trabajos en Riesgo · MEGO Produccion" },
       { name: "description", content: "ODFs en riesgo o tarde — detalle por máquina, operador y fecha." },
     ],
   }),

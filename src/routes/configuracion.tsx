@@ -10,7 +10,7 @@ export const Route = createFileRoute("/configuracion")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Configuración · FACT" },
+      { title: "Configuración · MEGO Produccion" },
       { name: "description", content: "Capacidad de máquinas y catálogo de tiempos por pieza." },
     ],
   }),

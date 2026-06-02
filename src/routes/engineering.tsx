@@ -29,7 +29,7 @@ import { Check, Flag } from "lucide-react";
 
 export const Route = createFileRoute("/engineering")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Ingeniería · FACT" }] }),
+  head: () => ({ meta: [{ title: "Ingeniería · MEGO Produccion" }] }),
   component: EngineeringPage,
 });
 

@@ -12,10 +12,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Activity className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-base font-semibold tracking-tight">FACT</h1>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-widest">
-                Mego Afek · Producción
-              </p>
+              <h1 className="text-base font-semibold tracking-tight">MEGO Produccion</h1>
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
@@ -59,8 +56,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Settings className="h-3.5 w-3.5" />
               <span className="uppercase tracking-widest">Config</span>
             </Link>
-            <span className="h-2 w-2 rounded-full bg-[color:var(--status-listo)]" />
-            <span>online</span>
           </div>
         </div>
       </header>
