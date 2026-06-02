@@ -19,6 +19,11 @@ const STATUS_HELP: Record<JobStatus, string> = {
   CEMENTACION: "En cementación / tratamiento térmico",
   EXPO: "Lista para exportación",
   YA_SE_ENVIO: "Despachado al cliente",
+  EN_ESPERA: "Pendiente de iniciar producción",
+  ON_HOLD: "Detenida — esperando definición o material",
+  MAQYRO: "Safety stock Maqyro",
+  EN_GEMAK: "En proceso GEMAK",
+  CEMENTACION_LISTO: "Cementación terminada, lista para Expo",
 };
 
 /** Statuses where cards bind to a specific machine. */
