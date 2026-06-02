@@ -59,6 +59,34 @@ const STATUS_TONE: Record<string, string> = {
   cancelled: "border-muted-foreground/40 text-muted-foreground line-through",
 };
 
+const JOB_STAGE_LABEL: Record<string, string> = {
+  EN_ESPERA: "En espera",
+  PLANNED: "Planeada",
+  MAZAK: "MAZAK",
+  TALLER_EXTERNO: "Taller ext.",
+  MAQUINADO_LISTO: "Maq. listo",
+  CEMENTACION: "Cementación",
+  CEMENTACION_LISTO: "Cement. listo",
+  EN_GEMAK: "En Gemak",
+  EXPO: "EXPO",
+  YA_SE_ENVIO: "Enviado",
+  ON_HOLD: "Hold",
+  MAQYRO: "Maq y RO",
+};
+
+const JOB_STAGE_TONE: Record<string, string> = {
+  EN_ESPERA: "border-muted-foreground/40 text-muted-foreground",
+  PLANNED: "border-muted-foreground/40 text-muted-foreground",
+  MAZAK: "border-blue-500/60 text-blue-200 bg-blue-500/10",
+  TALLER_EXTERNO: "border-blue-500/60 text-blue-200 bg-blue-500/10",
+  MAQUINADO_LISTO: "border-indigo-500/60 text-indigo-200 bg-indigo-500/10",
+  CEMENTACION: "border-purple-500/60 text-purple-200 bg-purple-500/10",
+  CEMENTACION_LISTO: "border-purple-500/60 text-purple-200 bg-purple-500/10",
+  EXPO: "border-cyan-500/60 text-cyan-200 bg-cyan-500/10",
+  YA_SE_ENVIO: "border-emerald-500/60 text-emerald-200 bg-emerald-500/10",
+  ON_HOLD: "border-red-500/60 text-red-200 bg-red-500/10",
+};
+
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const d = new Date(dateStr + "T00:00:00");
@@ -302,7 +330,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
               <Th className="w-32">MEX date</Th>
               <Th className="w-28">Shipped</Th>
               <Th className="w-16 text-right">Días</Th>
-              <Th className="w-24">ODF</Th>
+              <Th className="w-56">ODF · Etapa</Th>
               <Th className="w-40">Estado</Th>
               <Th className="min-w-[220px]">Notas</Th>
             </tr>
@@ -326,7 +354,6 @@ export function PoLinesSpreadsheet({ mode }: Props) {
               const d = daysUntil(r.line.committed_date);
               const isLate = d !== null && d < 0 && r.line.status !== "completed";
               const isClosed = r.line.status === "completed" || r.line.status === "cancelled";
-              const odfs = r.jobs.map((j) => j.odf).join(", ");
               const mexEnd = r.jobs
                 .map((j) => j.planned_end)
                 .filter((x): x is string => !!x)
@@ -414,10 +441,25 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                     )}
                   </Td>
                   <Td>
-                    {odfs ? (
-                      <span className="text-xs">{odfs}</span>
-                    ) : (
+                    {r.jobs.length === 0 ? (
                       <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-col gap-0.5">
+                        {r.jobs.map((j) => (
+                          <div key={j.id} className="flex items-center gap-1.5">
+                            <span className="font-mono text-[11px]">{j.odf}</span>
+                            <span
+                              className={cn(
+                                "rounded border px-1.5 text-[9px] uppercase tracking-wide",
+                                JOB_STAGE_TONE[j.status] ??
+                                  "border-muted-foreground/40 text-muted-foreground",
+                              )}
+                            >
+                              {JOB_STAGE_LABEL[j.status] ?? j.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </Td>
                   <Td>
