@@ -34,7 +34,7 @@ import {
 
 export const Route = createFileRoute("/purchase-orders/$id")({
   ssr: false,
-  head: () => ({ meta: [{ title: "PO · FACT" }] }),
+  head: () => ({ meta: [{ title: "PO · MEGO Produccion" }] }),
   component: PurchaseOrderDetailPage,
 });
 

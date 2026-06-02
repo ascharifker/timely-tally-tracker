@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "FACT · Mego Afek Producción" },
+      { title: "MEGO Produccion" },
       { name: "description", content: "Planificación de producción Mego Afek — MAZAK, talleres externos, OTD y cascada determinística." },
     ],
   }),

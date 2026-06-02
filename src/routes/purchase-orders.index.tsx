@@ -8,7 +8,7 @@ export const Route = createFileRoute("/purchase-orders/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Purchase Orders · FACT" },
+      { title: "Purchase Orders · MEGO Produccion" },
       {
         name: "description",
         content: "Pedidos del cliente. Cargá un PDF y dejá que la AI extraiga las líneas.",

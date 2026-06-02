@@ -48,7 +48,7 @@ import { Calendar, Pause, Play, ChevronRight, AlertTriangle } from "lucide-react
 
 export const Route = createFileRoute("/production")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Producción · FACT" }] }),
+  head: () => ({ meta: [{ title: "Producción · MEGO Produccion" }] }),
   component: ProductionPage,
 });
 
