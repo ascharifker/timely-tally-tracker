@@ -141,3 +141,80 @@ export const acknowledgeDateChange = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// Acknowledge ALL pending date changes (Peter clicks "Marcar todo visto").
+export const acknowledgeAllDateChanges = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const { error } = await supabaseAdmin
+      .from("date_change_log" as never)
+      .update({
+        acknowledged_by_peter: true,
+        acknowledged_at: new Date().toISOString(),
+      } as never)
+      .eq("acknowledged_by_peter", false);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  },
+);
+
+// Inline edit a single PO-line field (PIR, tube_spec, qty_ordered,
+// committed_date, notes). For non-date fields we log the previous value into
+// date_change_log too — `field` is free text, so we reuse the same table.
+const EDITABLE_FIELDS = [
+  "pir",
+  "tube_spec",
+  "qty_ordered",
+  "committed_date",
+  "notes",
+] as const;
+
+export const updatePoLineField = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        field: z.enum(EDITABLE_FIELDS),
+        value: z.union([z.string(), z.number(), z.null()]),
+        changed_by: z.string().nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    // Load the prior value so we can log the diff for non-date fields. The DB
+    // trigger already logs committed_date changes, so we skip those here.
+    const { data: prev, error: prevErr } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .select(data.field)
+      .eq("id", data.id)
+      .single();
+    if (prevErr || !prev) {
+      throw new Error(prevErr?.message ?? "Línea no encontrada");
+    }
+    const prevValue = (prev as Record<string, unknown>)[data.field] ?? null;
+
+    const patch: Record<string, unknown> = { [data.field]: data.value };
+    const { error } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .update(patch as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    if (data.field !== "committed_date") {
+      // committed_date is logged by the DB trigger already.
+      const oldStr = prevValue === null ? null : String(prevValue);
+      const newStr = data.value === null ? null : String(data.value);
+      if (oldStr !== newStr) {
+        await supabaseAdmin.from("date_change_log" as never).insert({
+          po_line_item_id: data.id,
+          field: data.field,
+          // old_value/new_value are date columns; we coerce text into reason
+          // for non-date fields so the diff still travels through the log.
+          old_value: null,
+          new_value: null,
+          changed_by: data.changed_by ?? null,
+          reason: `${oldStr ?? "—"} → ${newStr ?? "—"}`,
+        } as never);
+      }
+    }
+    return { ok: true };
+  });
