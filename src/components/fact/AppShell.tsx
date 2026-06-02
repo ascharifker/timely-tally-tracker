@@ -20,12 +20,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
             <Link
-              to="/"
+              to="/purchase-orders"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
               activeProps={{ className: "border-primary text-primary" }}
-              activeOptions={{ exact: true }}
             >
-              <span className="uppercase tracking-widest">Calendario</span>
+              <Inbox className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-widest">Purchase Orders</span>
             </Link>
             <Link
               to="/engineering"
@@ -44,12 +44,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="uppercase tracking-widest">Producción</span>
             </Link>
             <Link
-              to="/purchase-orders"
+              to="/"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
               activeProps={{ className: "border-primary text-primary" }}
+              activeOptions={{ exact: true }}
             >
-              <Inbox className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">Purchase Orders</span>
+              <span className="uppercase tracking-widest">Calendario</span>
             </Link>
             <Link
               to="/configuracion"
