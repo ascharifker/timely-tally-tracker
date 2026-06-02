@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { AppShell } from "@/components/fact/AppShell";
 import { usePoLinesByStatus, type PoLineWithContext } from "@/hooks/usePoQueues";
 import { useMachines } from "@/hooks/useFactData";
@@ -344,9 +344,9 @@ function CompletedJobsTable({
               </TableRow>
             )}
             {groupByPo
-              ? Array.from(groups.values()).map((g) => (
-                  <>
-                    <TableRow key={`hdr-${g.po_number}`} className="bg-muted/30">
+              ? Array.from(groups.entries()).map(([key, g]) => (
+                  <Fragment key={key}>
+                    <TableRow className="bg-muted/30">
                       <TableCell colSpan={8} className="text-xs font-mono">
                         <span className="text-primary">{g.po_number}</span>
                         {g.customer && <span className="text-muted-foreground"> · {g.customer}</span>}
@@ -354,7 +354,7 @@ function CompletedJobsTable({
                       </TableCell>
                     </TableRow>
                     {g.jobs.map(renderRow)}
-                  </>
+                  </Fragment>
                 ))
               : filtered.map(renderRow)}
           </TableBody>
