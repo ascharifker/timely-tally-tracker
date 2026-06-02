@@ -19,15 +19,17 @@ export interface SpreadsheetRow {
   shipped_at: string | null;
 }
 
+interface PoSubRow {
+  id: string;
+  po_number: string;
+  issued_date: string | null;
+  source_document_url: string | null;
+  notes: string | null;
+  customer: { id: string; name: string; code: string | null } | null;
+}
+
 interface LineRow extends POLineItem {
-  purchase_order:
-    | (Pick<
-        SpreadsheetRow["po"] extends infer T ? Exclude<T, null> : never,
-        "id" | "po_number" | "issued_date" | "source_document_url" | "notes"
-      > & {
-        customer: { id: string; name: string; code: string | null } | null;
-      })
-    | null;
+  purchase_order: PoSubRow | null;
 }
 
 interface JobRow {
