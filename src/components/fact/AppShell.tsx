@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, FileText, Settings, Inbox, Wrench, Factory } from "lucide-react";
+import { Activity, Settings, Inbox, Wrench, Factory } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -28,14 +28,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="uppercase tracking-widest">Calendario</span>
             </Link>
             <Link
-              to="/intake"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
-              activeProps={{ className: "border-primary text-primary" }}
-            >
-              <Inbox className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">Intake</span>
-            </Link>
-            <Link
               to="/engineering"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
               activeProps={{ className: "border-primary text-primary" }}
@@ -56,8 +48,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
               activeProps={{ className: "border-primary text-primary" }}
             >
-              <FileText className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">POs</span>
+              <Inbox className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-widest">Purchase Orders</span>
             </Link>
             <Link
               to="/configuracion"
