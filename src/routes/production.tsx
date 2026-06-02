@@ -17,6 +17,8 @@ import {
 } from "@/lib/odf.functions";
 import { JobStepsTimeline } from "@/components/fact/JobStepsTimeline";
 import { PoDetailDialog } from "@/components/fact/PoDetailDialog";
+import { OdfBreakdownDialog } from "@/components/fact/OdfBreakdownDialog";
+import { computeOdfOtd, OTD_TONE } from "@/lib/scheduling/odf-otd";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
@@ -45,6 +47,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Calendar, Pause, Play, ChevronRight, AlertTriangle } from "lucide-react";
+
+function renderOtdBadge(j: ActiveJob) {
+  const otd = computeOdfOtd(j);
+  const tone = OTD_TONE[otd.score];
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+      style={{ color: tone.color, backgroundColor: tone.bg }}
+      title={
+        otd.shipped_at && otd.customer_date
+          ? `Enviado ${otd.shipped_at.slice(0,10)} · cliente ${otd.customer_date}`
+          : "Sin fecha cliente o envío"
+      }
+    >
+      {tone.label}
+      {otd.days_diff !== null && (
+        <span className="font-mono">
+          {otd.days_diff > 0 ? `+${otd.days_diff}d` : otd.days_diff < 0 ? `${otd.days_diff}d` : "0d"}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export const Route = createFileRoute("/production")({
   ssr: false,
@@ -86,6 +111,7 @@ function ProductionPage() {
 
   const [active, setActive] = useState<PoLineWithContext | null>(null);
   const [detailPoId, setDetailPoId] = useState<string | null>(null);
+  const [detailJob, setDetailJob] = useState<ActiveJob | null>(null);
 
   const refreshAll = async () => {
     await Promise.all([
@@ -194,6 +220,7 @@ function ProductionPage() {
         machines={machines}
         onChange={refreshAll}
         onOpenPo={setDetailPoId}
+        onOpenOdf={setDetailJob}
       />
 
       <div className="mt-8 mb-4">
@@ -206,6 +233,7 @@ function ProductionPage() {
         jobs={completedJobs}
         machines={machines}
         onOpenPo={setDetailPoId}
+        onOpenOdf={setDetailJob}
       />
 
       <CreateOdfDialog
@@ -220,6 +248,11 @@ function ProductionPage() {
         }}
       />
       <PoDetailDialog poId={detailPoId} onClose={() => setDetailPoId(null)} />
+      <OdfBreakdownDialog
+        job={detailJob}
+        machines={machines}
+        onClose={() => setDetailJob(null)}
+      />
     </AppShell>
   );
 }
@@ -228,10 +261,12 @@ function CompletedJobsTable({
   jobs,
   machines,
   onOpenPo,
+  onOpenOdf,
 }: {
   jobs: ActiveJob[];
   machines: { id: string; name: string }[];
   onOpenPo: (poId: string) => void;
+  onOpenOdf: (job: ActiveJob) => void;
 }) {
   const [filter, setFilter] = useState("");
   const [groupByPo, setGroupByPo] = useState(true);
@@ -272,16 +307,32 @@ function CompletedJobsTable({
 
   const renderRow = (j: ActiveJob) => (
     <TableRow key={j.id} className="text-muted-foreground">
-      <TableCell className="font-mono font-semibold">{j.odf}</TableCell>
+      <TableCell>
+        <button
+          type="button"
+          onClick={() => onOpenOdf(j)}
+          className="inline-flex items-center gap-1.5 group"
+          title="Ver desglose de la ODF"
+        >
+          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-primary font-mono">
+            ODF
+          </span>
+          <span className="font-mono font-semibold text-foreground group-hover:underline">{j.odf}</span>
+        </button>
+      </TableCell>
       <TableCell className="text-xs">
         {j.po ? (
           <>
             <button
               type="button"
               onClick={() => onOpenPo(j.po!.id)}
-              className="font-mono text-primary hover:underline"
+              className="inline-flex items-center gap-1.5"
+              title="Ver detalle de la PO"
             >
-              {j.po.po_number}
+              <span className="rounded bg-[color:var(--status-mazak)]/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-[color:var(--status-mazak)] font-mono">
+                PO
+              </span>
+              <span className="font-mono text-primary hover:underline">{j.po.po_number}</span>
             </button>
             <div>{j.po.customer_name ?? "—"}</div>
           </>
@@ -294,6 +345,7 @@ function CompletedJobsTable({
       <TableCell className="font-mono text-xs">{j.pir ?? "—"}</TableCell>
       <TableCell className="font-mono text-xs">{j.export_date ?? "—"}</TableCell>
       <TableCell className="font-mono text-xs">{j.customer_date ?? "—"}</TableCell>
+      <TableCell>{renderOtdBadge(j)}</TableCell>
       <TableCell className="text-xs">
         <span className="inline-flex items-center gap-1 rounded bg-[color:var(--status-ok)]/15 px-1.5 py-0.5 text-[10px] uppercase text-[color:var(--status-ok)]">
           Enviado
@@ -326,20 +378,21 @@ function CompletedJobsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ODF</TableHead>
-              <TableHead>PO / Cliente</TableHead>
+              <TableHead>ODF #</TableHead>
+              <TableHead>PO # / Cliente</TableHead>
               <TableHead>Máquina</TableHead>
               <TableHead className="text-right">Qty</TableHead>
               <TableHead>PIR</TableHead>
               <TableHead>Export</TableHead>
               <TableHead>Cliente</TableHead>
+              <TableHead>OTD</TableHead>
               <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
                   Sin resultados.
                 </TableCell>
               </TableRow>
@@ -348,7 +401,10 @@ function CompletedJobsTable({
               ? Array.from(groups.entries()).map(([key, g]) => (
                   <Fragment key={key}>
                     <TableRow className="bg-muted/30">
-                      <TableCell colSpan={8} className="text-xs font-mono">
+                      <TableCell colSpan={9} className="text-xs font-mono">
+                        <span className="rounded bg-[color:var(--status-mazak)]/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-[color:var(--status-mazak)] mr-1.5">
+                          PO
+                        </span>
                         <span className="text-primary">{g.po_number}</span>
                         {g.customer && <span className="text-muted-foreground"> · {g.customer}</span>}
                         <span className="text-muted-foreground"> · {g.jobs.length} ODF{g.jobs.length === 1 ? "" : "s"}</span>
@@ -370,11 +426,13 @@ function ActiveJobsTable({
   machines,
   onChange,
   onOpenPo,
+  onOpenOdf,
 }: {
   jobs: ActiveJob[];
   machines: { id: string; name: string }[];
   onChange: () => Promise<void>;
   onOpenPo: (poId: string) => void;
+  onOpenOdf: (job: ActiveJob) => void;
 }) {
   const advance = useServerFn(advanceJobStep);
   const hold = useServerFn(holdJob);
@@ -406,8 +464,8 @@ function ActiveJobsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ODF</TableHead>
-              <TableHead>PO / Cliente</TableHead>
+              <TableHead>ODF #</TableHead>
+              <TableHead>PO # / Cliente</TableHead>
               <TableHead>Máquina</TableHead>
               <TableHead className="text-right">Qty</TableHead>
               <TableHead>Pasos</TableHead>
@@ -421,8 +479,18 @@ function ActiveJobsTable({
               const onHold = j.status === "ON_HOLD";
               return (
                 <TableRow key={j.id}>
-                  <TableCell className="font-mono font-semibold">
-                    {j.odf}
+                  <TableCell>
+                    <button
+                      type="button"
+                      onClick={() => onOpenOdf(j)}
+                      className="inline-flex items-center gap-1.5 group"
+                      title="Ver desglose de la ODF"
+                    >
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-primary font-mono">
+                        ODF
+                      </span>
+                      <span className="font-mono font-semibold group-hover:underline">{j.odf}</span>
+                    </button>
                     {onHold && (
                       <span className="ml-2 inline-flex items-center gap-1 rounded bg-[color:var(--status-risk)]/15 px-1.5 py-0.5 text-[10px] uppercase text-[color:var(--status-risk)]">
                         <AlertTriangle className="h-3 w-3" /> on hold
@@ -435,10 +503,13 @@ function ActiveJobsTable({
                         <button
                           type="button"
                           onClick={() => onOpenPo(j.po!.id)}
-                          className="font-mono text-primary hover:underline"
+                          className="inline-flex items-center gap-1.5"
                           title="Ver detalle de la PO"
                         >
-                          {j.po.po_number}
+                          <span className="rounded bg-[color:var(--status-mazak)]/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-[color:var(--status-mazak)] font-mono">
+                            PO
+                          </span>
+                          <span className="font-mono text-primary hover:underline">{j.po.po_number}</span>
                         </button>
                         <div className="text-muted-foreground">{j.po.customer_name ?? "—"}</div>
                       </>
