@@ -2,12 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { AppShell } from "@/components/fact/AppShell";
 import { usePoLinesByStatus, type PoLineWithContext } from "@/hooks/usePoQueues";
 import { useMachines } from "@/hooks/useFactData";
 import { useVendors } from "@/hooks/useVendors";
-import { useActiveJobs, type ActiveJob } from "@/hooks/useActiveJobs";
+import { useActiveJobs, useCompletedJobs, type ActiveJob } from "@/hooks/useActiveJobs";
 import {
   splitPoLineIntoOdf,
   advanceJobStep,
@@ -80,6 +80,7 @@ function ProductionPage() {
   const { data: machines = [] } = useMachines();
   const { data: vendors = [] } = useVendors();
   const { data: activeJobs = [] } = useActiveJobs();
+  const { data: completedJobs = [] } = useCompletedJobs();
   const { data: plannedByLine = {} } = usePlannedQtyByLine(lines.map((l) => l.id));
   const qc = useQueryClient();
 
@@ -91,6 +92,7 @@ function ProductionPage() {
       qc.invalidateQueries({ queryKey: ["po_lines_by_status"] }),
       qc.invalidateQueries({ queryKey: ["jobs"] }),
       qc.invalidateQueries({ queryKey: ["active_jobs"] }),
+      qc.invalidateQueries({ queryKey: ["completed_jobs"] }),
       qc.invalidateQueries({ queryKey: ["planned_qty_by_line"] }),
       qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] }),
       qc.invalidateQueries({ queryKey: ["po_line_history"] }),
@@ -194,6 +196,18 @@ function ProductionPage() {
         onOpenPo={setDetailPoId}
       />
 
+      <div className="mt-8 mb-4">
+        <h2 className="text-2xl font-semibold tracking-tight">ODFs completadas</h2>
+        <p className="text-sm text-muted-foreground">
+          Histórico de ODFs enviadas. Filtrá por PO o cliente para revisar lo entregado.
+        </p>
+      </div>
+      <CompletedJobsTable
+        jobs={completedJobs}
+        machines={machines}
+        onOpenPo={setDetailPoId}
+      />
+
       <CreateOdfDialog
         line={active}
         pending={active ? Math.max(0, active.qty_ordered - (plannedByLine[active.id] ?? 0)) : 0}
@@ -207,6 +221,147 @@ function ProductionPage() {
       />
       <PoDetailDialog poId={detailPoId} onClose={() => setDetailPoId(null)} />
     </AppShell>
+  );
+}
+
+function CompletedJobsTable({
+  jobs,
+  machines,
+  onOpenPo,
+}: {
+  jobs: ActiveJob[];
+  machines: { id: string; name: string }[];
+  onOpenPo: (poId: string) => void;
+}) {
+  const [filter, setFilter] = useState("");
+  const [groupByPo, setGroupByPo] = useState(true);
+  const mById = Object.fromEntries(machines.map((m) => [m.id, m.name]));
+
+  const filtered = jobs.filter((j) => {
+    if (!filter.trim()) return true;
+    const q = filter.toLowerCase();
+    return (
+      j.odf.toLowerCase().includes(q) ||
+      (j.po?.po_number ?? "").toLowerCase().includes(q) ||
+      (j.po?.customer_name ?? "").toLowerCase().includes(q) ||
+      (j.pir ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  if (jobs.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
+        Aún no hay ODFs enviadas.
+      </div>
+    );
+  }
+
+  const groups = new Map<string, { po_number: string; customer: string | null; jobs: ActiveJob[] }>();
+  if (groupByPo) {
+    for (const j of filtered) {
+      const key = j.po?.id ?? "__none__";
+      const g = groups.get(key) ?? {
+        po_number: j.po?.po_number ?? "Sin PO",
+        customer: j.po?.customer_name ?? null,
+        jobs: [],
+      };
+      g.jobs.push(j);
+      groups.set(key, g);
+    }
+  }
+
+  const renderRow = (j: ActiveJob) => (
+    <TableRow key={j.id} className="text-muted-foreground">
+      <TableCell className="font-mono font-semibold">{j.odf}</TableCell>
+      <TableCell className="text-xs">
+        {j.po ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onOpenPo(j.po!.id)}
+              className="font-mono text-primary hover:underline"
+            >
+              {j.po.po_number}
+            </button>
+            <div>{j.po.customer_name ?? "—"}</div>
+          </>
+        ) : (
+          "—"
+        )}
+      </TableCell>
+      <TableCell className="text-xs">{j.machine_id ? mById[j.machine_id] ?? "—" : "—"}</TableCell>
+      <TableCell className="text-right font-mono">{j.qty}</TableCell>
+      <TableCell className="font-mono text-xs">{j.pir ?? "—"}</TableCell>
+      <TableCell className="font-mono text-xs">{j.export_date ?? "—"}</TableCell>
+      <TableCell className="font-mono text-xs">{j.customer_date ?? "—"}</TableCell>
+      <TableCell className="text-xs">
+        <span className="inline-flex items-center gap-1 rounded bg-[color:var(--status-ok)]/15 px-1.5 py-0.5 text-[10px] uppercase text-[color:var(--status-ok)]">
+          Enviado
+        </span>
+      </TableCell>
+    </TableRow>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Buscar ODF, PO, cliente o PIR…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-xs"
+        />
+        <Button
+          variant={groupByPo ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setGroupByPo((v) => !v)}
+        >
+          {groupByPo ? "Agrupado por PO" : "Lista plana"}
+        </Button>
+        <span className="text-xs text-muted-foreground ml-auto">
+          {filtered.length} de {jobs.length} ODFs
+        </span>
+      </div>
+      <div className="rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ODF</TableHead>
+              <TableHead>PO / Cliente</TableHead>
+              <TableHead>Máquina</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead>PIR</TableHead>
+              <TableHead>Export</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Estado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                  Sin resultados.
+                </TableCell>
+              </TableRow>
+            )}
+            {groupByPo
+              ? Array.from(groups.entries()).map(([key, g]) => (
+                  <Fragment key={key}>
+                    <TableRow className="bg-muted/30">
+                      <TableCell colSpan={8} className="text-xs font-mono">
+                        <span className="text-primary">{g.po_number}</span>
+                        {g.customer && <span className="text-muted-foreground"> · {g.customer}</span>}
+                        <span className="text-muted-foreground"> · {g.jobs.length} ODF{g.jobs.length === 1 ? "" : "s"}</span>
+                      </TableCell>
+                    </TableRow>
+                    {g.jobs.map(renderRow)}
+                  </Fragment>
+                ))
+              : filtered.map(renderRow)}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 
