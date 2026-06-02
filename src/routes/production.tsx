@@ -17,6 +17,8 @@ import {
 } from "@/lib/odf.functions";
 import { JobStepsTimeline } from "@/components/fact/JobStepsTimeline";
 import { PoDetailDialog } from "@/components/fact/PoDetailDialog";
+import { OdfBreakdownDialog } from "@/components/fact/OdfBreakdownDialog";
+import { computeOdfOtd, OTD_TONE } from "@/lib/scheduling/odf-otd";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
@@ -86,6 +88,7 @@ function ProductionPage() {
 
   const [active, setActive] = useState<PoLineWithContext | null>(null);
   const [detailPoId, setDetailPoId] = useState<string | null>(null);
+  const [detailJob, setDetailJob] = useState<ActiveJob | null>(null);
 
   const refreshAll = async () => {
     await Promise.all([
@@ -194,6 +197,7 @@ function ProductionPage() {
         machines={machines}
         onChange={refreshAll}
         onOpenPo={setDetailPoId}
+        onOpenOdf={setDetailJob}
       />
 
       <div className="mt-8 mb-4">
@@ -206,6 +210,7 @@ function ProductionPage() {
         jobs={completedJobs}
         machines={machines}
         onOpenPo={setDetailPoId}
+        onOpenOdf={setDetailJob}
       />
 
       <CreateOdfDialog
@@ -220,6 +225,11 @@ function ProductionPage() {
         }}
       />
       <PoDetailDialog poId={detailPoId} onClose={() => setDetailPoId(null)} />
+      <OdfBreakdownDialog
+        job={detailJob}
+        machines={machines}
+        onClose={() => setDetailJob(null)}
+      />
     </AppShell>
   );
 }
