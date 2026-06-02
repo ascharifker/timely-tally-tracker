@@ -7,6 +7,7 @@ import { AppShell } from "@/components/fact/AppShell";
 import { usePoLinesByStatus, type PoLineWithContext } from "@/hooks/usePoQueues";
 import { useMachines } from "@/hooks/useFactData";
 import { createJobFromPoLine } from "@/lib/po-workflow.functions";
+import { PoDetailDialog } from "@/components/fact/PoDetailDialog";
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ function ProductionPage() {
   const qc = useQueryClient();
 
   const [active, setActive] = useState<PoLineWithContext | null>(null);
+  const [detailPoId, setDetailPoId] = useState<string | null>(null);
 
   return (
     <AppShell>
@@ -90,9 +92,16 @@ function ProductionPage() {
               <TableRow key={l.id}>
                 <TableCell className="text-sm">
                   {l.purchase_order?.customer?.name ?? "—"}
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {l.purchase_order?.po_number}
-                  </div>
+                  {l.purchase_order && (
+                    <button
+                      type="button"
+                      onClick={() => setDetailPoId(l.purchase_order!.id)}
+                      className="block font-mono text-xs text-primary hover:underline text-left"
+                      title="Ver detalle de la PO"
+                    >
+                      {l.purchase_order.po_number}
+                    </button>
+                  )}
                 </TableCell>
                 <TableCell className="font-mono text-xs">L{l.line_number}</TableCell>
                 <TableCell className="font-mono text-xs">{l.pir ?? "—"}</TableCell>
@@ -122,6 +131,7 @@ function ProductionPage() {
           await qc.invalidateQueries({ queryKey: ["jobs"] });
         }}
       />
+      <PoDetailDialog poId={detailPoId} onClose={() => setDetailPoId(null)} />
     </AppShell>
   );
 }
