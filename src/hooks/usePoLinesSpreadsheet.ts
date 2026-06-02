@@ -124,6 +124,7 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
             tube_spec: l.tube_spec,
             qty_ordered: l.qty_ordered,
             committed_date: l.committed_date,
+            export_date: l.export_date ?? null,
             unit_price: l.unit_price,
             currency: l.currency,
             notes: l.notes,
