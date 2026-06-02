@@ -127,6 +127,7 @@ export interface POLineItem {
   tube_spec: string | null;
   qty_ordered: number;
   committed_date: string | null;
+  export_date: string | null;
   unit_price: number | null;
   currency: string | null;
   notes: string | null;
