@@ -354,7 +354,6 @@ export function PoLinesSpreadsheet({ mode }: Props) {
               const d = daysUntil(r.line.committed_date);
               const isLate = d !== null && d < 0 && r.line.status !== "completed";
               const isClosed = r.line.status === "completed" || r.line.status === "cancelled";
-              const odfs = r.jobs.map((j) => j.odf).join(", ");
               const mexEnd = r.jobs
                 .map((j) => j.planned_end)
                 .filter((x): x is string => !!x)
