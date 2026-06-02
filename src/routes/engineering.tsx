@@ -99,7 +99,7 @@ function EngineeringPage() {
     <AppShell>
       <Toaster theme="dark" position="top-right" />
       <div className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Ingeniería · Alexis</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Ingeniería</h2>
         <p className="text-sm text-muted-foreground">
           Validá los PIRs contra la master list. Corregí PIR / spec si la AI los extrajo mal.
         </p>
