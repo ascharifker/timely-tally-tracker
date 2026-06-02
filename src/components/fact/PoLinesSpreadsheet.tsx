@@ -330,7 +330,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
               <Th className="w-32">MEX date</Th>
               <Th className="w-28">Shipped</Th>
               <Th className="w-16 text-right">Días</Th>
-              <Th className="w-24">ODF</Th>
+              <Th className="w-56">ODF · Etapa</Th>
               <Th className="w-40">Estado</Th>
               <Th className="min-w-[220px]">Notas</Th>
             </tr>
@@ -442,10 +442,25 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                     )}
                   </Td>
                   <Td>
-                    {odfs ? (
-                      <span className="text-xs">{odfs}</span>
-                    ) : (
+                    {r.jobs.length === 0 ? (
                       <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-col gap-0.5">
+                        {r.jobs.map((j) => (
+                          <div key={j.id} className="flex items-center gap-1.5">
+                            <span className="font-mono text-[11px]">{j.odf}</span>
+                            <span
+                              className={cn(
+                                "rounded border px-1.5 text-[9px] uppercase tracking-wide",
+                                JOB_STAGE_TONE[j.status] ??
+                                  "border-muted-foreground/40 text-muted-foreground",
+                              )}
+                            >
+                              {JOB_STAGE_LABEL[j.status] ?? j.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </Td>
                   <Td>
