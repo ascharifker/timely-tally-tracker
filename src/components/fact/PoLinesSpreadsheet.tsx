@@ -59,6 +59,34 @@ const STATUS_TONE: Record<string, string> = {
   cancelled: "border-muted-foreground/40 text-muted-foreground line-through",
 };
 
+const JOB_STAGE_LABEL: Record<string, string> = {
+  EN_ESPERA: "En espera",
+  PLANNED: "Planeada",
+  MAZAK: "MAZAK",
+  TALLER_EXTERNO: "Taller ext.",
+  MAQUINADO_LISTO: "Maq. listo",
+  CEMENTACION: "Cementación",
+  CEMENTACION_LISTO: "Cement. listo",
+  EN_GEMAK: "En Gemak",
+  EXPO: "EXPO",
+  YA_SE_ENVIO: "Enviado",
+  ON_HOLD: "Hold",
+  MAQYRO: "Maq y RO",
+};
+
+const JOB_STAGE_TONE: Record<string, string> = {
+  EN_ESPERA: "border-muted-foreground/40 text-muted-foreground",
+  PLANNED: "border-muted-foreground/40 text-muted-foreground",
+  MAZAK: "border-blue-500/60 text-blue-200 bg-blue-500/10",
+  TALLER_EXTERNO: "border-blue-500/60 text-blue-200 bg-blue-500/10",
+  MAQUINADO_LISTO: "border-indigo-500/60 text-indigo-200 bg-indigo-500/10",
+  CEMENTACION: "border-purple-500/60 text-purple-200 bg-purple-500/10",
+  CEMENTACION_LISTO: "border-purple-500/60 text-purple-200 bg-purple-500/10",
+  EXPO: "border-cyan-500/60 text-cyan-200 bg-cyan-500/10",
+  YA_SE_ENVIO: "border-emerald-500/60 text-emerald-200 bg-emerald-500/10",
+  ON_HOLD: "border-red-500/60 text-red-200 bg-red-500/10",
+};
+
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const d = new Date(dateStr + "T00:00:00");
