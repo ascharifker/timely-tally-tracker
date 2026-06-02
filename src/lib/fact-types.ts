@@ -10,7 +10,12 @@ export type JobStatus =
   | "MAQUINADO_LISTO"
   | "CEMENTACION"
   | "EXPO"
-  | "YA_SE_ENVIO";
+  | "YA_SE_ENVIO"
+  | "EN_ESPERA"
+  | "ON_HOLD"
+  | "MAQYRO"
+  | "EN_GEMAK"
+  | "CEMENTACION_LISTO";
 export type JobPriority = "low" | "normal" | "high" | "urgent";
 
 export interface Machine {
@@ -199,6 +204,11 @@ export const STATUS_LABEL: Record<JobStatus, string> = {
   CEMENTACION: "Cementación",
   EXPO: "Expo",
   YA_SE_ENVIO: "Ya se Envió",
+  EN_ESPERA: "En Espera",
+  ON_HOLD: "On Hold",
+  MAQYRO: "Maqyro",
+  EN_GEMAK: "En Gemak",
+  CEMENTACION_LISTO: "Cementación Lista",
 };
 
 export const STATUS_COLOR: Record<JobStatus, string> = {
@@ -209,6 +219,11 @@ export const STATUS_COLOR: Record<JobStatus, string> = {
   CEMENTACION: "var(--status-cementacion)",
   EXPO: "var(--status-expo)",
   YA_SE_ENVIO: "var(--status-enviado)",
+  EN_ESPERA: "var(--status-planned)",
+  ON_HOLD: "var(--status-risk)",
+  MAQYRO: "var(--status-cementacion)",
+  EN_GEMAK: "var(--status-taller)",
+  CEMENTACION_LISTO: "var(--status-listo)",
 };
 
 export const SHIFT_LABEL: Record<ShiftSlot, string> = {
