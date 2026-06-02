@@ -92,6 +92,7 @@ function ProductionPage() {
       qc.invalidateQueries({ queryKey: ["po_lines_by_status"] }),
       qc.invalidateQueries({ queryKey: ["jobs"] }),
       qc.invalidateQueries({ queryKey: ["active_jobs"] }),
+      qc.invalidateQueries({ queryKey: ["completed_jobs"] }),
       qc.invalidateQueries({ queryKey: ["planned_qty_by_line"] }),
       qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] }),
       qc.invalidateQueries({ queryKey: ["po_line_history"] }),
