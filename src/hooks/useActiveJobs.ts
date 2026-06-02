@@ -20,6 +20,7 @@ export interface JobStep {
 export interface ActiveJob extends Job {
   steps: JobStep[];
   current_step: JobStep | null;
+  po: { id: string; po_number: string; customer_name: string | null } | null;
 }
 
 const TERMINAL_STATUSES = ["YA_SE_ENVIO"];
@@ -49,10 +50,34 @@ export function useActiveJobs() {
         arr.push(s);
         byJob.set(s.job_id, arr);
       }
+      const lineIds = Array.from(
+        new Set(list.map((j) => j.po_line_item_id).filter((x): x is string => !!x)),
+      );
+      const poByLine = new Map<string, { id: string; po_number: string; customer_name: string | null }>();
+      if (lineIds.length > 0) {
+        const { data: lines, error: lErr } = await supabase
+          .from("po_line_items")
+          .select("id, purchase_order:purchase_orders(id, po_number, customer:customers(name))")
+          .in("id", lineIds);
+        if (lErr) throw lErr;
+        for (const row of (lines ?? []) as Array<{
+          id: string;
+          purchase_order: { id: string; po_number: string; customer: { name: string } | null } | null;
+        }>) {
+          if (row.purchase_order) {
+            poByLine.set(row.id, {
+              id: row.purchase_order.id,
+              po_number: row.purchase_order.po_number,
+              customer_name: row.purchase_order.customer?.name ?? null,
+            });
+          }
+        }
+      }
       return list.map((j) => {
         const all = byJob.get(j.id) ?? [];
         const current = all.find((s) => !s.completed_at) ?? null;
-        return { ...j, steps: all, current_step: current };
+        const po = j.po_line_item_id ? poByLine.get(j.po_line_item_id) ?? null : null;
+        return { ...j, steps: all, current_step: current, po };
       });
     },
   });
