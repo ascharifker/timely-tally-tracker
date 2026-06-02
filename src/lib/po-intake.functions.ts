@@ -176,6 +176,7 @@ export const commitPo = createServerFn({ method: "POST" })
     }
 
     // 2. Insert purchase_order.
+    let poId: string;
     const { data: po, error: poErr } = await supabaseAdmin
       .from("purchase_orders" as never)
       .insert({
@@ -188,11 +189,37 @@ export const commitPo = createServerFn({ method: "POST" })
       } as never)
       .select("id")
       .single();
-    if (poErr) throw new Error(`No se pudo crear el PO: ${poErr.message}`);
-    const poId = (po as { id: string }).id;
+    if (poErr) {
+      // Duplicate (customer_id, po_number) — reuse existing PO and append new lines.
+      const isDup =
+        (poErr as { code?: string }).code === "23505" ||
+        /duplicate key/i.test(poErr.message);
+      if (!isDup) throw new Error(`No se pudo crear el PO: ${poErr.message}`);
+      const { data: existingPo, error: findErr } = await supabaseAdmin
+        .from("purchase_orders" as never)
+        .select("id")
+        .eq("customer_id", customerId)
+        .eq("po_number", data.po_number)
+        .maybeSingle();
+      if (findErr || !existingPo) {
+        throw new Error(`PO duplicado y no se pudo recuperar el existente: ${poErr.message}`);
+      }
+      poId = (existingPo as { id: string }).id;
+    } else {
+      poId = (po as { id: string }).id;
+    }
 
-    // 3. Insert line items.
-    const rows = data.line_items.map((li) => ({
+    // 3. Insert line items — skip line_numbers that already exist for this PO.
+    const { data: existingLines } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .select("line_number")
+      .eq("purchase_order_id", poId);
+    const taken = new Set(
+      ((existingLines as { line_number: number }[] | null) ?? []).map((r) => r.line_number),
+    );
+    const rows = data.line_items
+      .filter((li) => !taken.has(li.line_number))
+      .map((li) => ({
       purchase_order_id: poId,
       line_number: li.line_number,
       pir: li.pir,
@@ -202,13 +229,13 @@ export const commitPo = createServerFn({ method: "POST" })
       unit_price: li.unit_price,
       currency: li.currency,
     }));
-    const { error: liErr } = await supabaseAdmin
-      .from("po_line_items" as never)
-      .insert(rows as never);
-    if (liErr) {
-      // Rollback the PO (best effort).
-      await supabaseAdmin.from("purchase_orders" as never).delete().eq("id", poId);
-      throw new Error(`No se pudieron crear las líneas: ${liErr.message}`);
+    if (rows.length > 0) {
+      const { error: liErr } = await supabaseAdmin
+        .from("po_line_items" as never)
+        .insert(rows as never);
+      if (liErr) {
+        throw new Error(`No se pudieron crear las líneas: ${liErr.message}`);
+      }
     }
 
     return { id: poId };
