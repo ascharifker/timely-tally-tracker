@@ -90,7 +90,7 @@ export function useCompletedJobs() {
       const { data: jobs, error } = await supabase
         .from("jobs")
         .select("*")
-        .in("status", TERMINAL_STATUSES)
+        .in("status", TERMINAL_STATUSES as unknown as ["YA_SE_ENVIO"])
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) throw error;
