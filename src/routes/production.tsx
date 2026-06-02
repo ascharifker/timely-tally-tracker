@@ -48,6 +48,29 @@ import {
 } from "@/components/ui/dialog";
 import { Calendar, Pause, Play, ChevronRight, AlertTriangle } from "lucide-react";
 
+function renderOtdBadge(j: ActiveJob) {
+  const otd = computeOdfOtd(j);
+  const tone = OTD_TONE[otd.score];
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+      style={{ color: tone.color, backgroundColor: tone.bg }}
+      title={
+        otd.shipped_at && otd.customer_date
+          ? `Enviado ${otd.shipped_at.slice(0,10)} · cliente ${otd.customer_date}`
+          : "Sin fecha cliente o envío"
+      }
+    >
+      {tone.label}
+      {otd.days_diff !== null && (
+        <span className="font-mono">
+          {otd.days_diff > 0 ? `+${otd.days_diff}d` : otd.days_diff < 0 ? `${otd.days_diff}d` : "0d"}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export const Route = createFileRoute("/production")({
   ssr: false,
   head: () => ({ meta: [{ title: "Producción · MEGO Produccion" }] }),
