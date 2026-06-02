@@ -67,7 +67,7 @@ export function stepDurationHours(step: JobStep): number | null {
 }
 
 export const OTD_TONE: Record<OtdScore, { label: string; color: string; bg: string }> = {
-  on_time: { label: "A tiempo", color: "var(--status-ok)", bg: "color-mix(in oklab, var(--status-ok) 15%, transparent)" },
+  on_time: { label: "A tiempo", color: "var(--status-enviado)", bg: "color-mix(in oklab, var(--status-enviado) 15%, transparent)" },
   early: { label: "Adelantado", color: "var(--status-expo)", bg: "color-mix(in oklab, var(--status-expo) 15%, transparent)" },
   late: { label: "Tarde", color: "var(--status-risk)", bg: "color-mix(in oklab, var(--status-risk) 15%, transparent)" },
   unknown: { label: "Sin fecha", color: "var(--muted-foreground)", bg: "color-mix(in oklab, var(--muted-foreground) 15%, transparent)" },
