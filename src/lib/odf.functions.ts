@@ -168,6 +168,51 @@ const STATUS_FROM_STEP: Record<string, string> = {
   YA_SE_ENVIO: "YA_SE_ENVIO",
 };
 
+// Recompute po_line_items.status from the state of its child jobs.
+// - all jobs shipped & sum(qty) >= qty_ordered  → "completed"
+// - any job exists (and line isn't completed)   → "in_progress"
+// - no jobs                                     → leave untouched
+async function recomputeLineStatusForJob(jobId: string): Promise<void> {
+  const { data: jobRow } = await supabaseAdmin
+    .from("jobs" as never)
+    .select("po_line_item_id")
+    .eq("id", jobId)
+    .single();
+  const lineId = (jobRow as { po_line_item_id: string | null } | null)?.po_line_item_id;
+  if (!lineId) return;
+  await recomputeLineStatus(lineId);
+}
+
+async function recomputeLineStatus(lineId: string): Promise<void> {
+  const { data: lineRow } = await supabaseAdmin
+    .from("po_line_items" as never)
+    .select("qty_ordered, status")
+    .eq("id", lineId)
+    .single();
+  const line = lineRow as { qty_ordered: number; status: string } | null;
+  if (!line) return;
+  const { data: jobsRows } = await supabaseAdmin
+    .from("jobs" as never)
+    .select("qty, status")
+    .eq("po_line_item_id", lineId);
+  const jobs = (jobsRows as { qty: number; status: string }[]) ?? [];
+  if (jobs.length === 0) return;
+  const shippedQty = jobs
+    .filter((j) => j.status === "YA_SE_ENVIO")
+    .reduce((a, j) => a + (j.qty ?? 0), 0);
+  let next: string;
+  if (jobs.every((j) => j.status === "YA_SE_ENVIO") && shippedQty >= line.qty_ordered) {
+    next = "completed";
+  } else {
+    next = "in_progress";
+  }
+  if (next === line.status) return;
+  await supabaseAdmin
+    .from("po_line_items" as never)
+    .update({ status: next } as never)
+    .eq("id", lineId);
+}
+
 export const advanceJobStep = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ job_id: z.string().uuid() }).parse(input),
@@ -203,6 +248,7 @@ export const advanceJobStep = createServerFn({ method: "POST" })
       .update({ status: nextStatus } as never)
       .eq("id", data.job_id);
     if (jErr) throw new Error(jErr.message);
+    await recomputeLineStatusForJob(data.job_id);
     return { ok: true, next_status: nextStatus };
   });
 
@@ -243,6 +289,7 @@ export const resumeJob = createServerFn({ method: "POST" })
       .update({ status } as never)
       .eq("id", data.job_id);
     if (uErr) throw new Error(uErr.message);
+    await recomputeLineStatusForJob(data.job_id);
     return { ok: true, status };
   });
 
