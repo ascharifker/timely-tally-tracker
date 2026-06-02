@@ -24,7 +24,7 @@ function PurchaseOrdersPage() {
       <Toaster theme="dark" position="top-right" />
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Purchase Orders · Peter</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Purchase Orders</h2>
           <p className="text-sm text-muted-foreground">
             Una fila por línea de PO, como tu planilla. Editá in-line, los cambios quedan resaltados.
           </p>
