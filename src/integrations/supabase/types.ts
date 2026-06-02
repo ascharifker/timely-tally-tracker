@@ -120,6 +120,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "date_change_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_current_step"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "date_change_log_po_line_item_id_fkey"
             columns: ["po_line_item_id"]
             isOneToOne: false
@@ -135,10 +142,13 @@ export type Database = {
           job_id: string
           machine_id: string | null
           note: string | null
+          planned_end: string | null
+          planned_start: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
           step_name: string
           step_order: number
+          vendor_id: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -146,10 +156,13 @@ export type Database = {
           job_id: string
           machine_id?: string | null
           note?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           step_name: string
           step_order: number
+          vendor_id?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -157,10 +170,13 @@ export type Database = {
           job_id?: string
           machine_id?: string | null
           note?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           step_name?: string
           step_order?: number
+          vendor_id?: string | null
         }
         Relationships: [
           {
@@ -169,6 +185,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_current_step"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "job_steps_machine_id_fkey"
@@ -359,6 +382,21 @@ export type Database = {
         }
         Relationships: []
       }
+      odf_sequences: {
+        Row: {
+          last_number: number
+          year: number
+        }
+        Insert: {
+          last_number?: number
+          year: number
+        }
+        Update: {
+          last_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
       part_times: {
         Row: {
           created_at: string
@@ -401,6 +439,7 @@ export type Database = {
           currency: string | null
           engineering_reviewed_at: string | null
           engineering_reviewed_by: string | null
+          export_date: string | null
           flag_reason: string | null
           id: string
           line_number: number
@@ -419,6 +458,7 @@ export type Database = {
           currency?: string | null
           engineering_reviewed_at?: string | null
           engineering_reviewed_by?: string | null
+          export_date?: string | null
           flag_reason?: string | null
           id?: string
           line_number?: number
@@ -437,6 +477,7 @@ export type Database = {
           currency?: string | null
           engineering_reviewed_at?: string | null
           engineering_reviewed_by?: string | null
+          export_date?: string | null
           flag_reason?: string | null
           id?: string
           line_number?: number
@@ -546,6 +587,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "shifts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_current_step"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "shifts_machine_id_fkey"
             columns: ["machine_id"]
             isOneToOne: false
@@ -605,6 +653,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "status_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_current_step"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       vendors: {
@@ -654,10 +709,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_job_current_step: {
+        Row: {
+          completed_at: string | null
+          job_id: string | null
+          machine_id: string | null
+          planned_end: string | null
+          planned_start: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"] | null
+          step_id: string | null
+          step_name: string | null
+          step_order: number | null
+          vendor_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_steps_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      next_odf_number: { Args: { p_year: number }; Returns: string }
     }
     Enums: {
       event_kind:
@@ -677,6 +755,11 @@ export type Database = {
         | "CEMENTACION"
         | "EXPO"
         | "YA_SE_ENVIO"
+        | "EN_ESPERA"
+        | "ON_HOLD"
+        | "MAQYRO"
+        | "EN_GEMAK"
+        | "CEMENTACION_LISTO"
       machine_type: "internal" | "external_shop"
       po_line_status:
         | "pending_engineering"
@@ -833,6 +916,11 @@ export const Constants = {
         "CEMENTACION",
         "EXPO",
         "YA_SE_ENVIO",
+        "EN_ESPERA",
+        "ON_HOLD",
+        "MAQYRO",
+        "EN_GEMAK",
+        "CEMENTACION_LISTO",
       ],
       machine_type: ["internal", "external_shop"],
       po_line_status: [
