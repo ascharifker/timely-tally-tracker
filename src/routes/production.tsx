@@ -7,7 +7,7 @@ import { AppShell } from "@/components/fact/AppShell";
 import { usePoLinesByStatus, type PoLineWithContext } from "@/hooks/usePoQueues";
 import { useMachines } from "@/hooks/useFactData";
 import { useVendors } from "@/hooks/useVendors";
-import { useActiveJobs, type ActiveJob } from "@/hooks/useActiveJobs";
+import { useActiveJobs, useCompletedJobs, type ActiveJob } from "@/hooks/useActiveJobs";
 import {
   splitPoLineIntoOdf,
   advanceJobStep,
@@ -80,6 +80,7 @@ function ProductionPage() {
   const { data: machines = [] } = useMachines();
   const { data: vendors = [] } = useVendors();
   const { data: activeJobs = [] } = useActiveJobs();
+  const { data: completedJobs = [] } = useCompletedJobs();
   const { data: plannedByLine = {} } = usePlannedQtyByLine(lines.map((l) => l.id));
   const qc = useQueryClient();
 
@@ -191,6 +192,18 @@ function ProductionPage() {
         jobs={activeJobs}
         machines={machines}
         onChange={refreshAll}
+        onOpenPo={setDetailPoId}
+      />
+
+      <div className="mt-8 mb-4">
+        <h2 className="text-2xl font-semibold tracking-tight">ODFs completadas</h2>
+        <p className="text-sm text-muted-foreground">
+          Histórico de ODFs enviadas. Filtrá por PO o cliente para revisar lo entregado.
+        </p>
+      </div>
+      <CompletedJobsTable
+        jobs={completedJobs}
+        machines={machines}
         onOpenPo={setDetailPoId}
       />
 
