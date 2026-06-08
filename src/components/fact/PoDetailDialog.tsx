@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { usePoDetail } from "@/hooks/usePoDetail";
 import { ExternalLink } from "lucide-react";
+import { PO_LINE_STATUS_LABEL_EN, type POLineStatus } from "@/lib/fact-types";
 
 export function PoDetailDialog({
   poId,
@@ -32,12 +33,12 @@ export function PoDetailDialog({
       <DialogContent className="max-w-4xl bg-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {po ? `PO ${po.po_number}` : "Detalle de PO"}
+            {po ? `PO # ${po.po_number}` : "PO details"}
           </DialogTitle>
         </DialogHeader>
 
         {isLoading && (
-          <div className="text-center text-muted-foreground py-8">Cargando…</div>
+          <div className="text-center text-muted-foreground py-8">Loading…</div>
         )}
 
         {po && (
@@ -45,7 +46,7 @@ export function PoDetailDialog({
             {/* Header info */}
             <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
               <div>
-                <div className="text-xs text-muted-foreground">Cliente</div>
+                <div className="text-xs text-muted-foreground">Customer</div>
                 <div className="font-medium">{po.customer?.name ?? "—"}</div>
               </div>
               <div>
@@ -53,11 +54,11 @@ export function PoDetailDialog({
                 <Badge variant="outline">{po.status}</Badge>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Fecha emisión</div>
+                <div className="text-xs text-muted-foreground">Issue date</div>
                 <div className="font-mono">{po.issued_date ?? "—"}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Comprometida</div>
+                <div className="text-xs text-muted-foreground">Customer date</div>
                 <div className="font-mono">{po.committed_date ?? "—"}</div>
               </div>
               {po.source_document_url && (
@@ -68,13 +69,13 @@ export function PoDetailDialog({
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
                   >
-                    <ExternalLink className="h-3 w-3" /> Documento original
+                    <ExternalLink className="h-3 w-3" /> Original document
                   </a>
                 </div>
               )}
               {po.notes && (
                 <div className="col-span-2">
-                  <div className="text-xs text-muted-foreground">Notas PO</div>
+                  <div className="text-xs text-muted-foreground">PO notes</div>
                   <div className="whitespace-pre-wrap">{po.notes}</div>
                 </div>
               )}
@@ -83,7 +84,7 @@ export function PoDetailDialog({
             {/* Lines */}
             <div>
               <h3 className="text-sm font-semibold mb-2">
-                Líneas ({po.lines?.length ?? 0})
+                Lines ({po.lines?.length ?? 0})
               </h3>
               <div className="rounded-md border">
                 <Table>
@@ -93,9 +94,9 @@ export function PoDetailDialog({
                       <TableHead>PIR</TableHead>
                       <TableHead>Spec</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead>Comprometida</TableHead>
+                      <TableHead>Customer date</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Notas</TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -108,7 +109,7 @@ export function PoDetailDialog({
                         <TableCell className="font-mono text-xs">{l.committed_date ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {l.status}
+                            {PO_LINE_STATUS_LABEL_EN[l.status as POLineStatus] ?? l.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
@@ -124,23 +125,23 @@ export function PoDetailDialog({
             {/* Change history */}
             <div>
               <h3 className="text-sm font-semibold mb-2">
-                Historial de cambios ({changes.length})
+                Change history ({changes.length})
               </h3>
               {changes.length === 0 ? (
                 <div className="text-xs text-muted-foreground py-3 px-2 rounded-md border bg-muted/20">
-                  Sin cambios registrados.
+                  No changes recorded.
                 </div>
               ) : (
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Línea</TableHead>
-                        <TableHead>Campo</TableHead>
-                        <TableHead>Antes</TableHead>
-                        <TableHead>Ahora</TableHead>
-                        <TableHead>Cuándo</TableHead>
-                        <TableHead>Quién</TableHead>
+                        <TableHead>Line</TableHead>
+                        <TableHead>Field</TableHead>
+                        <TableHead>Old</TableHead>
+                        <TableHead>New</TableHead>
+                        <TableHead>When</TableHead>
+                        <TableHead>Who</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
