@@ -106,6 +106,9 @@ export type PurchaseOrderStatus =
   | "completed"
   | "cancelled";
 
+/** Engineering review track for a PO. Drives which reviewer (Alexis vs Lendris) can touch it. */
+export type ReviewTrack = "coe" | "third_party" | "internal";
+
 export interface PurchaseOrder {
   id: string;
   customer_id: string;
@@ -158,6 +161,18 @@ export const PO_LINE_STATUS_LABEL: Record<POLineStatus, string> = {
   in_progress: "En curso",
   completed: "Completada",
   cancelled: "Cancelada",
+};
+
+/** English labels for the Order layer (Peter). Production-side keeps the Spanish map above. */
+export const PO_LINE_STATUS_LABEL_EN: Record<POLineStatus, string> = {
+  pending_engineering: "Pending engineering",
+  engineering_approved: "Engineering approved",
+  engineering_flagged: "Engineering flagged",
+  ready_for_production: "Ready for production",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 export interface DateChange {
