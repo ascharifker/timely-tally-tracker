@@ -109,13 +109,13 @@ export function UploadPoDialog() {
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes("429")) {
-        toast.error("Rate limit", { description: "Reintentá en un momento." });
+        toast.error("Rate limit", { description: "Try again in a moment." });
       } else if (msg.includes("402")) {
-        toast.error("Sin créditos", {
-          description: "Agregá créditos en Workspace → Usage.",
+        toast.error("Out of credits", {
+          description: "Add credits in Workspace → Usage.",
         });
       } else {
-        toast.error("No se pudo procesar el PDF", { description: msg });
+        toast.error("Could not process the PDF", { description: msg });
       }
       reset();
     }
@@ -147,12 +147,12 @@ export function UploadPoDialog() {
       });
       qc.invalidateQueries({ queryKey: ["purchase_orders"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
-      toast.success("Purchase Order creado");
+      toast.success("Purchase Order created");
       setOpen(false);
       reset();
       navigate({ to: "/purchase-orders/$id", params: { id: result.id } });
     } catch (e) {
-      toast.error("No se pudo crear el PO", { description: (e as Error).message });
+      toast.error("Could not create the PO", { description: (e as Error).message });
       setStage("reviewing");
     }
   };
@@ -167,15 +167,15 @@ export function UploadPoDialog() {
     >
       <DialogTrigger asChild>
         <Button>
-          <Upload className="mr-2 h-4 w-4" /> Cargar PO
+          <Upload className="mr-2 h-4 w-4" /> Upload PO
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Cargar Purchase Order</DialogTitle>
+          <DialogTitle>Upload Purchase Order</DialogTitle>
           <DialogDescription>
-            Subí el PDF del PO del cliente. Lo procesamos con AI y te dejamos
-            revisar antes de guardarlo.
+            Upload the customer's PO PDF. We'll process it with AI and let you
+            review before saving.
           </DialogDescription>
         </DialogHeader>
 
@@ -188,8 +188,8 @@ export function UploadPoDialog() {
             <Loader2 className="h-8 w-8 animate-spin" />
             <p className="text-sm">
               {stage === "uploading"
-                ? "Subiendo PDF…"
-                : "Extrayendo datos con AI…"}
+                ? "Uploading PDF…"
+                : "Extracting data with AI…"}
             </p>
           </div>
         )}
@@ -207,7 +207,7 @@ export function UploadPoDialog() {
         {stage === "committing" && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin" />
-            <p className="text-sm">Guardando…</p>
+            <p className="text-sm">Saving…</p>
           </div>
         )}
       </DialogContent>
@@ -229,7 +229,7 @@ function FileDropZone({ onFile }: { onFile: (file: File) => void }) {
         setDragOver(false);
         const f = e.dataTransfer.files?.[0];
         if (f && f.type === "application/pdf") onFile(f);
-        else toast.error("Solo aceptamos PDF");
+        else toast.error("Only PDF files are accepted");
       }}
       className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed py-16 cursor-pointer transition-colors ${
         dragOver
@@ -239,7 +239,7 @@ function FileDropZone({ onFile }: { onFile: (file: File) => void }) {
     >
       <FileText className="h-10 w-10 text-muted-foreground" />
       <p className="text-sm text-muted-foreground">
-        Arrastrá un PDF aquí o hacé click para seleccionar
+        Drag a PDF here, or click to select
       </p>
       <input
         type="file"
@@ -306,7 +306,7 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label>Cliente</Label>
+          <Label>Customer</Label>
           <Select
             value={value.customerId ?? "__new__"}
             onValueChange={(v) => {
@@ -331,26 +331,26 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                   {c.name}
                 </SelectItem>
               ))}
-              <SelectItem value="__new__">+ Crear nuevo cliente…</SelectItem>
+              <SelectItem value="__new__">+ Create new customer…</SelectItem>
             </SelectContent>
           </Select>
           {value.customerId === null && (
             <Input
-              placeholder="Nombre del nuevo cliente"
+              placeholder="New customer name"
               value={value.customerName}
               onChange={(e) => set("customerName", e.target.value)}
             />
           )}
         </div>
         <div className="space-y-1.5">
-          <Label>Número de PO</Label>
+          <Label>PO #</Label>
           <Input
             value={value.po_number}
             onChange={(e) => set("po_number", e.target.value)}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Fecha de emisión</Label>
+          <Label>Issue date</Label>
           <Input
             type="date"
             value={value.issued_date}
@@ -358,7 +358,7 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Fecha comprometida (PO)</Label>
+          <Label>Customer date (PO)</Label>
           <Input
             type="date"
             value={value.committed_date}
@@ -368,7 +368,7 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
       </div>
 
       <div className="space-y-1.5">
-        <Label>Notas</Label>
+        <Label>Notes</Label>
         <Textarea
           rows={2}
           value={value.notes}
@@ -378,9 +378,9 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <Label>Líneas ({value.line_items.length})</Label>
+          <Label>Lines ({value.line_items.length})</Label>
           <Button size="sm" variant="outline" onClick={addLine}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Agregar línea
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add line
           </Button>
         </div>
         <div className="rounded-md border overflow-x-auto">
@@ -389,11 +389,11 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
               <TableRow>
                 <TableHead className="w-10">#</TableHead>
                 <TableHead>PIR</TableHead>
-                <TableHead>Spec / Descripción</TableHead>
-                <TableHead className="w-24">Cantidad</TableHead>
-                <TableHead className="w-40">F. Comprometida</TableHead>
-                <TableHead className="w-28">Precio</TableHead>
-                <TableHead className="w-20">Moneda</TableHead>
+                <TableHead>Spec / Description</TableHead>
+                <TableHead className="w-24">Qty</TableHead>
+                <TableHead className="w-40">Customer date</TableHead>
+                <TableHead className="w-28">Price</TableHead>
+                <TableHead className="w-20">Currency</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -471,10 +471,10 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
 
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="outline" onClick={onCancel}>
-          Cancelar
+          Cancel
         </Button>
         <Button onClick={onCommit} disabled={!canCommit}>
-          Confirmar y crear PO
+          Confirm and create PO
         </Button>
       </div>
     </div>
