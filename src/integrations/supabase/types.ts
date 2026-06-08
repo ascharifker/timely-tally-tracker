@@ -509,6 +509,7 @@ export type Database = {
           issued_date: string | null
           notes: string | null
           po_number: string
+          review_track: Database["public"]["Enums"]["review_track"]
           source_document_url: string | null
           status: string
           updated_at: string
@@ -521,6 +522,7 @@ export type Database = {
           issued_date?: string | null
           notes?: string | null
           po_number: string
+          review_track?: Database["public"]["Enums"]["review_track"]
           source_document_url?: string | null
           status?: string
           updated_at?: string
@@ -533,6 +535,7 @@ export type Database = {
           issued_date?: string | null
           notes?: string | null
           po_number?: string
+          review_track?: Database["public"]["Enums"]["review_track"]
           source_document_url?: string | null
           status?: string
           updated_at?: string
@@ -662,6 +665,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       vendors: {
         Row: {
           active: boolean
@@ -735,9 +759,26 @@ export type Database = {
       }
     }
     Functions: {
+      current_user_can_edit_po: { Args: { _po_id: string }; Returns: boolean }
+      current_user_can_edit_production: { Args: never; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       next_odf_number: { Args: { p_year: number }; Returns: string }
     }
     Enums: {
+      app_role:
+        | "admin"
+        | "manager"
+        | "po_editor"
+        | "coe_reviewer"
+        | "third_party_reviewer"
+        | "production_editor"
+        | "viewer"
       event_kind:
         | "delay"
         | "priority_shift"
@@ -770,6 +811,7 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "cancelled"
+      review_track: "coe" | "third_party" | "internal"
       shift_slot: "manana" | "tarde" | "noche"
     }
     CompositeTypes: {
@@ -898,6 +940,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: [
+        "admin",
+        "manager",
+        "po_editor",
+        "coe_reviewer",
+        "third_party_reviewer",
+        "production_editor",
+        "viewer",
+      ],
       event_kind: [
         "delay",
         "priority_shift",
@@ -933,6 +984,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      review_track: ["coe", "third_party", "internal"],
       shift_slot: ["manana", "tarde", "noche"],
     },
   },

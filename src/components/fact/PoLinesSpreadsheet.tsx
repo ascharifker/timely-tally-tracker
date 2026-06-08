@@ -21,7 +21,9 @@ import {
 } from "@/components/ui/select";
 import { Check, ExternalLink, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PO_LINE_STATUS_LABEL, type POLineStatus } from "@/lib/fact-types";
+import { PO_LINE_STATUS_LABEL_EN, type POLineStatus } from "@/lib/fact-types";
+import { useAuth } from "@/hooks/useUserRole";
+import { canEditAnyPo } from "@/lib/rbac";
 import type { SpreadsheetRow } from "@/hooks/usePoLinesSpreadsheet";
 import { usePoLinesSpreadsheet } from "@/hooks/usePoLinesSpreadsheet";
 import {
@@ -60,18 +62,18 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 const JOB_STAGE_LABEL: Record<string, string> = {
-  EN_ESPERA: "En espera",
-  PLANNED: "Planeada",
+  EN_ESPERA: "Waiting",
+  PLANNED: "Planned",
   MAZAK: "MAZAK",
-  TALLER_EXTERNO: "Taller ext.",
-  MAQUINADO_LISTO: "Maq. listo",
-  CEMENTACION: "Cementación",
-  CEMENTACION_LISTO: "Cement. listo",
-  EN_GEMAK: "En Gemak",
+  TALLER_EXTERNO: "Ext. shop",
+  MAQUINADO_LISTO: "Machined",
+  CEMENTACION: "Cementing",
+  CEMENTACION_LISTO: "Cement. done",
+  EN_GEMAK: "At Gemak",
   EXPO: "EXPO",
-  YA_SE_ENVIO: "Enviado",
+  YA_SE_ENVIO: "Shipped",
   ON_HOLD: "Hold",
-  MAQYRO: "Maq y RO",
+  MAQYRO: "Mach + RO",
 };
 
 const JOB_STAGE_TONE: Record<string, string> = {
@@ -97,16 +99,18 @@ function daysUntil(dateStr: string | null): number | null {
 
 function timeAgo(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return "hace segundos";
-  if (diff < 3600) return `hace ${Math.round(diff / 60)}m`;
-  if (diff < 86400) return `hace ${Math.round(diff / 3600)}h`;
-  return `hace ${Math.round(diff / 86400)}d`;
+  if (diff < 60) return "seconds ago";
+  if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
+  return `${Math.round(diff / 86400)}d ago`;
 }
 
 export function PoLinesSpreadsheet({ mode }: Props) {
   const { data: rows = [], isLoading } = usePoLinesSpreadsheet();
   const lineIds = useMemo(() => rows.map((r) => r.line.id), [rows]);
   const { data: changes } = usePoLineHistory(lineIds);
+  const { roles } = useAuth();
+  const canEdit = canEditAnyPo(roles);
 
   const qc = useQueryClient();
   const updateFn = useServerFn(updatePoLineField);
@@ -233,14 +237,14 @@ export function PoLinesSpreadsheet({ mode }: Props) {
       await updateFn({ data: { id, field, value, changed_by: "Peter" } });
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+      toast.error(e instanceof Error ? e.message : "Could not save");
     }
   };
 
   const ackAll = async () => {
     try {
       await ackAllFn();
-      toast.success("Cambios marcados como vistos");
+      toast.success("Changes marked as seen");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -251,11 +255,11 @@ export function PoLinesSpreadsheet({ mode }: Props) {
     <TooltipProvider delayDuration={200}>
       {/* Quick presets — bitácora style */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <PresetChip active={preset === "all"} onClick={() => setPreset("all")} label="Todos" count={counts.total} />
-        <PresetChip active={preset === "pending"} onClick={() => setPreset("pending")} label="Pendiente ing." count={counts.pending} tone="amber" />
-        <PresetChip active={preset === "production"} onClick={() => setPreset("production")} label="En producción" count={counts.production} tone="blue" />
-        <PresetChip active={preset === "shipped"} onClick={() => setPreset("shipped")} label="Enviados" count={counts.shipped} tone="emerald" />
-        <PresetChip active={preset === "late"} onClick={() => setPreset("late")} label="Atrasados" count={lateCount} tone="red" />
+        <PresetChip active={preset === "all"} onClick={() => setPreset("all")} label="All" count={counts.total} />
+        <PresetChip active={preset === "pending"} onClick={() => setPreset("pending")} label="Pending eng." count={counts.pending} tone="amber" />
+        <PresetChip active={preset === "production"} onClick={() => setPreset("production")} label="In production" count={counts.production} tone="blue" />
+        <PresetChip active={preset === "shipped"} onClick={() => setPreset("shipped")} label="Shipped" count={counts.shipped} tone="emerald" />
+        <PresetChip active={preset === "late"} onClick={() => setPreset("late")} label="Late" count={lateCount} tone="red" />
       </div>
       {/* Toolbar */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -264,16 +268,16 @@ export function PoLinesSpreadsheet({ mode }: Props) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar PIR, PO, cliente, nota, ODF…"
+            placeholder="Search PIR, PO #, customer, note, ODF #…"
             className="h-8 pl-7 text-xs"
           />
         </div>
         <Select value={customerFilter} onValueChange={setCustomerFilter}>
           <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue placeholder="Cliente" />
+            <SelectValue placeholder="Customer" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los clientes</SelectItem>
+            <SelectItem value="all">All customers</SelectItem>
             {customers.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
@@ -283,11 +287,11 @@ export function PoLinesSpreadsheet({ mode }: Props) {
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="h-8 w-48 text-xs">
-            <SelectValue placeholder="Estado exacto" />
+            <SelectValue placeholder="Exact status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Estado exacto: todos</SelectItem>
-            {Object.entries(PO_LINE_STATUS_LABEL).map(([k, v]) => (
+            <SelectItem value="all">Exact status: all</SelectItem>
+            {Object.entries(PO_LINE_STATUS_LABEL_EN).map(([k, v]) => (
               <SelectItem key={k} value={k}>
                 {v}
               </SelectItem>
@@ -306,11 +310,11 @@ export function PoLinesSpreadsheet({ mode }: Props) {
           )}
         >
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
-          Cambios sin ver ({pendingChanges})
+          Unseen changes ({pendingChanges})
         </button>
         {pendingChanges > 0 && (
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={ackAll}>
-            <Check className="h-3.5 w-3.5 mr-1" /> Marcar todo visto
+            <Check className="h-3.5 w-3.5 mr-1" /> Mark all seen
           </Button>
         )}
       </div>
@@ -320,33 +324,33 @@ export function PoLinesSpreadsheet({ mode }: Props) {
         <table className="w-full border-collapse text-[12px] font-mono">
           <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground font-sans">
-              <Th className="w-32">Cliente</Th>
+              <Th className="w-32">Customer</Th>
               <Th className="w-28">PO #</Th>
               <Th className="w-32">PIR</Th>
-              <Th className="min-w-[260px]">Descripción</Th>
+              <Th className="min-w-[260px]">Description</Th>
               <Th className="w-16 text-right">Qty</Th>
               <Th className="w-16 text-right">Pend</Th>
-              <Th className="w-32">Comprometida</Th>
-              <Th className="w-32">MEX date</Th>
+              <Th className="w-32">Customer date</Th>
+              <Th className="w-32">Export date</Th>
               <Th className="w-28">Shipped</Th>
-              <Th className="w-16 text-right">Días</Th>
-              <Th className="w-56">ODF · Etapa</Th>
-              <Th className="w-40">Estado</Th>
-              <Th className="min-w-[220px]">Notas</Th>
+              <Th className="w-16 text-right">Days</Th>
+              <Th className="w-56">ODF # · Stage</Th>
+              <Th className="w-40">Status</Th>
+              <Th className="min-w-[220px]">Notes</Th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
                 <td colSpan={13} className="text-center text-muted-foreground py-8">
-                  Cargando…
+                  Loading…
                 </td>
               </tr>
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>
                 <td colSpan={13} className="text-center text-muted-foreground py-8">
-                  Sin líneas que coincidan.
+                  No lines match.
                 </td>
               </tr>
             )}
@@ -389,11 +393,13 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                     value={r.line.pir ?? ""}
                     onCommit={(v) => handleEdit(r.line.id, "pir", v || null)}
                     change={getChange(changes, r.line.id, "pir")}
+                    readOnly={!canEdit}
                   />
                   <EditableCell
                     value={r.line.tube_spec ?? ""}
                     onCommit={(v) => handleEdit(r.line.id, "tube_spec", v || null)}
                     change={getChange(changes, r.line.id, "tube_spec")}
+                    readOnly={!canEdit}
                   />
                   <EditableCell
                     value={String(r.line.qty_ordered)}
@@ -401,12 +407,13 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                     onCommit={(v) => {
                       const n = parseInt(v, 10);
                       if (!Number.isFinite(n) || n < 1) {
-                        toast.error("Qty inválida");
+                        toast.error("Invalid qty");
                         return;
                       }
                       handleEdit(r.line.id, "qty_ordered", n);
                     }}
                     change={getChange(changes, r.line.id, "qty_ordered")}
+                    readOnly={!canEdit}
                   />
                   <Td className="text-right">
                     {Math.max(0, r.line.qty_ordered - r.total_pieces_completed)}
@@ -416,6 +423,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                     value={r.line.committed_date ?? ""}
                     onCommit={(v) => handleEdit(r.line.id, "committed_date", v || null)}
                     change={getChange(changes, r.line.id, "committed_date")}
+                    readOnly={!canEdit}
                   />
                   <Td className="text-muted-foreground">
                     {mexEnd ? mexEnd.slice(0, 10) : "—"}
@@ -470,7 +478,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                         STATUS_TONE[r.line.status] ?? "",
                       )}
                     >
-                      {PO_LINE_STATUS_LABEL[r.line.status]}
+                        {PO_LINE_STATUS_LABEL_EN[r.line.status]}
                     </Badge>
                     {r.line.flag_reason && (
                       <div className="text-[10px] text-red-300/80 mt-0.5 truncate max-w-[180px]">
@@ -482,6 +490,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
                     value={r.line.notes ?? ""}
                     onCommit={(v) => handleEdit(r.line.id, "notes", v || null)}
                     change={getChange(changes, r.line.id, "notes")}
+                    readOnly={!canEdit}
                   />
                 </tr>
               );
@@ -490,16 +499,16 @@ export function PoLinesSpreadsheet({ mode }: Props) {
         </table>
       </div>
       <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span>{filtered.length} visibles</span>
+        <span>{filtered.length} visible</span>
         <span>·</span>
-        <span>{counts.active} activas</span>
+        <span>{counts.active} active</span>
         <span>·</span>
-        <span>{counts.shipped} enviadas</span>
+        <span>{counts.shipped} shipped</span>
         <span>·</span>
-        <span className={lateCount > 0 ? "text-red-400" : ""}>{lateCount} atrasadas</span>
+        <span className={lateCount > 0 ? "text-red-400" : ""}>{lateCount} late</span>
         <span>·</span>
         <span>{counts.total} total</span>
-        <span className="ml-auto">click en una celda para editar</span>
+        <span className="ml-auto">{canEdit ? "click a cell to edit" : "read-only · ask your admin for edit access"}</span>
       </div>
     </TooltipProvider>
   );
@@ -574,12 +583,14 @@ function EditableCell({
   change,
   type = "text",
   align = "left",
+  readOnly = false,
 }: {
   value: string;
   onCommit: (v: string) => void;
   change: ChangeCell | undefined;
   type?: "text" | "date";
   align?: "left" | "right";
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -598,11 +609,12 @@ function EditableCell({
   const cell = (
     <td
       className={cn(
-        "border-r border-border px-2 py-1 align-middle cursor-text relative",
+        "border-r border-border px-2 py-1 align-middle relative",
+        readOnly ? "cursor-default" : "cursor-text",
         align === "right" && "text-right",
         isChanged && "bg-amber-500/10 border-l-2 border-l-amber-500",
       )}
-      onClick={() => !editing && setEditing(true)}
+      onClick={() => !editing && !readOnly && setEditing(true)}
     >
       {editing ? (
         <input

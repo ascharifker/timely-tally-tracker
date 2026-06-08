@@ -26,7 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import {
-  PO_LINE_STATUS_LABEL,
+  PO_LINE_STATUS_LABEL_EN,
   STATUS_LABEL,
   type Job,
   type POLineStatus,
@@ -34,7 +34,7 @@ import {
 
 export const Route = createFileRoute("/purchase-orders/$id")({
   ssr: false,
-  head: () => ({ meta: [{ title: "PO · MEGO Produccion" }] }),
+  head: () => ({ meta: [{ title: "PO · MEGO OTD Hub" }] }),
   component: PurchaseOrderDetailPage,
 });
 
@@ -94,9 +94,9 @@ function PurchaseOrderDetailPage() {
         </Link>
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {isLoading && <p className="text-muted-foreground">Loading…</p>}
       {!isLoading && !po && (
-        <p className="text-muted-foreground">No encontramos este PO.</p>
+        <p className="text-muted-foreground">PO not found.</p>
       )}
 
       {po && (
@@ -105,8 +105,9 @@ function PurchaseOrderDetailPage() {
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground px-1.5 py-0.5 rounded border border-border">PO #</span>
                 <h2 className="text-2xl font-semibold tracking-tight">
-                  PO {po.po_number}
+                  {po.po_number}
                 </h2>
                 <Badge variant="outline">{po.status}</Badge>
               </div>
@@ -120,12 +121,12 @@ function PurchaseOrderDetailPage() {
                 <>
                   <Button asChild variant="outline" size="sm">
                     <a href={pdfUrl} target="_blank" rel="noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir PDF
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open PDF
                     </a>
                   </Button>
                   <Button asChild variant="outline" size="sm">
                     <a href={pdfUrl} download>
-                      <Download className="h-3.5 w-3.5 mr-1.5" /> Descargar
+                      <Download className="h-3.5 w-3.5 mr-1.5" /> Download
                     </a>
                   </Button>
                 </>
@@ -135,25 +136,25 @@ function PurchaseOrderDetailPage() {
 
           {/* Metrics row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <Metric label="Cargado hace" value={`${ageDays} d`} />
+            <Metric label="Uploaded" value={`${ageDays} d ago`} />
             <Metric
-              label="Fecha comprometida"
+              label="Customer date"
               value={po.committed_date ?? "—"}
               hint={
                 committedInDays == null
                   ? null
                   : committedInDays < 0
-                    ? `vencido hace ${Math.abs(committedInDays)} d`
-                    : `en ${committedInDays} d`
+                    ? `overdue by ${Math.abs(committedInDays)} d`
+                    : `in ${committedInDays} d`
               }
               danger={committedInDays != null && committedInDays < 0}
             />
             <Metric
-              label="Progreso"
+              label="Progress"
               value={`${completedLines}/${totalLines}`}
-              hint={`${progressPct}% completado`}
+              hint={`${progressPct}% complete`}
             />
-            <Metric label="Líneas" value={String(totalLines)} />
+            <Metric label="Lines" value={String(totalLines)} />
           </div>
 
           {/* Status chips */}
@@ -161,7 +162,7 @@ function PurchaseOrderDetailPage() {
             <div className="mb-6 flex flex-wrap gap-1.5">
               {(Object.keys(statusCounts) as POLineStatus[]).map((s) => (
                 <Badge key={s} variant="secondary" className="text-xs">
-                  {PO_LINE_STATUS_LABEL[s]} · {statusCounts[s]}
+                  {PO_LINE_STATUS_LABEL_EN[s]} · {statusCounts[s]}
                 </Badge>
               ))}
             </div>
@@ -169,24 +170,24 @@ function PurchaseOrderDetailPage() {
 
           <Tabs defaultValue="resumen">
             <TabsList>
-              <TabsTrigger value="resumen">Resumen</TabsTrigger>
-              <TabsTrigger value="lineas">Líneas ({totalLines})</TabsTrigger>
+              <TabsTrigger value="resumen">Summary</TabsTrigger>
+              <TabsTrigger value="lineas">Lines ({totalLines})</TabsTrigger>
               <TabsTrigger value="odfs">ODFs ({po.jobs.length})</TabsTrigger>
               <TabsTrigger value="historial">
-                Historial ({po.date_changes.length})
+                History ({po.date_changes.length})
               </TabsTrigger>
               <TabsTrigger value="pdf">PDF</TabsTrigger>
             </TabsList>
 
             <TabsContent value="resumen" className="space-y-4 mt-4">
               <div className="grid grid-cols-3 gap-4 text-sm">
-                <Field label="Cliente" value={po.customer?.name ?? "—"} />
-                <Field label="Código cliente" value={po.customer?.code ?? "—"} />
-                <Field label="PO número" value={po.po_number} />
-                <Field label="Fecha de emisión" value={po.issued_date} />
-                <Field label="Fecha comprometida" value={po.committed_date} />
+                <Field label="Customer" value={po.customer?.name ?? "—"} />
+                <Field label="Customer code" value={po.customer?.code ?? "—"} />
+                <Field label="PO #" value={po.po_number} />
+                <Field label="Issue date" value={po.issued_date} />
+                <Field label="Customer date" value={po.committed_date} />
                 <Field
-                  label="Creado"
+                  label="Created"
                   value={new Date(po.created_at).toLocaleString()}
                 />
               </div>
@@ -198,7 +199,7 @@ function PurchaseOrderDetailPage() {
               {po.customer?.notes && (
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-                    Notas del cliente
+                    Customer notes
                   </p>
                   <p className="text-sm whitespace-pre-wrap">{po.customer.notes}</p>
                 </div>
@@ -213,17 +214,17 @@ function PurchaseOrderDetailPage() {
                       <TableHead className="w-10">#</TableHead>
                       <TableHead>PIR</TableHead>
                       <TableHead>Spec</TableHead>
-                      <TableHead className="text-right">Cant.</TableHead>
-                      <TableHead>F. Comprometida</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>ODF</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead>Customer date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>ODF #</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {po.line_items.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                          Sin líneas.
+                          No lines.
                         </TableCell>
                       </TableRow>
                     )}
@@ -241,7 +242,7 @@ function PurchaseOrderDetailPage() {
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
                               <Badge variant="outline" className="text-[10px] w-fit">
-                                {PO_LINE_STATUS_LABEL[li.status]}
+                                {PO_LINE_STATUS_LABEL_EN[li.status]}
                               </Badge>
                               {li.flag_reason && (
                                 <span className="text-[11px] text-destructive inline-flex items-center gap-1">
@@ -278,19 +279,19 @@ function PurchaseOrderDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ODF</TableHead>
-                      <TableHead>Máquina</TableHead>
-                      <TableHead>Operador</TableHead>
-                      <TableHead>Inicio</TableHead>
-                      <TableHead>Fin</TableHead>
-                      <TableHead>Estado</TableHead>
+                      <TableHead>ODF #</TableHead>
+                      <TableHead>Machine</TableHead>
+                      <TableHead>Operator</TableHead>
+                      <TableHead>Start</TableHead>
+                      <TableHead>End</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {po.jobs.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
-                          Todavía no hay ODFs creadas desde este PO.
+                          No ODFs have been created from this PO yet.
                         </TableCell>
                       </TableRow>
                     )}
@@ -305,7 +306,7 @@ function PurchaseOrderDetailPage() {
                       >
                         <TableCell className="font-mono text-xs text-primary">{j.odf}</TableCell>
                         <TableCell className="text-sm">
-                          {j.machine_name ?? <span className="text-muted-foreground">Sin asignar</span>}
+                          {j.machine_name ?? <span className="text-muted-foreground">Unassigned</span>}
                         </TableCell>
                         <TableCell className="text-sm">
                           {j.operator_name ?? <span className="text-muted-foreground">—</span>}
@@ -333,19 +334,19 @@ function PurchaseOrderDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Cuándo</TableHead>
-                      <TableHead>Campo</TableHead>
-                      <TableHead>Anterior</TableHead>
-                      <TableHead>Nuevo</TableHead>
-                      <TableHead>Por</TableHead>
-                      <TableHead>Visto por Peter</TableHead>
+                      <TableHead>When</TableHead>
+                      <TableHead>Field</TableHead>
+                      <TableHead>Old</TableHead>
+                      <TableHead>New</TableHead>
+                      <TableHead>By</TableHead>
+                      <TableHead>Seen by Peter</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {po.date_changes.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
-                          Sin cambios de fecha registrados.
+                          No date changes recorded.
                         </TableCell>
                       </TableRow>
                     )}
@@ -358,13 +359,13 @@ function PurchaseOrderDetailPage() {
                         <TableCell className="text-sm">{dc.old_value ?? "—"}</TableCell>
                         <TableCell className="text-sm font-medium">{dc.new_value ?? "—"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {dc.changed_by ?? "sistema"}
+                          {dc.changed_by ?? "system"}
                         </TableCell>
                         <TableCell>
                           {dc.acknowledged_by_peter ? (
-                            <Badge variant="outline" className="text-[10px]">Sí</Badge>
+                            <Badge variant="outline" className="text-[10px]">Yes</Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-[10px]">Pendiente</Badge>
+                            <Badge variant="secondary" className="text-[10px]">Pending</Badge>
                           )}
                         </TableCell>
                       </TableRow>
@@ -377,12 +378,12 @@ function PurchaseOrderDetailPage() {
             <TabsContent value="pdf" className="mt-4">
               {!po.source_document_url && (
                 <p className="text-sm text-muted-foreground">
-                  Este PO no tiene PDF adjunto.
+                  No PDF attached to this PO.
                 </p>
               )}
               {po.source_document_url && !pdfUrl && (
                 <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
-                  <FileText className="h-4 w-4" /> Generando vista previa…
+                  <FileText className="h-4 w-4" /> Generating preview…
                 </p>
               )}
               {pdfUrl && (
