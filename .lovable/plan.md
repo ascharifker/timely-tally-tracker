@@ -1,93 +1,61 @@
-## Sprint 1 (revised per v2 roadmap + role correction)
+## Goal
 
-Three P0 items. Order layer goes English; Production stays Spanish. Dates renamed. RBAC stood up with **Alex as the only admin** — Peter is not an admin, he's a scoped editor for the PO/Order process.
+1. Bootstrap **alex.scharifker@mego-afek.com** as admin with a one‑time recovery link you'll receive in chat.
+2. Add an admin‑only **`/admin/users`** page with MISH‑style invite‑only user management (copy‑link invites, role changes, full delete on revoke).
 
----
-
-### 1. English on the Order layer (P0)
-
-Files touched (UI strings only, no logic):
-- `src/routes/purchase-orders.index.tsx`
-- `src/routes/purchase-orders.$id.tsx`
-- `src/components/po/PoLinesSpreadsheet.tsx`
-- `src/components/po/UploadPoDialog.tsx`
-- `src/components/po/PoDetailDialog.tsx`
-- `src/components/layout/AppShell.tsx` (Order-side nav only)
-
-Production routes/components/dialogs untouched — Luis Angel + floor keep Spanish.
-
-A new `PO_LINE_STATUS_LABEL_EN` map lives in `src/lib/fact-types.ts` so the existing Spanish `PO_LINE_STATUS_LABEL` stays as the source of truth for Production.
-
-### 2. Rename dates → **Export date** / **Customer date** (P0)
-
-Pure labeling pass. Schema already has `committed_date` and `export_date`.
-- "Compromiso" / "Committed" → **Customer date**
-- "Mexico date" / "Fecha export" / "Export" → **Export date**
-
-Production-side dialogs keep current Spanish labels.
-
-### 3. RBAC (P0) — corrected role model
-
-**Roles (Postgres enum `app_role`):**
-
-| Role | Person | What they can do |
-|---|---|---|
-| `admin` | **Alex (you)** | Everything, incl. assigning roles |
-| `manager` | Fernando Q | Read everything across Order + Production; edit Production |
-| `po_editor` | Peter | Create / edit / delete POs and PO lines |
-| `coe_reviewer` | Alexis | Edit POs flagged `review_track = coe` |
-| `third_party_reviewer` | Lendris | Edit POs flagged `review_track = third_party` |
-| `production_editor` | Luis Angel | Edit `jobs`, `job_steps`, `machine_runs` |
-| `viewer` | everyone else | Read-only on Order + Production |
-
-Two engineering roles (not one + flag) — Alexis literally cannot touch third-party POs, Lendris literally cannot touch COE. Vacation/delegation deferred to Sprint 3.
-
-**Auth:** Email/password only (no Google, no magic link). Signup disabled — Alex creates accounts.
-
-**Provisioning:** No admin UI in Sprint 1. After each person signs up, I hand you a one-line SQL snippet to insert their role. Admin UI ships with delegation in Sprint 3.
-
-**Sprint 1 demo:** sign in as a viewer (edit controls hidden/disabled) vs sign in as Peter (creates and edits a PO). That's the proof Peter asked for.
+Signup stays disabled — accounts only exist via this flow.
 
 ---
 
-## Technical section
+## Part A — Bootstrap your admin account (one-time)
 
-### Migration (single file)
+A throw‑away server script that:
+1. `admin.createUser({ email: 'alex.scharifker@mego-afek.com', email_confirm: true })` with a random password.
+2. Inserts `(user_id, 'admin')` into `public.user_roles`.
+3. `admin.generateLink({ type: 'recovery' })` and prints the link.
+4. I paste the link back to you here. You open it → set a password → you're in as admin.
 
-1. `create type public.app_role as enum ('admin','manager','po_editor','coe_reviewer','third_party_reviewer','production_editor','viewer');`
-2. `create table public.user_roles (id uuid pk, user_id uuid → auth.users on delete cascade, role app_role, unique(user_id, role));` + GRANTs (`authenticated`, `service_role`) + RLS + read-own policy + admin-manage policy via `has_role`.
-3. `create type public.review_track as enum ('coe','third_party','internal');` + `alter table public.purchase_orders add column review_track review_track not null default 'coe';`
-4. Security-definer fns: `public.has_role(uuid, app_role)`, `public.current_user_can_edit_po(po_id uuid)` (true if admin / po_editor / matching reviewer for the PO's track).
-5. Replace RLS on `purchase_orders`, `po_line_items`, `jobs`, `job_steps`, `machine_runs`:
-   - SELECT: any authenticated user
-   - INSERT/UPDATE/DELETE on PO tables: `current_user_can_edit_po(...)`
-   - INSERT/UPDATE/DELETE on Production tables: `admin` / `manager` / `production_editor`
-6. Backfill existing rows: `review_track = 'coe'` (matches Peter's main book).
+(Single‑use, expires in ~1 hour.)
 
-### Client
+---
 
-- `src/integrations/supabase/client.ts` already exists.
-- New `src/hooks/useUserRole.ts` — fetches role(s) once per session via authenticated server fn.
-- New `src/lib/rbac.ts` — `canEditPo(role, reviewTrack)`, `canEditProduction(role)`, `isAdmin(role)`, `isViewer(role)`.
-- `src/routes/_authenticated/route.tsx` (managed gate) — confirm exists; if not, ship in same edit as first protected route.
-- `src/routes/auth.tsx` — email/password sign-in form (no signup tab, no Google button).
-- `AppShell` — show current user + role badge; hide edit affordances based on role.
-- Gate edit buttons in `PoLinesSpreadsheet`, `PoDetailDialog`, `UploadPoDialog`, and the production dialogs based on `useUserRole` + RBAC helpers.
+## Part B — `/admin/users` (invite‑only management)
 
-### Auth config
+### Route & gating
+- New `src/routes/_authenticated/admin.users.tsx`, child of the managed `_authenticated` layout.
+- Server fns gated by `requireSupabaseAuth` + `assertAdmin(userId)` (uses existing `has_role`).
+- Sidebar link in `AppShell`, visible only when current user has `admin`.
 
-`supabase--configure_auth`: `disable_signup: true`, `auto_confirm_email: true` (so Alex-provisioned accounts work without inbox round-trips), `external_anonymous_users_enabled: false`, `password_hibp_enabled: true`.
+### UI
+Table of users with: email · role badge · status (`invited` / `active` / `never signed in`) · last sign‑in · actions menu.
 
-### Order of execution
+Actions:
+- **Copy invite link** (for users who haven't signed in yet) — generates a fresh `invite` link.
+- **Copy reset link** (for active users who lost access) — generates a `recovery` link.
+- **Change role** — dropdown of the 7 roles.
+- **Delete user** — confirm dialog → fully removes from `auth.users` (cascades `user_roles`).
 
-1. Save memory: Lendris spelling + Alex-only-admin + role table.
-2. Run migration (single approval).
-3. Configure auth.
-4. Write `auth.tsx`, `useUserRole`, `rbac.ts`, role badge in `AppShell`.
-5. English pass + date rename across the six Order files in one batch.
-6. Gate edit affordances.
-7. Verify: sign in as seeded viewer, confirm edits blocked; sign in as Peter, confirm PO edit works; sign in as Alexis, confirm third-party PO is read-only; sign in as Lendris, confirm COE PO is read-only.
+**Invite user** button → dialog (email + role) → on submit returns the action_link, shown with a one‑click Copy button. You paste it into email/WhatsApp/Slack yourself.
 
-### Explicitly out of scope (Sprint 2/3)
+### Server functions (`src/lib/admin-users.functions.ts`)
+All wrapped in `requireSupabaseAuth` + admin check; `supabaseAdmin` loaded inside each handler via `await import(...)`.
 
-`tube_spec` decomposition, Raquel filterable report, Orders-received view, COE vs Third-party split views, historical Excel ingest (MIG), export-to-email, vacation delegation, admin role-assignment UI, COE-NAL Stock ingest.
+- `listUsers()` — joins `auth.users` (admin API) with `user_roles`.
+- `inviteUser({ email, role })` — `createUser` + role insert + `generateLink({ type: 'invite' })` → `{ action_link }`.
+- `copyLinkForUser({ userId, type: 'invite' | 'recovery' })` — `generateLink` for existing user.
+- `changeUserRole({ userId, role })` — upsert into `user_roles`.
+- `deleteUser({ userId })` — `admin.deleteUser` (cascades roles via FK).
+
+### Migration
+- Ensure `user_roles.user_id` FK has `ON DELETE CASCADE` (so delete auth user cleans up roles).
+- No new tables.
+
+### Out of scope (Sprint 3+)
+- No `invite_audit` table, no email auto‑send, no resend throttling, no bulk import, no profile fields. Add when vacation delegation lands.
+
+---
+
+## Decisions confirmed
+1. Revoke = **hard delete** ✅
+2. **Copy‑link only**, no auto‑email ✅
+3. Run bootstrap now, paste recovery link in chat ✅

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RiesgoRouteImport } from './routes/riesgo'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as IntakeRouteImport } from './routes/intake'
@@ -20,10 +21,16 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PurchaseOrdersIndexRouteImport } from './routes/purchase-orders.index'
 import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
 import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 
 const RiesgoRoute = RiesgoRouteImport.update({
   id: '/riesgo',
   path: '/riesgo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
@@ -76,6 +83,11 @@ const MaquinaIdRoute = MaquinaIdRouteImport.update({
   path: '/maquina/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -85,7 +97,9 @@ export interface FileRoutesByFullPath {
   '/intake': typeof IntakeRoute
   '/production': typeof ProductionRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
@@ -97,7 +111,9 @@ export interface FileRoutesByTo {
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
   '/production': typeof ProductionRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders': typeof PurchaseOrdersIndexRoute
@@ -111,7 +127,9 @@ export interface FileRoutesById {
   '/intake': typeof IntakeRoute
   '/production': typeof ProductionRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
@@ -126,7 +144,9 @@ export interface FileRouteTypes {
     | '/intake'
     | '/production'
     | '/purchase-orders'
+    | '/reset-password'
     | '/riesgo'
+    | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
@@ -138,7 +158,9 @@ export interface FileRouteTypes {
     | '/engineering'
     | '/intake'
     | '/production'
+    | '/reset-password'
     | '/riesgo'
+    | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders'
@@ -151,7 +173,9 @@ export interface FileRouteTypes {
     | '/intake'
     | '/production'
     | '/purchase-orders'
+    | '/reset-password'
     | '/riesgo'
+    | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
@@ -165,7 +189,9 @@ export interface RootRouteChildren {
   IntakeRoute: typeof IntakeRoute
   ProductionRoute: typeof ProductionRoute
   PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
   RiesgoRoute: typeof RiesgoRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
 }
 
@@ -176,6 +202,13 @@ declare module '@tanstack/react-router' {
       path: '/riesgo'
       fullPath: '/riesgo'
       preLoaderRoute: typeof RiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/purchase-orders': {
@@ -248,6 +281,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MaquinaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -273,7 +313,9 @@ const rootRouteChildren: RootRouteChildren = {
   IntakeRoute: IntakeRoute,
   ProductionRoute: ProductionRoute,
   PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
   RiesgoRoute: RiesgoRoute,
+  AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
 }
 export const routeTree = rootRouteImport
