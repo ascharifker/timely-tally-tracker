@@ -312,10 +312,10 @@ function CompletedJobsTable({
           type="button"
           onClick={() => onOpenOdf(j)}
           className="inline-flex items-center gap-1.5 group"
-          title="Ver desglose de la ODF"
+          title="Ver desglose de la ODT"
         >
           <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-primary font-mono">
-            ODF
+            ODT
           </span>
           <span className="font-mono font-semibold text-foreground group-hover:underline">{j.odf}</span>
         </button>
