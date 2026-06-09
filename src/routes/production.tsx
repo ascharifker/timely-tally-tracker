@@ -378,7 +378,7 @@ function CompletedJobsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ODF #</TableHead>
+              <TableHead>ODT #</TableHead>
               <TableHead>PO # / Cliente</TableHead>
               <TableHead>Máquina</TableHead>
               <TableHead className="text-right">Qty</TableHead>
