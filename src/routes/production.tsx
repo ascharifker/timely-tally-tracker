@@ -199,7 +199,7 @@ function ProductionPage() {
                 </TableCell>
                 <TableCell>
                   <Button size="sm" disabled={pending === 0} onClick={() => setActive(l)}>
-                    <Calendar className="h-3.5 w-3.5 mr-1" /> Crear ODF
+                    <Calendar className="h-3.5 w-3.5 mr-1" /> Crear ODT
                   </Button>
                 </TableCell>
               </TableRow>
