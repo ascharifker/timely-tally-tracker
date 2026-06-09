@@ -77,7 +77,7 @@ export function CreateJobDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus className="mr-1 h-4 w-4" /> Nuevo ODT
+          <Plus className="mr-1 h-4 w-4" /> Nueva ODT
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl bg-card">
