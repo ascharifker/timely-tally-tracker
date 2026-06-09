@@ -1,54 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Toaster, toast } from "sonner";
-import { Loader2, Plus, Copy, Trash2, KeyRound } from "lucide-react";
-import { AppShell } from "@/components/fact/AppShell";
-import { useAuth, type AppRole } from "@/hooks/useUserRole";
-import { ROLE_LABEL, isAdmin } from "@/lib/rbac";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  listUsers,
-  inviteUser,
-  copyLinkForUser,
-  changeUserRole,
-  deleteUser,
-  type AdminUserRow,
-} from "@/lib/admin-users.functions";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/users")({
-  ssr: false,
-  head: () => ({ meta: [{ title: "Users · MEGO Admin" }] }),
-  component: AdminUsersPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/settings", search: { tab: "users" } });
+  },
 });
 
 const ROLE_OPTIONS: AppRole[] = [
