@@ -92,6 +92,7 @@ export const inviteUser = createServerFn({ method: "POST" })
     const { data: link, error: lErr } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
       email,
+      options: { redirectTo: redirectFromRequest("/reset-password") },
     });
     if (lErr || !link.properties?.action_link) {
       throw new Error(lErr?.message ?? "generateLink failed");
@@ -112,6 +113,7 @@ export const copyLinkForUser = createServerFn({ method: "POST" })
     const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
       type: data.type,
       email: data.email,
+      options: { redirectTo: redirectFromRequest("/reset-password") },
     });
     if (error || !link.properties?.action_link) {
       throw new Error(error?.message ?? "generateLink failed");
@@ -191,6 +193,7 @@ export const bootstrapFirstAdmin = createServerFn({ method: "POST" })
     const { data: link, error: lErr } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
       email,
+      options: { redirectTo: redirectFromRequest("/reset-password") },
     });
     if (lErr || !link.properties?.action_link) {
       throw new Error(lErr?.message ?? "generateLink failed");
