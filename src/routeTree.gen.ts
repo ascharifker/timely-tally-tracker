@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RiesgoRouteImport } from './routes/riesgo'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
@@ -25,6 +26,11 @@ import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RiesgoRoute = RiesgoRouteImport.update({
   id: '/riesgo',
   path: '/riesgo',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/settings': typeof SettingsRoute
   '/admin/delegations': typeof AdminDelegationsRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/production': typeof ProductionRoute
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/settings': typeof SettingsRoute
   '/admin/delegations': typeof AdminDelegationsRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/settings': typeof SettingsRoute
   '/admin/delegations': typeof AdminDelegationsRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/purchase-orders'
     | '/reset-password'
     | '/riesgo'
+    | '/settings'
     | '/admin/delegations'
     | '/admin/users'
     | '/maquina/$id'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/production'
     | '/reset-password'
     | '/riesgo'
+    | '/settings'
     | '/admin/delegations'
     | '/admin/users'
     | '/maquina/$id'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/purchase-orders'
     | '/reset-password'
     | '/riesgo'
+    | '/settings'
     | '/admin/delegations'
     | '/admin/users'
     | '/maquina/$id'
@@ -216,6 +228,7 @@ export interface RootRouteChildren {
   PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   RiesgoRoute: typeof RiesgoRoute
+  SettingsRoute: typeof SettingsRoute
   AdminDelegationsRoute: typeof AdminDelegationsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
@@ -223,6 +236,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/riesgo': {
       id: '/riesgo'
       path: '/riesgo'
@@ -356,6 +376,7 @@ const rootRouteChildren: RootRouteChildren = {
   PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   RiesgoRoute: RiesgoRoute,
+  SettingsRoute: SettingsRoute,
   AdminDelegationsRoute: AdminDelegationsRoute,
   AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
