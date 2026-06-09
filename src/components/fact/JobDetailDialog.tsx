@@ -33,8 +33,14 @@ interface Props {
   onClose: () => void;
 }
 
-export function JobDetailDialog({ job, onClose }: Props) {
+export function JobDetailDialog({ job: jobProp, onClose }: Props) {
   const { data: jobs = [] } = useJobs();
+  // Always read the latest version of this job from the cache so that
+  // mutations (e.g. shift change) reflect immediately without reopening.
+  const job = useMemo(
+    () => (jobProp ? jobs.find((j) => j.id === jobProp.id) ?? jobProp : null),
+    [jobs, jobProp],
+  );
   const { data: machines = [] } = useMachines();
   const { data: allRuns = [] } = useMachineRuns();
   const logDelay = useLogDelay();
@@ -135,7 +141,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
   return (
     <>
     <Dialog open={!!job} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl bg-card">
+      <DialogContent className="max-w-2xl bg-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono flex items-center justify-between">
             <span>ODT {job.odf} · {STATUS_LABEL[job.status]}</span>
