@@ -407,7 +407,7 @@ function CompletedJobsTable({
                         </span>
                         <span className="text-primary">{g.po_number}</span>
                         {g.customer && <span className="text-muted-foreground"> · {g.customer}</span>}
-                        <span className="text-muted-foreground"> · {g.jobs.length} ODF{g.jobs.length === 1 ? "" : "s"}</span>
+                        <span className="text-muted-foreground"> · {g.jobs.length} ODT{g.jobs.length === 1 ? "" : "s"}</span>
                       </TableCell>
                     </TableRow>
                     {g.jobs.map(renderRow)}
