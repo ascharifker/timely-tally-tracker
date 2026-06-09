@@ -16,13 +16,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { JobPriority } from "@/lib/fact-types";
+import { scheduleJob } from "@/lib/scheduling/schedule";
 
 export function CreateJobDialog() {
   const [open, setOpen] = useState(false);
   const [machineId, setMachineId] = useState<string | undefined>(undefined);
   const [priority, setPriority] = useState<JobPriority>("normal");
+  const [turnos, setTurnos] = useState<string>("");
   const { data: machines = [] } = useMachines();
   const create = useCreateJob();
+
+  const selectedMachine = machines.find((m) => m.id === machineId);
+  const hoursPerShift = selectedMachine?.hours_per_shift ?? 8;
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -32,6 +37,16 @@ export function CreateJobDialog() {
       return v && v.length > 0 ? v : null;
     };
     try {
+      const turnosNum = Number(turnos);
+      const hasTurnos = Number.isFinite(turnosNum) && turnosNum > 0;
+      const hours_override = hasTurnos ? turnosNum * hoursPerShift : null;
+      let planned_start: string | null = null;
+      let planned_end: string | null = null;
+      if (hasTurnos && selectedMachine) {
+        const span = scheduleJob(Date.now(), hours_override!, selectedMachine);
+        planned_start = span.planned_start;
+        planned_end = span.planned_end;
+      }
       await create.mutateAsync({
         odf: get("odf") ?? "",
         po_musa: get("po_musa"),
@@ -45,9 +60,13 @@ export function CreateJobDialog() {
         customer_date: get("customer_date"),
         notes: get("notes"),
         operator_name: get("operator_name"),
+        hours_override,
+        planned_start,
+        planned_end,
       });
       toast.success("ODF creado");
       setOpen(false);
+      setTurnos("");
     } catch (err) {
       toast.error("Error: " + (err instanceof Error ? err.message : "unknown"));
     }
@@ -72,6 +91,20 @@ export function CreateJobDialog() {
           <div className="col-span-1">
             <Label>Cantidad</Label>
             <Input name="qty" type="number" defaultValue={1} min={1} />
+          </div>
+          <div className="col-span-2">
+            <Label>Tiempo de maquinado (turnos)</Label>
+            <Input
+              type="number"
+              min={0.5}
+              step={0.5}
+              value={turnos}
+              onChange={(e) => setTurnos(e.target.value)}
+              placeholder="ej: 3"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              1 turno = {hoursPerShift} h{selectedMachine ? ` (${selectedMachine.name})` : " (por defecto, selecciona máquina para ajustar)"}
+            </p>
           </div>
           <div>
             <Label>PO MUSA</Label>
