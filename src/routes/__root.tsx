@@ -73,14 +73,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "OTD Hub · MEGO Producción" },
+      { name: "description", content: "Planificación de producción Mego Afek — ODTs, OTD determinístico y cascada de impacto." },
+      { name: "author", content: "MEGO" },
+      { property: "og:title", content: "OTD Hub · MEGO Producción" },
+      { property: "og:description", content: "Planificación de producción Mego Afek — ODTs, OTD determinístico y cascada de impacto." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "OTD Hub · MEGO Producción" },
+      { name: "twitter:description", content: "Planificación de producción Mego Afek — ODTs, OTD determinístico y cascada de impacto." },
     ],
     links: [
       {

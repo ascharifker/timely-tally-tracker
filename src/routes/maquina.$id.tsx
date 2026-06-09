@@ -112,7 +112,7 @@ function MachinePage() {
       {tab === "resumen" && (
         <div className="grid gap-3 md:grid-cols-4 mb-3">
           <KpiCard
-            label="ODFs activas"
+            label="ODTs activas"
             value={machineJobs.length.toString()}
             sub={`${open.length} corrida${open.length === 1 ? "" : "s"} en curso`}
           />
@@ -162,9 +162,9 @@ function MachinePage() {
         <div className="space-y-3">
           <MachineRunsTable runs={machineRuns} jobs={jobs} fixedMachineId={machine.id} />
           <Card className="border-border bg-card p-3">
-            <h3 className="text-sm font-semibold mb-2">ODFs asignadas</h3>
+            <h3 className="text-sm font-semibold mb-2">ODTs asignadas</h3>
             {machineJobs.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Ninguna ODF asignada.</p>
+              <p className="text-xs text-muted-foreground">Ninguna ODT asignada.</p>
             ) : (
               <div className="divide-y divide-border/40">
                 {machineJobs.map((j) => (

@@ -29,11 +29,11 @@ export function OTDTracker({ jobs }: { jobs: Job[] }) {
         <span>
           {atRiskCount > 0 ? (
             <>
-              <span className="font-semibold text-foreground">{atRiskCount}</span> ODF
+              <span className="font-semibold text-foreground">{atRiskCount}</span> ODT
               {atRiskCount === 1 ? "" : "s"} requieren atención
             </>
           ) : (
-            "Todos los ODFs al día"
+            "Todas las ODTs al día"
           )}
         </span>
         <span className="flex items-center gap-1 font-medium">
