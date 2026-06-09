@@ -1,15 +1,17 @@
 import { useEffect, type ReactNode } from "react";
-import { Activity, Settings, Inbox, Wrench, Factory, LogOut, ClipboardList } from "lucide-react";
+import { Activity, Settings, Inbox, Wrench, Factory, LogOut, ClipboardList, CalendarRange, Languages } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useUserRole";
 import { primaryRoleLabel, isAdmin, hasRole } from "@/lib/rbac";
+import { useI18n } from "@/lib/i18n";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { userId, email, roles, loading } = useAuth();
+  const { lang, setLang, t } = useI18n();
 
   useEffect(() => {
     if (!loading && !userId) {
@@ -59,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeProps={{ className: "border-primary text-primary" }}
             >
               <Inbox className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">Orders</span>
+              <span className="uppercase tracking-widest">{t("nav.orders")}</span>
             </Link>
             {showPendingReview && (
               <Link
@@ -68,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 activeProps={{ className: "border-primary text-primary" }}
               >
                 <ClipboardList className="h-3.5 w-3.5" />
-                <span className="uppercase tracking-widest">Pending</span>
+                <span className="uppercase tracking-widest">{t("nav.pending")}</span>
               </Link>
             )}
             <Link
@@ -77,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeProps={{ className: "border-primary text-primary" }}
             >
               <Wrench className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">Engineering</span>
+              <span className="uppercase tracking-widest">{t("nav.engineering")}</span>
             </Link>
             <Link
               to="/production"
@@ -85,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeProps={{ className: "border-primary text-primary" }}
             >
               <Factory className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">Producción</span>
+              <span className="uppercase tracking-widest">{t("nav.production")}</span>
             </Link>
             <Link
               to="/"
@@ -93,7 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeProps={{ className: "border-primary text-primary" }}
               activeOptions={{ exact: true }}
             >
-              <span className="uppercase tracking-widest">Calendario</span>
+              <span className="uppercase tracking-widest">{t("nav.calendar")}</span>
             </Link>
             <Link
               to="/configuracion"
@@ -101,18 +103,37 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeProps={{ className: "border-primary text-primary" }}
             >
               <Settings className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-widest">Config</span>
+              <span className="uppercase tracking-widest">{t("nav.config")}</span>
             </Link>
             {showAdmin && (
-              <Link
-                to="/admin/users"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
-                activeProps={{ className: "border-primary text-primary" }}
-              >
-                <span className="uppercase tracking-widest">Users</span>
-              </Link>
+              <>
+                <Link
+                  to="/admin/users"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+                  activeProps={{ className: "border-primary text-primary" }}
+                >
+                  <span className="uppercase tracking-widest">{t("nav.users")}</span>
+                </Link>
+                <Link
+                  to="/admin/delegations"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+                  activeProps={{ className: "border-primary text-primary" }}
+                >
+                  <CalendarRange className="h-3.5 w-3.5" />
+                  <span className="uppercase tracking-widest">{t("nav.delegations")}</span>
+                </Link>
+              </>
             )}
             <div className="flex items-center gap-2 pl-4 ml-2 border-l border-border">
+              <button
+                type="button"
+                onClick={() => setLang(lang === "en" ? "es" : "en")}
+                title={lang === "en" ? "Cambiar a español" : "Switch to English"}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors uppercase tracking-widest"
+              >
+                <Languages className="h-3.5 w-3.5" />
+                {lang === "en" ? "EN" : "ES"}
+              </button>
               <div className="flex flex-col items-end leading-tight">
                 <span className="text-[11px] text-foreground truncate max-w-[160px]" title={email ?? undefined}>{email}</span>
                 <span className="text-[10px] uppercase tracking-widest text-primary">{roleLabel}</span>
@@ -120,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={handleSignOut}
-                title="Sign out"
+                title={t("nav.signout")}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
               >
                 <LogOut className="h-3.5 w-3.5" />
