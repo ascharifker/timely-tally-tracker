@@ -23,6 +23,7 @@ import { Route as PurchaseOrdersIndexRouteImport } from './routes/purchase-order
 import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
 import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
 
 const RiesgoRoute = RiesgoRouteImport.update({
   id: '/riesgo',
@@ -94,6 +95,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDelegationsRoute = AdminDelegationsRouteImport.update({
+  id: '/admin/delegations',
+  path: '/admin/delegations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/admin/delegations': typeof AdminDelegationsRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/production': typeof ProductionRoute
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/admin/delegations': typeof AdminDelegationsRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
+  '/admin/delegations': typeof AdminDelegationsRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/purchase-orders'
     | '/reset-password'
     | '/riesgo'
+    | '/admin/delegations'
     | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/production'
     | '/reset-password'
     | '/riesgo'
+    | '/admin/delegations'
     | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/purchase-orders'
     | '/reset-password'
     | '/riesgo'
+    | '/admin/delegations'
     | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -204,6 +216,7 @@ export interface RootRouteChildren {
   PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   RiesgoRoute: typeof RiesgoRoute
+  AdminDelegationsRoute: typeof AdminDelegationsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
 }
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/delegations': {
+      id: '/admin/delegations'
+      path: '/admin/delegations'
+      fullPath: '/admin/delegations'
+      preLoaderRoute: typeof AdminDelegationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   RiesgoRoute: RiesgoRoute,
+  AdminDelegationsRoute: AdminDelegationsRoute,
   AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
 }

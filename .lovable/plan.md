@@ -37,7 +37,15 @@ Filter tabs on `/purchase-orders` — no new routes.
 
 **No schema changes.** `review_track` already exists on `purchase_orders` from Sprint 1. RLS already scopes edits via `current_user_can_edit_po`; viewing across tracks stays open to all authenticated users (read-only outside your track).
 
-**Out of scope (Sprint 3)**: #4 tube_spec decomposition, #7 export-to-email, vacation delegation, bilingual toggle. Re-open #4 once Raquel sends her column list.
+**Out of scope (Sprint 3)**: #4 tube_spec decomposition. Re-open once Raquel sends her column list.
+
+---
+
+## Sprint 3 — shipped
+
+- **#7 Export to email** — `ExportLinesDialog` on `PoLinesSpreadsheet`: downloads filtered CSV and opens `mailto:` with the formatted line summary in the body. Zero backend dep so it works before Lovable Emails is attached to this project; swap to server-side send later via Lovable Emails when the domain is wired.
+- **Bilingual toggle (EN/ES)** — `src/lib/i18n.tsx` provides `I18nProvider` + `useI18n()`. Persists in `localStorage` (`mego.lang`), defaults from `navigator.language`. Header toggle in `AppShell`. Covers Order-layer chrome (nav, page titles, track tabs, export dialog). Production layer stays Spanish.
+- **Vacation delegation** — `review_delegations` table + `has_active_delegation()` + extended `current_user_can_edit_po()`. Admin UI at `/admin/delegations` (list / add / remove). An active delegation grants the delegate edit rights on the chosen track for the date window without touching their role assignments.
 
 ---
 

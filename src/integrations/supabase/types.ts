@@ -550,6 +550,45 @@ export type Database = {
           },
         ]
       }
+      review_delegations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string
+          from_user_id: string
+          id: string
+          note: string | null
+          start_date: string
+          to_user_id: string
+          track: Database["public"]["Enums"]["review_track"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          from_user_id: string
+          id?: string
+          note?: string | null
+          start_date: string
+          to_user_id: string
+          track: Database["public"]["Enums"]["review_track"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          from_user_id?: string
+          id?: string
+          note?: string | null
+          start_date?: string
+          to_user_id?: string
+          track?: Database["public"]["Enums"]["review_track"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shifts: {
         Row: {
           available: boolean
@@ -761,6 +800,13 @@ export type Database = {
     Functions: {
       current_user_can_edit_po: { Args: { _po_id: string }; Returns: boolean }
       current_user_can_edit_production: { Args: never; Returns: boolean }
+      has_active_delegation: {
+        Args: {
+          _track: Database["public"]["Enums"]["review_track"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

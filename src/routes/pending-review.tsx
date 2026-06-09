@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useUserRole";
 import { defaultTrackForRoles } from "@/lib/rbac";
 import { usePoLinesSpreadsheet } from "@/hooks/usePoLinesSpreadsheet";
+import { useI18n } from "@/lib/i18n";
 
 const trackSchema = z.object({
   track: fallback(z.enum(["all", "coe", "third_party", "internal"]), "all").default("all"),
@@ -34,6 +35,7 @@ function PendingReviewPage() {
   const { track } = Route.useSearch();
   const navigate = useNavigate({ from: "/pending-review" });
   const { data: rows = [] } = usePoLinesSpreadsheet();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (track !== "all") return;
@@ -64,18 +66,16 @@ function PendingReviewPage() {
     <AppShell>
       <Toaster theme="dark" position="top-right" />
       <div className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Pending review</h2>
-        <p className="text-sm text-muted-foreground">
-          PO lines waiting on engineering review or flagged for re-review.
-        </p>
+        <h2 className="text-2xl font-semibold tracking-tight">{t("pending.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("pending.subtitle")}</p>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Total pending" value={kpis.total} />
-        <Kpi label="COE" value={kpis.byTrack.coe} />
-        <Kpi label="Third-Party" value={kpis.byTrack.third_party} />
+        <Kpi label={t("pending.total")} value={kpis.total} />
+        <Kpi label={t("track.coe")} value={kpis.byTrack.coe} />
+        <Kpi label={t("track.third_party")} value={kpis.byTrack.third_party} />
         <Kpi
-          label="Oldest waiting"
+          label={t("pending.oldest")}
           value={kpis.oldestAgeDays ? `${kpis.oldestAgeDays}d` : "—"}
         />
       </div>
@@ -88,10 +88,10 @@ function PendingReviewPage() {
         className="mb-3"
       >
         <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="coe">COE</TabsTrigger>
-          <TabsTrigger value="third_party">Third-Party</TabsTrigger>
-          <TabsTrigger value="internal">Internal</TabsTrigger>
+          <TabsTrigger value="all">{t("track.all")}</TabsTrigger>
+          <TabsTrigger value="coe">{t("track.coe")}</TabsTrigger>
+          <TabsTrigger value="third_party">{t("track.third_party")}</TabsTrigger>
+          <TabsTrigger value="internal">{t("track.internal")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
