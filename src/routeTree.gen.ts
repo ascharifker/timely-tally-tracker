@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RiesgoRouteImport } from './routes/riesgo'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
 import { Route as ProductionRouteImport } from './routes/production'
 import { Route as IntakeRouteImport } from './routes/intake'
@@ -24,6 +25,11 @@ import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 const RiesgoRoute = RiesgoRouteImport.update({
   id: '/riesgo',
   path: '/riesgo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/intake': typeof IntakeRoute
   '/production': typeof ProductionRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
   '/production': typeof ProductionRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/intake': typeof IntakeRoute
   '/production': typeof ProductionRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/intake'
     | '/production'
     | '/purchase-orders'
+    | '/reset-password'
     | '/riesgo'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/engineering'
     | '/intake'
     | '/production'
+    | '/reset-password'
     | '/riesgo'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/intake'
     | '/production'
     | '/purchase-orders'
+    | '/reset-password'
     | '/riesgo'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   IntakeRoute: typeof IntakeRoute
   ProductionRoute: typeof ProductionRoute
   PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
   RiesgoRoute: typeof RiesgoRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
 }
@@ -176,6 +189,13 @@ declare module '@tanstack/react-router' {
       path: '/riesgo'
       fullPath: '/riesgo'
       preLoaderRoute: typeof RiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/purchase-orders': {
@@ -273,9 +293,20 @@ const rootRouteChildren: RootRouteChildren = {
   IntakeRoute: IntakeRoute,
   ProductionRoute: ProductionRoute,
   PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
   RiesgoRoute: RiesgoRoute,
   MaquinaIdRoute: MaquinaIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
