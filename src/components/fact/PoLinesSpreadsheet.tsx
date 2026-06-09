@@ -21,7 +21,11 @@ import {
 } from "@/components/ui/select";
 import { Check, ExternalLink, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PO_LINE_STATUS_LABEL_EN, type POLineStatus } from "@/lib/fact-types";
+import {
+  PO_LINE_STATUS_LABEL_EN,
+  type POLineStatus,
+  type ReviewTrack,
+} from "@/lib/fact-types";
 import { useAuth } from "@/hooks/useUserRole";
 import { canEditAnyPo } from "@/lib/rbac";
 import type { SpreadsheetRow } from "@/hooks/usePoLinesSpreadsheet";
@@ -36,7 +40,7 @@ import {
   updatePoLineField,
 } from "@/lib/po-workflow.functions";
 
-type Mode = "intake" | "browse";
+type Mode = "intake" | "pending";
 type EditableField = "pir" | "tube_spec" | "qty_ordered" | "committed_date" | "notes";
 type Preset = "all" | "pending" | "production" | "shipped" | "late";
 
@@ -48,6 +52,10 @@ const PRESET_STATUSES: Record<Exclude<Preset, "all" | "late">, POLineStatus[]> =
 
 interface Props {
   mode: Mode;
+  /** Filter rows by the PO's review track. "all" = no filter. */
+  track?: "all" | ReviewTrack;
+  /** Initial preset selection; useful for the pending-review view. */
+  defaultPreset?: Preset;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -105,7 +113,8 @@ function timeAgo(iso: string): string {
   return `${Math.round(diff / 86400)}d ago`;
 }
 
-export function PoLinesSpreadsheet({ mode }: Props) {
+export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" }: Props) {
+  void mode;
   const { data: rows = [], isLoading } = usePoLinesSpreadsheet();
   const lineIds = useMemo(() => rows.map((r) => r.line.id), [rows]);
   const { data: changes } = usePoLineHistory(lineIds);
@@ -119,8 +128,13 @@ export function PoLinesSpreadsheet({ mode }: Props) {
   const [query, setQuery] = useState("");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [preset, setPreset] = useState<Preset>("all");
+  const [preset, setPreset] = useState<Preset>(defaultPreset);
   const [onlyChanges, setOnlyChanges] = useState(false);
+
+  // Re-sync preset when the parent changes defaultPreset (e.g. via URL).
+  useEffect(() => {
+    setPreset(defaultPreset);
+  }, [defaultPreset]);
 
   const customers = useMemo(() => {
     const m = new Map<string, string>();
@@ -168,6 +182,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
     const list = rows.filter((r) => {
       if (customerFilter !== "all" && r.customer?.id !== customerFilter) return false;
       if (statusFilter !== "all" && r.line.status !== statusFilter) return false;
+      if (track !== "all" && r.po?.review_track !== track) return false;
       if (preset !== "all") {
         if (preset === "late") {
           const d = daysUntil(r.line.committed_date);
@@ -219,7 +234,7 @@ export function PoLinesSpreadsheet({ mode }: Props) {
       const db = b.line.committed_date ?? "9999-12-31";
       return da.localeCompare(db);
     });
-  }, [rows, query, customerFilter, statusFilter, preset, onlyChanges, changes]);
+  }, [rows, query, customerFilter, statusFilter, preset, onlyChanges, changes, track]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });

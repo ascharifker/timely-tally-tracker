@@ -1,13 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/fact/AppShell";
 import { UploadPoDialog } from "@/components/fact/UploadPoDialog";
 import { PoLinesSpreadsheet } from "@/components/fact/PoLinesSpreadsheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useUserRole";
-import { canCreatePo } from "@/lib/rbac";
+import { canCreatePo, defaultTrackForRoles } from "@/lib/rbac";
+
+const trackSchema = z.object({
+  track: fallback(z.enum(["all", "coe", "third_party", "internal"]), "all").default("all"),
+});
 
 export const Route = createFileRoute("/purchase-orders/")({
   ssr: false,
+  validateSearch: zodValidator(trackSchema),
   head: () => ({
     meta: [
       { title: "Purchase Orders · MEGO OTD Hub" },
@@ -22,7 +31,19 @@ export const Route = createFileRoute("/purchase-orders/")({
 
 function PurchaseOrdersPage() {
   const { roles } = useAuth();
+  const { track } = Route.useSearch();
+  const navigate = useNavigate({ from: "/purchase-orders/" });
   const showUpload = canCreatePo(roles);
+
+  // First load: if URL has no explicit track and the user is a track-scoped
+  // reviewer, default them to their track.
+  useEffect(() => {
+    if (track !== "all") return;
+    const def = defaultTrackForRoles(roles);
+    if (def !== "all") navigate({ search: { track: def }, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roles.join(",")]);
+
   return (
     <AppShell>
       <Toaster theme="dark" position="top-right" />
@@ -39,7 +60,21 @@ function PurchaseOrdersPage() {
         </div>
         {showUpload && <UploadPoDialog />}
       </div>
-      <PoLinesSpreadsheet mode="intake" />
+      <Tabs
+        value={track}
+        onValueChange={(v) =>
+          navigate({ search: { track: v as "all" | "coe" | "third_party" | "internal" } })
+        }
+        className="mb-3"
+      >
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="coe">COE</TabsTrigger>
+          <TabsTrigger value="third_party">Third-Party</TabsTrigger>
+          <TabsTrigger value="internal">Internal</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <PoLinesSpreadsheet mode="intake" track={track} />
     </AppShell>
   );
 }

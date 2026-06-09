@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { POLineItem, POLineStatus } from "@/lib/fact-types";
+import type { POLineItem, POLineStatus, ReviewTrack } from "@/lib/fact-types";
 
 /** One flat row in the spreadsheet — mirrors Peter's Excel grain. */
 export interface SpreadsheetRow {
@@ -11,6 +11,7 @@ export interface SpreadsheetRow {
     issued_date: string | null;
     source_document_url: string | null;
     notes: string | null;
+    review_track: ReviewTrack;
   } | null;
   customer: { id: string; name: string; code: string | null } | null;
   /** Aggregated job info across all ODFs for this line. */
@@ -25,6 +26,7 @@ interface PoSubRow {
   issued_date: string | null;
   source_document_url: string | null;
   notes: string | null;
+  review_track: ReviewTrack;
   customer: { id: string; name: string; code: string | null } | null;
 }
 
@@ -53,7 +55,7 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
       let q = supabase
         .from("po_line_items" as never)
         .select(
-          "*, purchase_order:purchase_orders(id, po_number, issued_date, source_document_url, notes, customer:customers(id, name, code))",
+          "*, purchase_order:purchase_orders(id, po_number, issued_date, source_document_url, notes, review_track, customer:customers(id, name, code))",
         )
         .order("committed_date", { ascending: true, nullsFirst: false });
       if (opts.statuses && opts.statuses.length > 0) {
@@ -142,6 +144,7 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
                 issued_date: l.purchase_order.issued_date,
                 source_document_url: l.purchase_order.source_document_url,
                 notes: l.purchase_order.notes,
+                review_track: l.purchase_order.review_track,
               }
             : null,
           customer: l.purchase_order?.customer ?? null,

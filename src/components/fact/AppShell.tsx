@@ -1,10 +1,10 @@
 import { useEffect, type ReactNode } from "react";
-import { Activity, Settings, Inbox, Wrench, Factory, LogOut } from "lucide-react";
+import { Activity, Settings, Inbox, Wrench, Factory, LogOut, ClipboardList } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useUserRole";
-import { primaryRoleLabel, isAdmin } from "@/lib/rbac";
+import { primaryRoleLabel, isAdmin, hasRole } from "@/lib/rbac";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -34,6 +34,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const roleLabel = primaryRoleLabel(roles);
   const showAdmin = isAdmin(roles);
+  const showPendingReview =
+    isAdmin(roles) ||
+    hasRole(roles, "po_editor") ||
+    hasRole(roles, "coe_reviewer") ||
+    hasRole(roles, "third_party_reviewer");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -56,6 +61,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Inbox className="h-3.5 w-3.5" />
               <span className="uppercase tracking-widest">Orders</span>
             </Link>
+            {showPendingReview && (
+              <Link
+                to="/pending-review"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
+                activeProps={{ className: "border-primary text-primary" }}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                <span className="uppercase tracking-widest">Pending</span>
+              </Link>
+            )}
             <Link
               to="/engineering"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border hover:border-primary/60 hover:text-foreground transition-colors"
