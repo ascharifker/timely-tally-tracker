@@ -358,7 +358,7 @@ function CompletedJobsTable({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Buscar ODF, PO, cliente o PIR…"
+          placeholder="Buscar ODT, PO, cliente o PIR…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           className="max-w-xs"
@@ -371,7 +371,7 @@ function CompletedJobsTable({
           {groupByPo ? "Agrupado por PO" : "Lista plana"}
         </Button>
         <span className="text-xs text-muted-foreground ml-auto">
-          {filtered.length} de {jobs.length} ODFs
+          {filtered.length} de {jobs.length} ODTs
         </span>
       </div>
       <div className="rounded-md border bg-card">
