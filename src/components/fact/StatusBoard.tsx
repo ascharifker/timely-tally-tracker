@@ -114,7 +114,7 @@ export function StatusBoard({
         <div>
           <h2 className="text-sm font-semibold">Flujo de Producción</h2>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Arrastrá una ODF de una etapa a la siguiente para avanzarla. Total: {jobs.length} ODF{jobs.length === 1 ? "" : "s"}.
+            Arrastrá una ODT de una etapa a la siguiente para avanzarla. Total: {jobs.length} ODT{jobs.length === 1 ? "" : "s"}.
           </p>
         </div>
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
@@ -410,7 +410,7 @@ function renderCard({
         dragId === j.id ? "opacity-40" : ""
       } ${dimmed ? "opacity-30" : ""} ${missingMachine ? "border-[color:var(--status-risk)] border-dashed" : "border-border"}`}
       style={{ borderLeft: `3px solid ${leftBorder}` }}
-      title={missingMachine ? "Sin máquina asignada — abrí la ODF y asigná una, o devolvé a Planificado" : undefined}
+      title={missingMachine ? "Sin máquina asignada — abrí la ODT y asigná una, o devolvé a Planificado" : undefined}
     >
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -431,7 +431,7 @@ function renderCard({
               {machineShortLabel(machine)}
             </Link>
           )}
-          <span className="font-mono font-semibold truncate">ODF {j.odf}</span>
+          <span className="font-mono font-semibold truncate">ODT {j.odf}</span>
         </div>
         {urgency && (
           <Badge
