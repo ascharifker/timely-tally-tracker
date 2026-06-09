@@ -70,3 +70,12 @@ export function primaryRoleLabel(roles: AppRole[]): string {
   }
   return "Viewer";
 }
+
+/** Which track tab a user should land on by default. */
+export function defaultTrackForRoles(
+  roles: AppRole[],
+): "all" | ReviewTrack {
+  if (hasRole(roles, "coe_reviewer") && !isAdmin(roles)) return "coe";
+  if (hasRole(roles, "third_party_reviewer") && !isAdmin(roles)) return "third_party";
+  return "all";
+}
