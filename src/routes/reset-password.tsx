@@ -23,14 +23,64 @@ function ResetPasswordPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Supabase auto-parses the recovery token in the URL hash and emits PASSWORD_RECOVERY.
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
+    let cancelled = false;
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[reset-password] auth event", event, !!session);
+      if (session && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        setReady(true);
+      }
     });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
+
+    const tryFromHash = async () => {
+      // Supabase normally auto-parses the hash, but if anything strips it
+      // (router, history replace), manually call setSession.
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const params = new URLSearchParams(hash);
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      const errorDesc = params.get("error_description");
+      if (errorDesc) {
+        toast.error("Invalid or expired link", { description: errorDesc });
+        return false;
+      }
+      if (access_token && refresh_token) {
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) {
+          toast.error("Could not validate link", { description: error.message });
+          return false;
+        }
+        if (!cancelled) setReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        if (!cancelled) setReady(true);
+        return;
+      }
+      const ok = await tryFromHash();
+      if (ok) return;
+      // Last resort: poll briefly for the SDK to finish auto-detect.
+      for (let i = 0; i < 10 && !cancelled; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        const { data: d2 } = await supabase.auth.getSession();
+        if (d2.session) {
+          if (!cancelled) setReady(true);
+          return;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
