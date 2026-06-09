@@ -234,7 +234,7 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
       const db = b.line.committed_date ?? "9999-12-31";
       return da.localeCompare(db);
     });
-  }, [rows, query, customerFilter, statusFilter, preset, onlyChanges, changes]);
+  }, [rows, query, customerFilter, statusFilter, preset, onlyChanges, changes, track]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });
