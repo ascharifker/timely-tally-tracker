@@ -405,7 +405,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
             <button
               onClick={() => redistribute.mutate()}
               disabled={redistribute.isPending}
-              title="Redistribuye automáticamente todos los ODFs programados en bloques M/T/N"
+              title="Redistribuye automáticamente todas las ODTs programadas en bloques M/T/N"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black text-[11px] font-bold rounded uppercase tracking-wider transition-colors"
             >
               <Shuffle className="h-3.5 w-3.5" />
@@ -778,7 +778,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             borderLeft: `4px solid ${shiftMeta.color}`,
                             boxShadow: `0 0 0 1px rgba(82,82,91,0.5), 0 4px 14px rgba(0,0,0,0.55)`,
                           }}
-                          title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]}\n${dur.hours.toFixed(1)}h trabajo · ${machineHps}h/turno · ocupa ${realHours.toFixed(1)}h reloj\nTurnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")} · ${sourceLabel}${pendingMove ? "\n⚠ pendiente de aprobar" : ""}`}
+                          title={`ODT ${j.odf} · ${STATUS_LABEL[j.status]}\n${dur.hours.toFixed(1)}h trabajo · ${machineHps}h/turno · ocupa ${realHours.toFixed(1)}h reloj\nTurnos ${spannedShifts.map((i) => SHIFTS[i].label).join("→")} · ${sourceLabel}${pendingMove ? "\n⚠ pendiente de aprobar" : ""}`}
                         >
                           {hasDelay && (
                             <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[color:var(--status-risk)] ring-2 ring-[#121214]" />
@@ -793,7 +793,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                           )}
                           <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-[11px] font-black text-white leading-none truncate">
-                              ODF {j.odf}
+                              ODT {j.odf}
                             </span>
                             {j.tube_spec && (
                               <span className="text-[9px] text-zinc-400 font-medium uppercase mt-0.5 truncate">
@@ -907,10 +907,10 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                   className={`rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] hover:border-yellow-500/60 hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing ${
                     dragJobId === j.id ? "opacity-50" : ""
                   }`}
-                  title={`ODF ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
+                  title={`ODT ${j.odf} · ${STATUS_LABEL[j.status]} · arrastrá al cronograma`}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
-                  <span className="font-mono font-bold text-white">ODF {j.odf}</span>
+                  <span className="font-mono font-bold text-white">ODT {j.odf}</span>
                   {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
                 </button>
               ))}
@@ -933,7 +933,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
           ))}
         </div>
         <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
-          {machines.length} máquina{machines.length === 1 ? "" : "s"} · {effectiveJobs.filter(j => j.planned_start).length} ODFs programadas
+          {machines.length} máquina{machines.length === 1 ? "" : "s"} · {effectiveJobs.filter(j => j.planned_start).length} ODTs programadas
         </div>
       </div>
     </Card>

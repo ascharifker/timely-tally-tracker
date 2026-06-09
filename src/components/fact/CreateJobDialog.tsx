@@ -18,16 +18,16 @@ import { toast } from "sonner";
 import type { JobPriority } from "@/lib/fact-types";
 import { scheduleJob } from "@/lib/scheduling/schedule";
 
+// v1 = pure ODT. ODF parent layer deferred; future bridge = PO line item → ODT.
 export function CreateJobDialog() {
   const [open, setOpen] = useState(false);
   const [machineId, setMachineId] = useState<string | undefined>(undefined);
   const [priority, setPriority] = useState<JobPriority>("normal");
-  const [turnos, setTurnos] = useState<string>("");
+  const [hoursPerPiece, setHoursPerPiece] = useState<string>("");
   const { data: machines = [] } = useMachines();
   const create = useCreateJob();
 
   const selectedMachine = machines.find((m) => m.id === machineId);
-  const hoursPerShift = selectedMachine?.hours_per_shift ?? 8;
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -37,12 +37,13 @@ export function CreateJobDialog() {
       return v && v.length > 0 ? v : null;
     };
     try {
-      const turnosNum = Number(turnos);
-      const hasTurnos = Number.isFinite(turnosNum) && turnosNum > 0;
-      const hours_override = hasTurnos ? turnosNum * hoursPerShift : null;
+      const qtyNum = Number(get("qty") ?? 1) || 1;
+      const hppNum = Number(hoursPerPiece);
+      const hasHpp = Number.isFinite(hppNum) && hppNum > 0;
+      const hours_override = hasHpp ? hppNum * qtyNum : null;
       let planned_start: string | null = null;
       let planned_end: string | null = null;
-      if (hasTurnos && selectedMachine) {
+      if (hasHpp && selectedMachine) {
         const span = scheduleJob(Date.now(), hours_override!, selectedMachine);
         planned_start = span.planned_start;
         planned_end = span.planned_end;
@@ -53,7 +54,7 @@ export function CreateJobDialog() {
         po_halliburton: get("po_halliburton"),
         pir: get("pir"),
         tube_spec: get("tube_spec"),
-        qty: Number(get("qty") ?? 1),
+        qty: qtyNum,
         machine_id: machineId ?? null,
         priority,
         export_date: get("export_date"),
@@ -64,9 +65,9 @@ export function CreateJobDialog() {
         planned_start,
         planned_end,
       });
-      toast.success("ODF creado");
+      toast.success("ODT creado");
       setOpen(false);
-      setTurnos("");
+      setHoursPerPiece("");
     } catch (err) {
       toast.error("Error: " + (err instanceof Error ? err.message : "unknown"));
     }
@@ -76,16 +77,16 @@ export function CreateJobDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus className="mr-1 h-4 w-4" /> Nuevo ODF
+          <Plus className="mr-1 h-4 w-4" /> Nuevo ODT
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl bg-card">
         <DialogHeader>
-          <DialogTitle>Crear ODF</DialogTitle>
+          <DialogTitle>Crear ODT</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-1">
-            <Label>ODF *</Label>
+            <Label>ODT *</Label>
             <Input name="odf" required placeholder="123/26" />
           </div>
           <div className="col-span-1">
@@ -93,17 +94,17 @@ export function CreateJobDialog() {
             <Input name="qty" type="number" defaultValue={1} min={1} />
           </div>
           <div className="col-span-2">
-            <Label>Tiempo de maquinado (turnos)</Label>
+            <Label>Tiempo de maquinado por pieza (horas)</Label>
             <Input
               type="number"
-              min={0.5}
-              step={0.5}
-              value={turnos}
-              onChange={(e) => setTurnos(e.target.value)}
-              placeholder="ej: 3"
+              min={0.1}
+              step={0.1}
+              value={hoursPerPiece}
+              onChange={(e) => setHoursPerPiece(e.target.value)}
+              placeholder="ej: 2.5"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              1 turno = {hoursPerShift} h{selectedMachine ? ` (${selectedMachine.name})` : " (por defecto, selecciona máquina para ajustar)"}
+              Total = horas/pieza × cantidad. El calendario reparte ese total sobre los turnos disponibles de la máquina.
             </p>
           </div>
           <div>
@@ -167,7 +168,7 @@ export function CreateJobDialog() {
           </div>
           <DialogFooter className="col-span-2">
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? "Creando…" : "Crear ODF"}
+              {create.isPending ? "Creando…" : "Crear ODT"}
             </Button>
           </DialogFooter>
         </form>
