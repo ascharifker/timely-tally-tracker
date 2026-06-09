@@ -286,7 +286,7 @@ function CompletedJobsTable({
   if (jobs.length === 0) {
     return (
       <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-        Aún no hay ODFs enviadas.
+        Aún no hay ODTs enviadas.
       </div>
     );
   }
