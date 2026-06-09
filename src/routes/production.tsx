@@ -131,7 +131,7 @@ function ProductionPage() {
       <div className="mb-4">
         <h2 className="text-2xl font-semibold tracking-tight">Producción</h2>
         <p className="text-sm text-muted-foreground">
-          Partí cada línea en una o más ODFs (numeración nnn/yy) asignándoles máquina, turno y vendor de cementación.
+          Partí cada línea en una o más ODTs (numeración nnn/yy) asignándoles máquina, turno y vendor de cementación.
         </p>
       </div>
 
@@ -199,7 +199,7 @@ function ProductionPage() {
                 </TableCell>
                 <TableCell>
                   <Button size="sm" disabled={pending === 0} onClick={() => setActive(l)}>
-                    <Calendar className="h-3.5 w-3.5 mr-1" /> Crear ODF
+                    <Calendar className="h-3.5 w-3.5 mr-1" /> Crear ODT
                   </Button>
                 </TableCell>
               </TableRow>
@@ -210,7 +210,7 @@ function ProductionPage() {
       </div>
 
       <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Mis ODFs activas</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Mis ODTs activas</h2>
         <p className="text-sm text-muted-foreground">
           Pasos en curso, retrasos y acciones rápidas (avanzar, pausar, reportar retraso).
         </p>
@@ -224,9 +224,9 @@ function ProductionPage() {
       />
 
       <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">ODFs completadas</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">ODTs completadas</h2>
         <p className="text-sm text-muted-foreground">
-          Histórico de ODFs enviadas. Filtrá por PO o cliente para revisar lo entregado.
+          Histórico de ODTs enviadas. Filtrá por PO o cliente para revisar lo entregado.
         </p>
       </div>
       <CompletedJobsTable
@@ -286,7 +286,7 @@ function CompletedJobsTable({
   if (jobs.length === 0) {
     return (
       <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-        Aún no hay ODFs enviadas.
+        Aún no hay ODTs enviadas.
       </div>
     );
   }
@@ -312,10 +312,10 @@ function CompletedJobsTable({
           type="button"
           onClick={() => onOpenOdf(j)}
           className="inline-flex items-center gap-1.5 group"
-          title="Ver desglose de la ODF"
+          title="Ver desglose de la ODT"
         >
           <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-primary font-mono">
-            ODF
+            ODT
           </span>
           <span className="font-mono font-semibold text-foreground group-hover:underline">{j.odf}</span>
         </button>
@@ -358,7 +358,7 @@ function CompletedJobsTable({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Buscar ODF, PO, cliente o PIR…"
+          placeholder="Buscar ODT, PO, cliente o PIR…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           className="max-w-xs"
@@ -371,14 +371,14 @@ function CompletedJobsTable({
           {groupByPo ? "Agrupado por PO" : "Lista plana"}
         </Button>
         <span className="text-xs text-muted-foreground ml-auto">
-          {filtered.length} de {jobs.length} ODFs
+          {filtered.length} de {jobs.length} ODTs
         </span>
       </div>
       <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ODF #</TableHead>
+              <TableHead>ODT #</TableHead>
               <TableHead>PO # / Cliente</TableHead>
               <TableHead>Máquina</TableHead>
               <TableHead className="text-right">Qty</TableHead>
@@ -407,7 +407,7 @@ function CompletedJobsTable({
                         </span>
                         <span className="text-primary">{g.po_number}</span>
                         {g.customer && <span className="text-muted-foreground"> · {g.customer}</span>}
-                        <span className="text-muted-foreground"> · {g.jobs.length} ODF{g.jobs.length === 1 ? "" : "s"}</span>
+                        <span className="text-muted-foreground"> · {g.jobs.length} ODT{g.jobs.length === 1 ? "" : "s"}</span>
                       </TableCell>
                     </TableRow>
                     {g.jobs.map(renderRow)}
@@ -443,7 +443,7 @@ function ActiveJobsTable({
   if (jobs.length === 0) {
     return (
       <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-        Sin ODFs activas. Creá una arriba para empezar.
+        Sin ODTs activas. Creá una arriba para empezar.
       </div>
     );
   }
@@ -464,7 +464,7 @@ function ActiveJobsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ODF #</TableHead>
+              <TableHead>ODT #</TableHead>
               <TableHead>PO # / Cliente</TableHead>
               <TableHead>Máquina</TableHead>
               <TableHead className="text-right">Qty</TableHead>
@@ -484,10 +484,10 @@ function ActiveJobsTable({
                       type="button"
                       onClick={() => onOpenOdf(j)}
                       className="inline-flex items-center gap-1.5 group"
-                      title="Ver desglose de la ODF"
+                      title="Ver desglose de la ODT"
                     >
                       <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-primary font-mono">
-                        ODF
+                        ODT
                       </span>
                       <span className="font-mono font-semibold group-hover:underline">{j.odf}</span>
                     </button>
@@ -621,7 +621,7 @@ function DelayDialog({
     <Dialog open={!!job} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md bg-card">
         <DialogHeader>
-          <DialogTitle>Reportar retraso — ODF {job.odf}</DialogTitle>
+          <DialogTitle>Reportar retraso — ODT {job.odf}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 text-sm">
           <p className="text-xs text-muted-foreground">
@@ -721,7 +721,7 @@ function CreateOdfDialog({
           notes: v("notes"),
         },
       });
-      toast.success(`ODF ${res.odf} creada · pendiente ${res.pending_remaining}`);
+      toast.success(`ODT ${res.odf} creada · pendiente ${res.pending_remaining}`);
       await onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -735,12 +735,12 @@ function CreateOdfDialog({
       <DialogContent className="max-w-xl bg-card">
         <DialogHeader>
           <DialogTitle>
-            Crear ODF — {line.purchase_order?.po_number} · L{line.line_number}
+            Crear ODT — {line.purchase_order?.po_number} · L{line.line_number}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-1">
-            <Label>ODF (vacío = auto nnn/yy)</Label>
+            <Label>ODT (vacío = auto nnn/yy)</Label>
             <Input name="odf" placeholder="auto" />
           </div>
           <div className="col-span-1">
@@ -834,7 +834,7 @@ function CreateOdfDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Creando…" : "Crear ODF"}
+              {submitting ? "Creando…" : "Crear ODT"}
             </Button>
           </DialogFooter>
         </form>

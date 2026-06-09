@@ -71,7 +71,7 @@ export function OdfBreakdownDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 rounded bg-primary/15 px-2 py-1 text-[10px] uppercase tracking-widest text-primary font-mono">
-              ODF
+              ODT
             </span>
             <span className="font-mono">{job.odf}</span>
             <span className="text-xs text-muted-foreground font-normal">· {STATUS_LABEL[job.status]}</span>
