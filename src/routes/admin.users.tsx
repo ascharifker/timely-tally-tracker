@@ -92,7 +92,7 @@ function UsersTable() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<AppRole>("viewer");
+  const [inviteRole, setInviteRole] = useState<AppRole>("manager");
   const [linkDialog, setLinkDialog] = useState<{ open: boolean; link: string; email: string }>({
     open: false,
     link: "",
@@ -105,11 +105,18 @@ function UsersTable() {
   const inviteMut = useMutation({
     mutationFn: () => inviteFn({ data: { email: inviteEmail, role: inviteRole } }),
     onSuccess: (res) => {
+      const sentTo = inviteEmail;
       setInviteOpen(false);
-      setLinkDialog({ open: true, link: res.action_link, email: inviteEmail });
       setInviteEmail("");
-      setInviteRole("viewer");
+      setInviteRole("manager");
       invalidate();
+      if (res.email_sent) {
+        toast.success("Invite emailed", { description: sentTo });
+      } else if (res.action_link) {
+        setLinkDialog({ open: true, link: res.action_link, email: sentTo });
+      } else {
+        toast.success("Invite processed", { description: sentTo });
+      }
     },
     onError: (e: Error) => toast.error("Invite failed", { description: e.message }),
   });
@@ -147,7 +154,7 @@ function UsersTable() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Users</h1>
-          <p className="text-xs text-muted-foreground">Invite-only. Send the generated link manually.</p>
+          <p className="text-xs text-muted-foreground">Invite-only. New invites are emailed automatically.</p>
         </div>
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
           <DialogTrigger asChild>
@@ -178,7 +185,7 @@ function UsersTable() {
               <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
               <Button disabled={!inviteEmail || inviteMut.isPending} onClick={() => inviteMut.mutate()}>
                 {inviteMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Create &amp; generate link
+                Send invite
               </Button>
             </DialogFooter>
           </DialogContent>

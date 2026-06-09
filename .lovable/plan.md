@@ -1,63 +1,37 @@
-## Audit: Ship 1 (ODT rollout) vs Fernando's brief
+## Invite-only auth (mego-afek.com only)
 
-I pulled the artifact (`otd-hub-lovable-build-prompt-ship-1-odt-rollout-jun-9-2026.md`) and diffed it against current code.
+Lock signups, send real invite emails from `/admin/users`, restrict to `@mego-afek.com`.
 
-### What's already done ✅
-- **Task 1 — hours-per-piece input**: `CreateJobDialog.tsx` uses `hoursPerPiece` decimal state, `hours_override = hoursPerPiece × qty`, helper text rewritten, turnos/percent-of-shift logic removed, `// v1 = pure ODT…` comment present.
-- **Task 2 (partial) — ODF→ODT rename**: clean in `CreateJobDialog.tsx`, `MachineGantt.tsx`, `StatusBoard.tsx`, `routes/production.tsx`, `OdfBreakdownDialog.tsx`.
-- **Task 3 — loosened validation**: only `odf` is `required`; qty defaults to 1.
-- **Scheduling engine untouched**: no diff in `schedule.ts`, `duration.ts`, `cascade.ts`, `lanes.ts`, `impact.ts`, `otd.ts`.
+### 1. Disable public signup (backend) — already done
+`configure_auth`: `disable_signup: true`, `auto_confirm_email: false`, `password_hibp_enabled: true`. Done as part of this pass.
 
-### Gaps before sharing with Fernando ⚠️
+### 2. Rewrite `inviteUser` in `src/lib/admin-users.functions.ts`
+- Add `ALLOWED_INVITE_DOMAINS = ["mego-afek.com"]` + `assertAllowedDomain(email)` helper that throws `"Only @mego-afek.com emails can be invited."`.
+- Call `assertAllowedDomain` at the top of the handler.
+- Look up the user via `auth.admin.listUsers`.
+- If new → `supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo: <origin>/reset-password })`. Supabase sends the email.
+- If existing → `generateLink({ type: "recovery" })` and return the link as a fallback.
+- Replace role rows (delete + insert) so role is always exactly what admin picked.
+- Return `{ user_id, email_sent, action_link? }`.
 
-**1. Residual "ODF" in surfaces Fernando WILL navigate to** (brief says "any nav/header text in production"):
-- `src/components/fact/OTDTracker.tsx` — "ODF…requieren atención", "Todos los ODFs al día"
-- `src/components/fact/JobDetailDialog.tsx` — 9 occurrences (title bar, reprogramar copy, toasts, cascade preview)
-- `src/components/fact/JobHistorySheet.tsx` — sheet title "Historial · ODF …"
-- `src/routes/maquina.$id.tsx` — "ODFs activas", "ODFs asignadas", empty state
-- `src/routes/riesgo.tsx` — page copy, table header, count, meta description
-- `src/routes/index.tsx` — dashboard subtitle "N ODFs activos · M máquinas"
+### 3. Strip signup UI from `src/routes/auth.tsx`
+- Remove `<Tabs>`, the "Sign up" tab, `handleSignUp`, `confirm` state, and the "Check your inbox" screen.
+- Keep only sign-in form (email + password).
+- Add a small line: "Access is invite-only. Contact your administrator if you need an account."
 
-→ Rename all six files' user-visible "ODF/ODFs" → "ODT/ODTs". DB keys (`job.odf`) and code identifiers stay.
+### 4. Polish `/admin/users` invite dialog
+- Default invite role = `manager` (instead of `viewer`).
+- After invite: if `email_sent` → toast "Invite emailed to {email}", don't open link dialog. If `action_link` returned → open the existing copy-link dialog as today.
+- Update header subtitle from "Send the generated link manually" → "Invite-only. New invites are emailed automatically."
+- Button label: "Send invite" instead of "Create & generate link".
 
-**2. Publish metadata is still template default**:
-- `src/routes/__root.tsx` still has `title: "Lovable App"`, `description: "Lovable Generated Project"`, and the same on og:title/og:description.
-→ Set real title (e.g. "OTD Hub · MEGO Producción"), real description, matching og:* and twitter:* tags before publish.
+### Out of scope
+Branded auth email templates, invite audit log, bulk invites. Touching `bootstrapFirstAdmin` / `claimAdminIfEligible` / `resetAllowlistedUser`.
 
-**3. Auth reconciliation — your call, not a code change**:
-The brief flags Alex promised Fernando a self-signup link, but the app is locked-down (`disable_signup`). Recommended path from the brief: provision Fernando's account directly, seed role = `manager`, send him ready credentials instead of a signup link. **I won't touch auth in this pass — confirm how you want to handle it.**
+### Acceptance
+1. `/auth` shows only Sign in.
+2. `supabase.auth.signUp` from console → error.
+3. Admin invites `fernando@mego-afek.com` (role: manager) → Fernando gets email, sets password at `/reset-password`, lands in as manager.
+4. Inviting `x@gmail.com` → "Only @mego-afek.com emails can be invited."
 
-### Acceptance re-check (manual, after edits)
-1. ODT qty=3, hours/pc=2.5, 8h machine → Gantt block ≈ one shift.
-2. ODT with only number saves and stays off the calendar.
-3. No "ODF" text visible anywhere in production navigation.
-4. Scheduling engine git-clean (already confirmed).
-
----
-
-## Plan for this pass
-
-### Step 1 — Finish ODF→ODT label sweep (production-adjacent surfaces)
-Edit the six files above, replacing visible "ODF"/"ODFs" with "ODT"/"ODTs". Keep `j.odf` field reads, route names, DB columns, and the `// ODF parent layer deferred` comment in `CreateJobDialog.tsx`.
-
-### Step 2 — Publish metadata
-In `src/routes/__root.tsx`, replace the four "Lovable App"/"Lovable Generated Project" head entries with:
-- title: `OTD Hub · MEGO Producción`
-- description: `Planificación de producción Mego Afek — ODTs, OTD determinístico y cascada de impacto.`
-- og:title / og:description / twitter:title / twitter:description: same values
-- og:type stays `website`
-
-### Step 3 — You decide on auth, then I publish
-Two options for Fernando's account — tell me which:
-- **A. Stay locked-down (recommended by brief):** I leave auth alone; you/Alex create Fernando's user in the backend with role `manager` and send him creds out-of-band. Then I publish.
-- **B. Open self-signup temporarily:** enable signups + email verification, optionally restrict to his email domain, manually promote to `manager` after first login. Riskier; not what the brief recommends.
-
-### Out of scope (deferred, per brief)
-tube_spec decomposition, ODF parent hierarchy, Excel ingest, Raquel report, taller list additions.
-
-### Acceptance for this pass
-- `rg "ODF" src/components/fact src/routes` returns only the deferred-layer code comment.
-- Root head() shows real OTD Hub metadata.
-- Auth path decided and (for option A) Fernando's account exists before I hit publish.
-
-Answer Step 3 (A or B) and I'll execute Steps 1–2 immediately.
+Approve to execute steps 2–4 (step 1 already applied).
