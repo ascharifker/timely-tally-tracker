@@ -1,6 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getRequest } from "@tanstack/react-start/server";
+
+function redirectFromRequest(path: string): string {
+  try {
+    const req = getRequest();
+    const url = new URL(req.url);
+    return `${url.origin}${path}`;
+  } catch {
+    return path;
+  }
+}
 
 const APP_ROLES = [
   "admin",
