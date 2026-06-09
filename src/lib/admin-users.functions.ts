@@ -211,3 +211,41 @@ export const bootstrapFirstAdmin = createServerFn({ method: "POST" })
     }
     return { user_id: userId, action_link: link.properties.action_link };
   });
+
+// Hard-coded allowlist of emails that should automatically receive the admin
+// role on first sign-in. Keep this small.
+const ADMIN_ALLOWLIST = new Set<string>(["alex.scharifker@mego-afek.com"]);
+
+// Auth'd: if the signed-in user's email is on the allowlist, ensure they
+// have the admin role. Safe to call repeatedly.
+export const claimAdminIfEligible = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ admin: boolean }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error: uErr } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    if (uErr || !u.user) return { admin: false };
+    const email = u.user.email?.toLowerCase() ?? "";
+    if (!ADMIN_ALLOWLIST.has(email)) return { admin: false };
+    await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: context.userId, role: "admin" }, { onConflict: "user_id,role" });
+    return { admin: true };
+  });
+
+// One-off reset: delete an allowlisted user (and their role rows) so they
+// can sign up fresh. Unauthenticated but locked to the allowlist.
+export const resetAllowlistedUser = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ email: z.string().email() }).parse(input))
+  .handler(async ({ data }): Promise<{ deleted: boolean }> => {
+    const email = data.email.trim().toLowerCase();
+    if (!ADMIN_ALLOWLIST.has(email)) throw new Error("Not allowed");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: list, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    if (error) throw new Error(error.message);
+    const u = list.users.find((x) => x.email?.toLowerCase() === email);
+    if (!u) return { deleted: false };
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", u.id);
+    const { error: dErr } = await supabaseAdmin.auth.admin.deleteUser(u.id);
+    if (dErr) throw new Error(dErr.message);
+    return { deleted: true };
+  });
