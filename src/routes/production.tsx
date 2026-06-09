@@ -621,7 +621,7 @@ function DelayDialog({
     <Dialog open={!!job} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md bg-card">
         <DialogHeader>
-          <DialogTitle>Reportar retraso — ODF {job.odf}</DialogTitle>
+          <DialogTitle>Reportar retraso — ODT {job.odf}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 text-sm">
           <p className="text-xs text-muted-foreground">
