@@ -210,7 +210,7 @@ function ProductionPage() {
       </div>
 
       <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Mis ODFs activas</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Mis ODTs activas</h2>
         <p className="text-sm text-muted-foreground">
           Pasos en curso, retrasos y acciones rápidas (avanzar, pausar, reportar retraso).
         </p>
@@ -224,9 +224,9 @@ function ProductionPage() {
       />
 
       <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">ODFs completadas</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">ODTs completadas</h2>
         <p className="text-sm text-muted-foreground">
-          Histórico de ODFs enviadas. Filtrá por PO o cliente para revisar lo entregado.
+          Histórico de ODTs enviadas. Filtrá por PO o cliente para revisar lo entregado.
         </p>
       </div>
       <CompletedJobsTable
