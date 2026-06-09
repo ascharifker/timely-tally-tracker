@@ -443,7 +443,7 @@ function ActiveJobsTable({
   if (jobs.length === 0) {
     return (
       <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-        Sin ODFs activas. Creá una arriba para empezar.
+        Sin ODTs activas. Creá una arriba para empezar.
       </div>
     );
   }
