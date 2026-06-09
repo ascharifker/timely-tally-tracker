@@ -92,7 +92,7 @@ export function ApproveMovesDialog({
         </DialogHeader>
 
         <p className="text-xs text-muted-foreground">
-          Asigná una categoría a cada movimiento. La cascada empuja a los ODFs siguientes en la misma máquina.
+          Asigná una categoría a cada movimiento. La cascada empuja a las ODTs siguientes en la misma máquina.
         </p>
 
         <div className="rounded border border-border divide-y divide-border max-h-[50vh] overflow-auto">
@@ -101,7 +101,7 @@ export function ApproveMovesDialog({
             return (
               <div key={m.jobId} className="grid grid-cols-[1fr,160px,28px] items-center gap-3 px-3 py-2">
                 <div>
-                  <div className="font-mono text-sm font-semibold">ODF {m.odf}</div>
+                  <div className="font-mono text-sm font-semibold">ODT {m.odf}</div>
                   <div className="text-[11px] text-muted-foreground font-mono">
                     {fmt(m.original_start)} → {fmt(m.original_end)}
                   </div>

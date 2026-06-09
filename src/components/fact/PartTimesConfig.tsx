@@ -77,7 +77,7 @@ export function PartTimesConfig({
             Catálogo de tiempos · PIR × Máquina
           </h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            Horas por pieza para cada combinación. Total ODF = h/pieza × cantidad.
+            Horas por pieza para cada combinación. Total ODT = h/pieza × cantidad.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function PartTimesConfig({
           <AlertCircle className="h-4 w-4 mt-px shrink-0" />
           <div>
             <span className="font-bold">{missing.length} combinación{missing.length === 1 ? "" : "es"} PIR×máquina sin tiempo cargado.</span>{" "}
-            Esos ODFs usan duración estimada heurística.{" "}
+            Esas ODTs usan duración estimada heurística.{" "}
             <span className="text-amber-100/70">
               Ej: {missing.slice(0, 3).map((m) => `${m.pir} en ${machineName(m.machine_id)}`).join(" · ")}
               {missing.length > 3 ? ` · +${missing.length - 3}` : ""}

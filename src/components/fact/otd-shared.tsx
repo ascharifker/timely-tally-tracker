@@ -43,7 +43,7 @@ export function OTDLegend() {
       <div>
         <span className="text-foreground/80 font-medium">Cómo se calcula:</span>{" "}
         <span className="text-[var(--status-expo)] font-semibold">A tiempo</span> — exportación ≤ fecha cliente.{" "}
-        <span className="text-[var(--primary)] font-semibold">En riesgo</span> — ODF aún en maquinado/cementación y faltan menos de 5 días para entrega.{" "}
+        <span className="text-[var(--primary)] font-semibold">En riesgo</span> — ODT aún en maquinado/cementación y faltan menos de 5 días para entrega.{" "}
         <span className="text-[var(--status-risk)] font-semibold">Tarde</span> — fecha de exportación posterior a la del cliente.
       </div>
     </div>

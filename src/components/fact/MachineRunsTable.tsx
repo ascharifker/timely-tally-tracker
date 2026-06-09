@@ -84,14 +84,14 @@ export function MachineRunsTable({ runs, jobs, fixedJob, fixedMachineId }: Props
           {!fixedJob && (
             <div>
               <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                ODF
+                ODT
               </Label>
               <select
                 value={form.job_id}
                 onChange={(e) => setForm((f) => ({ ...f, job_id: e.target.value }))}
                 className="w-full h-9 rounded border border-border bg-background px-2 text-sm"
               >
-                <option value="">— Elegí ODF —</option>
+                <option value="">— Elegí ODT —</option>
                 {jobs.map((j) => (
                   <option key={j.id} value={j.id}>
                     {j.odf} · {j.tube_spec ?? ""}
@@ -169,7 +169,7 @@ export function MachineRunsTable({ runs, jobs, fixedJob, fixedMachineId }: Props
       ) : (
         <div className="divide-y divide-border/40">
           <div className="grid grid-cols-[80px_1fr_1fr_60px_70px_30px] gap-2 px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono text-muted-foreground bg-sidebar/30">
-            <span>ODF</span>
+            <span>ODT</span>
             <span>Inicio</span>
             <span>Fin</span>
             <span className="text-right">Piezas</span>
