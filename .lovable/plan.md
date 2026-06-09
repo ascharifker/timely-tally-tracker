@@ -1,31 +1,35 @@
-## Goal
-Add a "Tiempo de maquinado (turnos)" input to the **Crear ODF** dialog so the user enters how many shifts (turnos) the job will take, and the calendar/Gantt immediately reflects that duration.
+## Ship 1 — ODT rollout (input layer + label rename only)
 
-## Approach
-Reuse the existing `hours_override` column on `jobs` (already used by `jobDurationHours` as the highest-priority duration source). Convert turnos → hours using the selected machine's `hours_per_shift` (default 8 if none selected). Also pre-schedule `planned_start` / `planned_end` at creation time when both a machine and turnos are provided, so the new ODF lands on the calendar without a second action.
+Scheduling engine stays untouched. `schedule.ts`, `duration.ts`, `cascade.ts`, `lanes.ts`, `impact.ts`, `otd.ts` — no edits.
 
-## Changes
+### Task 1 — Hours-per-piece in `CreateJobDialog.tsx`
+- Replace `turnos` state with `hoursPerPiece` (decimal, `min=0.1`, `step=0.1`, placeholder `"ej: 2.5"`).
+- Relabel field to **"Tiempo de maquinado por pieza (horas)"**.
+- Compute `hours_override = hoursPerPiece × qty` (read qty from form). Continue passing `hours_override` to `scheduleJob(...)` unchanged.
+- Helper text: "Total = horas/pieza × cantidad. El calendario reparte ese total sobre los turnos disponibles de la máquina."
+- Remove the "1 turno = X h" helper and all per-shift conversion logic.
+- Add comment: `// v1 = pure ODT. ODF parent layer deferred; future bridge = PO line item → ODT.`
 
-### `src/components/fact/CreateJobDialog.tsx`
-- Add a new field next to **Cantidad**:
-  - Label: `Tiempo de maquinado (turnos)`
-  - `Input type="number" min={0.5} step={0.5}` (allow half-shifts)
-  - Helper text under it: `1 turno = X h` where X is the selected machine's `hours_per_shift` (fallback "8 h por defecto" when no machine selected).
-- On submit:
-  - Look up the selected machine from the existing `machines` list to get `hours_per_shift` (default 8).
-  - If turnos > 0: `hours_override = turnos * hoursPerShift`. Pass it on the insert payload.
-  - If a machine is selected AND turnos > 0: compute `planned_start` / `planned_end` via `scheduleJob(Date.now(), hours_override, machine)` from `src/lib/scheduling/schedule.ts` and include them in the insert.
-  - If no machine selected, only persist `hours_override` (calendar will place it once the user assigns a machine — existing `useUpdateJobStatus` already uses `jobDurationHours` which honors `hours_override`).
+### Task 2 — Rename ODF → ODT in production UI only
+Visible label rename, Spanish preserved. DB columns, `jobs` table, and `odf` payload key all unchanged.
 
-### `src/hooks/useFactData.ts`
-- No schema change. `useCreateJob` already accepts `Partial<Job>`; just ensure `hours_override`, `planned_start`, `planned_end` flow through (they already do via `Partial<Job>`).
+Files to touch (text-only):
+- `CreateJobDialog.tsx`: trigger "Nuevo ODF" → "Nuevo ODT"; title "Crear ODF" → "Crear ODT"; label "ODF *" → "ODT *"; toast "ODF creado" → "ODT creado"; submit "Crear ODF" → "Crear ODT".
+- `MachineGantt.tsx`: block labels and tooltips `ODF ${j.odf}` → `ODT ${j.odf}`; "ODFs programadas" → "ODTs programadas"; tooltip "todos los ODFs" → "todas las ODTs".
+- `StatusBoard.tsx`: card label `ODF {j.odf}` → `ODT {j.odf}`; helper copy "Arrastrá una ODF…" + "Total: N ODFs" → ODT; missing-machine tooltip "abrí la ODF" → "abrí la ODT".
 
-## Out of scope
-- No DB migration — `hours_override` already exists on `jobs`.
-- No changes to `PartTime` catalog or cascade logic.
-- Not changing the unit shown elsewhere (turnos stays as an input convenience; storage remains hours).
+Out of scope for the rename in this ship: PO/intake/spreadsheet/OTD-tracker/admin/route files — those are non-production surfaces (PO layer, dashboards, risk page). Keeping the rename strictly to the three production surfaces above matches the prompt and avoids label drift in the PO domain. If you also want PO/dashboard surfaces renamed, say so and I'll extend.
 
-## Acceptance
-- Creating an ODF with machine = MAZAK-1 and turnos = 3 saves `hours_override = 3 × hours_per_shift` and the Gantt shows the block starting at the next shift boundary with a 3-shift length.
-- Creating an ODF without a machine still records the chosen turnos as `hours_override`; the bar appears once the job is assigned to a machine.
-- Existing ODFs without turnos input behave exactly as before (heuristic / catalog).
+### Task 3 — Loosen create-form validation
+- Keep `required` only on the `odf` (ODT number) field. Remove any other required attributes (currently only `odf` is required, confirm during edit).
+- qty already defaults to 1 — leave as-is.
+- ODT with no machine + no turnos → no `planned_start`/`planned_end` → already excluded from the calendar. No code change needed; verify after edit.
+
+### Acceptance
+1. qty=3, hours/pc=2.5, machine 8h/turno → `hours_override=7.5` → Gantt block ≈ one shift.
+2. ODT with only number saves successfully and does not appear on calendar.
+3. All "ODF" text in `CreateJobDialog`, `MachineGantt`, `StatusBoard` reads "ODT".
+4. No diff in `src/lib/scheduling/*`.
+
+### Not in this ship
+Auth reconciliation, tube_spec decomposition, ODF parent hierarchy, Excel ingest, Raquel report, taller list.
