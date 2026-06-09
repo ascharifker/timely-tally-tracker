@@ -721,7 +721,7 @@ function CreateOdfDialog({
           notes: v("notes"),
         },
       });
-      toast.success(`ODF ${res.odf} creada · pendiente ${res.pending_remaining}`);
+      toast.success(`ODT ${res.odf} creada · pendiente ${res.pending_remaining}`);
       await onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
