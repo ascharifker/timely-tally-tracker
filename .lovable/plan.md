@@ -1,61 +1,49 @@
-## Goal
+## Sprint 2 — Reporting value (revised)
 
-1. Bootstrap **alex.scharifker@mego-afek.com** as admin with a one‑time recovery link you'll receive in chat.
-2. Add an admin‑only **`/admin/users`** page with MISH‑style invite‑only user management (copy‑link invites, role changes, full delete on revoke).
-
-Signup stays disabled — accounts only exist via this flow.
+Holding **#4 (decompose `tube_spec`)** until Raquel confirms her column list. Shipping **#5** and **#3** now.
 
 ---
 
-## Part A — Bootstrap your admin account (one-time)
+### #5 — "Orders received" / pending-review view
 
-A throw‑away server script that:
-1. `admin.createUser({ email: 'alex.scharifker@mego-afek.com', email_confirm: true })` with a random password.
-2. Inserts `(user_id, 'admin')` into `public.user_roles`.
-3. `admin.generateLink({ type: 'recovery' })` and prints the link.
-4. I paste the link back to you here. You open it → set a password → you're in as admin.
+A dedicated landing surface for engineering reviewers (Alexis / Lendris) and Peter to see what's waiting on them.
 
-(Single‑use, expires in ~1 hour.)
+- New route `src/routes/pending-review.tsx` (under `_authenticated`).
+- Reuses `PoLinesSpreadsheet` with a new `mode="pending"` that pre-filters to lines where `status = 'pending_engineering'` (and optionally `engineering_flagged` for re-review).
+- Top KPI strip: counts by track (COE, Third-Party, Internal) + "oldest waiting" age in days.
+- Row click → existing `PoDetailDialog`.
+- Sidebar/header nav link "Pending review", visible to: `admin`, `po_editor`, `coe_reviewer`, `third_party_reviewer`. Reviewers' link auto-scopes to their own track via search param.
 
----
+### #3 — COE vs Third-Party split (filter tabs)
 
-## Part B — `/admin/users` (invite‑only management)
+Filter tabs on `/purchase-orders` — no new routes.
 
-### Route & gating
-- New `src/routes/_authenticated/admin.users.tsx`, child of the managed `_authenticated` layout.
-- Server fns gated by `requireSupabaseAuth` + `assertAdmin(userId)` (uses existing `has_role`).
-- Sidebar link in `AppShell`, visible only when current user has `admin`.
-
-### UI
-Table of users with: email · role badge · status (`invited` / `active` / `never signed in`) · last sign‑in · actions menu.
-
-Actions:
-- **Copy invite link** (for users who haven't signed in yet) — generates a fresh `invite` link.
-- **Copy reset link** (for active users who lost access) — generates a `recovery` link.
-- **Change role** — dropdown of the 7 roles.
-- **Delete user** — confirm dialog → fully removes from `auth.users` (cascades `user_roles`).
-
-**Invite user** button → dialog (email + role) → on submit returns the action_link, shown with a one‑click Copy button. You paste it into email/WhatsApp/Slack yourself.
-
-### Server functions (`src/lib/admin-users.functions.ts`)
-All wrapped in `requireSupabaseAuth` + admin check; `supabaseAdmin` loaded inside each handler via `await import(...)`.
-
-- `listUsers()` — joins `auth.users` (admin API) with `user_roles`.
-- `inviteUser({ email, role })` — `createUser` + role insert + `generateLink({ type: 'invite' })` → `{ action_link }`.
-- `copyLinkForUser({ userId, type: 'invite' | 'recovery' })` — `generateLink` for existing user.
-- `changeUserRole({ userId, role })` — upsert into `user_roles`.
-- `deleteUser({ userId })` — `admin.deleteUser` (cascades roles via FK).
-
-### Migration
-- Ensure `user_roles.user_id` FK has `ON DELETE CASCADE` (so delete auth user cleans up roles).
-- No new tables.
-
-### Out of scope (Sprint 3+)
-- No `invite_audit` table, no email auto‑send, no resend throttling, no bulk import, no profile fields. Add when vacation delegation lands.
+- Tabs: **All · COE · Third-Party · Internal**, backed by URL search param `?track=all|coe|third_party|internal` (Zod-validated via `@tanstack/zod-adapter`, default `all`).
+- `PoLinesSpreadsheet` accepts a `track` prop and filters lines by joined `purchase_orders.review_track`.
+- Same tabs reused inside the Pending-review view.
+- Default tab per role: `coe_reviewer` → COE, `third_party_reviewer` → Third-Party, others → All. Reviewer tabs not matching their role are still visible (read-only) so handovers work.
 
 ---
 
-## Decisions confirmed
-1. Revoke = **hard delete** ✅
-2. **Copy‑link only**, no auto‑email ✅
-3. Run bootstrap now, paste recovery link in chat ✅
+### Technical details
+
+**New / changed files**
+- `src/routes/pending-review.tsx` (new)
+- `src/hooks/usePendingReviewLines.ts` (new) — single query joining `po_line_items` + `purchase_orders` filtered by status/track.
+- `src/components/fact/PoLinesSpreadsheet.tsx` — add `mode: "intake" | "pending"` and `track?: ReviewTrack | "all"` props; existing call sites keep current behavior.
+- `src/routes/purchase-orders.index.tsx` — add Tabs + `validateSearch` for `?track=`.
+- `src/components/fact/AppShell.tsx` — add "Pending review" nav link, role-gated.
+- `src/lib/rbac.ts` — add `defaultTrackForRoles(roles)` helper.
+
+**No schema changes.** `review_track` already exists on `purchase_orders` from Sprint 1. RLS already scopes edits via `current_user_can_edit_po`; viewing across tracks stays open to all authenticated users (read-only outside your track).
+
+**Out of scope (Sprint 3)**: #4 tube_spec decomposition, #7 export-to-email, vacation delegation, bilingual toggle. Re-open #4 once Raquel sends her column list.
+
+---
+
+### Order of execution
+1. Search-param + tabs on `/purchase-orders`.
+2. `PoLinesSpreadsheet` track prop.
+3. `usePendingReviewLines` hook + `pending-review.tsx` route.
+4. Nav link + role-defaulted track.
+5. Manual verification: log in as admin, switch tabs, hit Pending review, confirm reviewer-scoped defaults.
