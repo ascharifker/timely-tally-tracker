@@ -13,6 +13,7 @@ import { Route as RiesgoRouteImport } from './routes/riesgo'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
 import { Route as ProductionRouteImport } from './routes/production'
+import { Route as PendingReviewRouteImport } from './routes/pending-review'
 import { Route as IntakeRouteImport } from './routes/intake'
 import { Route as EngineeringRouteImport } from './routes/engineering'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
@@ -41,6 +42,11 @@ const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
 const ProductionRoute = ProductionRouteImport.update({
   id: '/production',
   path: '/production',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendingReviewRoute = PendingReviewRouteImport.update({
+  id: '/pending-review',
+  path: '/pending-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntakeRoute = IntakeRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/configuracion': typeof ConfiguracionRoute
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
+  '/pending-review': typeof PendingReviewRoute
   '/production': typeof ProductionRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/configuracion': typeof ConfiguracionRoute
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
+  '/pending-review': typeof PendingReviewRoute
   '/production': typeof ProductionRoute
   '/reset-password': typeof ResetPasswordRoute
   '/riesgo': typeof RiesgoRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/configuracion': typeof ConfiguracionRoute
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
+  '/pending-review': typeof PendingReviewRoute
   '/production': typeof ProductionRoute
   '/purchase-orders': typeof PurchaseOrdersRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/configuracion'
     | '/engineering'
     | '/intake'
+    | '/pending-review'
     | '/production'
     | '/purchase-orders'
     | '/reset-password'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/configuracion'
     | '/engineering'
     | '/intake'
+    | '/pending-review'
     | '/production'
     | '/reset-password'
     | '/riesgo'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/configuracion'
     | '/engineering'
     | '/intake'
+    | '/pending-review'
     | '/production'
     | '/purchase-orders'
     | '/reset-password'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   ConfiguracionRoute: typeof ConfiguracionRoute
   EngineeringRoute: typeof EngineeringRoute
   IntakeRoute: typeof IntakeRoute
+  PendingReviewRoute: typeof PendingReviewRoute
   ProductionRoute: typeof ProductionRoute
   PurchaseOrdersRoute: typeof PurchaseOrdersRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -223,6 +236,13 @@ declare module '@tanstack/react-router' {
       path: '/production'
       fullPath: '/production'
       preLoaderRoute: typeof ProductionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pending-review': {
+      id: '/pending-review'
+      path: '/pending-review'
+      fullPath: '/pending-review'
+      preLoaderRoute: typeof PendingReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/intake': {
@@ -311,6 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracionRoute: ConfiguracionRoute,
   EngineeringRoute: EngineeringRoute,
   IntakeRoute: IntakeRoute,
+  PendingReviewRoute: PendingReviewRoute,
   ProductionRoute: ProductionRoute,
   PurchaseOrdersRoute: PurchaseOrdersRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
@@ -321,3 +342,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
