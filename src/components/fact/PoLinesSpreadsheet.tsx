@@ -39,6 +39,7 @@ import {
   acknowledgeAllDateChanges,
   updatePoLineField,
 } from "@/lib/po-workflow.functions";
+import { ExportLinesDialog } from "@/components/fact/ExportLinesDialog";
 
 type Mode = "intake" | "pending";
 type EditableField = "pir" | "tube_spec" | "qty_ordered" | "committed_date" | "notes";
@@ -332,6 +333,12 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
             <Check className="h-3.5 w-3.5 mr-1" /> Mark all seen
           </Button>
         )}
+        <div className="ml-auto">
+          <ExportLinesDialog
+            rows={filtered}
+            scope={`${track}-${preset}`}
+          />
+        </div>
       </div>
 
       {/* Grid */}

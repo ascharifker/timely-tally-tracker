@@ -9,6 +9,7 @@ import { PoLinesSpreadsheet } from "@/components/fact/PoLinesSpreadsheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useUserRole";
 import { canCreatePo, defaultTrackForRoles } from "@/lib/rbac";
+import { useI18n } from "@/lib/i18n";
 
 const trackSchema = z.object({
   track: fallback(z.enum(["all", "coe", "third_party", "internal"]), "all").default("all"),
@@ -34,6 +35,7 @@ function PurchaseOrdersPage() {
   const { track } = Route.useSearch();
   const navigate = useNavigate({ from: "/purchase-orders/" });
   const showUpload = canCreatePo(roles);
+  const { t } = useI18n();
 
   // First load: if URL has no explicit track and the user is a track-scoped
   // reviewer, default them to their track.
@@ -49,10 +51,9 @@ function PurchaseOrdersPage() {
       <Toaster theme="dark" position="top-right" />
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Purchase Orders</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("orders.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            One row per PO line. Lines stay visible across the full lifecycle
-            (engineering → production → export → shipped). Edit in-line; changes are highlighted.
+            {t("orders.subtitle")}
             <span className="font-mono text-[11px] ml-2 opacity-70">
               PO # = customer order &nbsp;·&nbsp; ODF # = internal production order
             </span>
@@ -68,10 +69,10 @@ function PurchaseOrdersPage() {
         className="mb-3"
       >
         <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="coe">COE</TabsTrigger>
-          <TabsTrigger value="third_party">Third-Party</TabsTrigger>
-          <TabsTrigger value="internal">Internal</TabsTrigger>
+          <TabsTrigger value="all">{t("track.all")}</TabsTrigger>
+          <TabsTrigger value="coe">{t("track.coe")}</TabsTrigger>
+          <TabsTrigger value="third_party">{t("track.third_party")}</TabsTrigger>
+          <TabsTrigger value="internal">{t("track.internal")}</TabsTrigger>
         </TabsList>
       </Tabs>
       <PoLinesSpreadsheet mode="intake" track={track} />
