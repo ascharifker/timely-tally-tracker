@@ -834,7 +834,7 @@ function CreateOdfDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Creando…" : "Crear ODF"}
+              {submitting ? "Creando…" : "Crear ODT"}
             </Button>
           </DialogFooter>
         </form>
