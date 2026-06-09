@@ -16,7 +16,7 @@ export const Route = createFileRoute("/riesgo")({
   head: () => ({
     meta: [
       { title: "Trabajos en Riesgo · MEGO Produccion" },
-      { name: "description", content: "ODFs en riesgo o tarde — detalle por máquina, operador y fecha." },
+      { name: "description", content: "ODTs en riesgo o tarde — detalle por máquina, operador y fecha." },
     ],
   }),
   component: RiesgoPage,
@@ -96,7 +96,7 @@ function RiesgoPage() {
         </Link>
         <h1 className="mt-2 text-xl font-semibold tracking-tight">Trabajos en Riesgo</h1>
         <p className="text-xs text-muted-foreground">
-          ODFs que requieren atención inmediata para cumplir fecha cliente.
+          ODTs que requieren atención inmediata para cumplir fecha cliente.
         </p>
       </div>
 
@@ -115,20 +115,20 @@ function RiesgoPage() {
             <FilterTab id="late" label="Tarde" count={counts.late} />
           </div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-            {rows.length} ODF{rows.length === 1 ? "" : "s"}
+            {rows.length} ODT{rows.length === 1 ? "" : "s"}
           </div>
         </div>
 
         {rows.length === 0 ? (
           <div className="rounded border border-border/60 bg-sidebar/20 px-4 py-8 text-center text-sm text-muted-foreground">
-            Sin ODFs en esta categoría.
+            Sin ODTs en esta categoría.
           </div>
         ) : (
           <div className="overflow-x-auto rounded border border-border/60">
             <table className="w-full text-[11px]">
               <thead className="bg-sidebar/40 text-[9px] uppercase tracking-widest text-muted-foreground">
                 <tr>
-                  <th className="px-2 py-2 text-left font-semibold">ODF</th>
+                  <th className="px-2 py-2 text-left font-semibold">ODT</th>
                   <th className="px-2 py-2 text-left font-semibold">Tubo</th>
                   <th className="px-2 py-2 text-left font-semibold">PIR</th>
                   <th className="px-2 py-2 text-right font-semibold">Qty</th>

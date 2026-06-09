@@ -22,7 +22,7 @@ export function JobHistorySheet({ jobId, odf, open, onClose }: Props) {
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="bg-card sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="font-mono">Historial · ODF {odf ?? ""}</SheetTitle>
+          <SheetTitle className="font-mono">Historial · ODT {odf ?? ""}</SheetTitle>
         </SheetHeader>
         <div className="mt-4 space-y-2">
           {isLoading && <p className="text-xs text-muted-foreground">Cargando…</p>}

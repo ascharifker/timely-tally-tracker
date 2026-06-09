@@ -36,7 +36,7 @@ function FactDashboard() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Panel de Producción</h1>
           <p className="text-xs text-muted-foreground">
-            {isLoading ? "Cargando…" : `${jobs.length} ODFs activos · ${machines.length} máquinas`}
+            {isLoading ? "Cargando…" : `${jobs.length} ODTs activas · ${machines.length} máquinas`}
           </p>
         </div>
         <CreateJobDialog />

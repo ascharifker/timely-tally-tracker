@@ -85,13 +85,13 @@ export function JobDetailDialog({ job, onClose }: Props) {
       return;
     }
     if (preview.length === 0) {
-      toast.error("El ODF no tiene fecha planificada — no hay nada que reprogramar");
+      toast.error("La ODT no tiene fecha planificada — no hay nada que reprogramar");
       return;
     }
     try {
       await logDelay.mutateAsync({ jobId: job.id, delayHours, reason: reason.trim(), eventKind });
       toast.success(
-        `Retraso registrado · ${preview.length} ODF${preview.length > 1 ? "s" : ""} reprogramado${preview.length > 1 ? "s" : ""}`,
+        `Retraso registrado · ${preview.length} ODT${preview.length > 1 ? "s" : ""} reprogramada${preview.length > 1 ? "s" : ""}`,
       );
       setReason("");
       onClose();
@@ -114,7 +114,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
 
   const moveToShift = async (targetShiftIdx: number, dayDelta = 0) => {
     if (!job.planned_start || !job.planned_end) {
-      toast.error("El ODF no tiene fecha planificada — no se puede mover a un turno");
+      toast.error("La ODT no tiene fecha planificada — no se puede mover a un turno");
       return;
     }
     const oldStart = new Date(job.planned_start);
@@ -138,7 +138,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
       <DialogContent className="max-w-2xl bg-card">
         <DialogHeader>
           <DialogTitle className="font-mono flex items-center justify-between">
-            <span>ODF {job.odf} · {STATUS_LABEL[job.status]}</span>
+            <span>ODT {job.odf} · {STATUS_LABEL[job.status]}</span>
             <Button variant="ghost" size="sm" className="h-7 gap-1.5" onClick={() => setHistoryOpen(true)}>
               <History className="h-3.5 w-3.5" />
               <span className="text-xs">Historial</span>
@@ -295,9 +295,9 @@ export function JobDetailDialog({ job, onClose }: Props) {
         )}
 
         <div className="mt-4 border-t border-border pt-4">
-          <h3 className="text-sm font-semibold mb-1">Reprogramar ODF</h3>
+          <h3 className="text-sm font-semibold mb-1">Reprogramar ODT</h3>
           <p className="text-[11px] text-muted-foreground mb-3">
-            Empuja este ODF + todos los siguientes en la misma máquina. Horas negativas = adelantar.
+            Empuja esta ODT + todas las siguientes en la misma máquina. Horas negativas = adelantar.
           </p>
 
           <div className="grid grid-cols-[1fr,1fr] gap-2 mb-2">
@@ -353,12 +353,12 @@ export function JobDetailDialog({ job, onClose }: Props) {
           {preview.length > 0 ? (
             <div className="rounded border border-border mb-3">
               <div className="bg-sidebar/30 px-2 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
-                Reprogramación prevista · {preview.length} ODF{preview.length > 1 ? "s" : ""}
+                Reprogramación prevista · {preview.length} ODT{preview.length > 1 ? "s" : ""}
               </div>
               <div className="divide-y divide-border max-h-48 overflow-auto">
                 {preview.map((c) => (
                   <div key={c.job_id} className="grid grid-cols-[80px,1fr,1fr] items-center gap-2 px-2 py-1.5 text-[11px] font-mono">
-                    <span className="font-semibold">ODF {c.odf}</span>
+                    <span className="font-semibold">ODT {c.odf}</span>
                     <span className="text-muted-foreground line-through">
                       {c.old_end ? new Date(c.old_end).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
                     </span>
@@ -370,7 +370,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
               </div>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground mb-3">Sin reprogramación posible — este ODF no tiene fecha planificada.</p>
+            <p className="text-xs text-muted-foreground mb-3">Sin reprogramación posible — esta ODT no tiene fecha planificada.</p>
           )}
 
           <Button
@@ -380,7 +380,7 @@ export function JobDetailDialog({ job, onClose }: Props) {
           >
             {logDelay.isPending
               ? "Aplicando…"
-              : `Aplicar y reprogramar ${preview.length} ODF${preview.length > 1 ? "s" : ""}`}
+              : `Aplicar y reprogramar ${preview.length} ODT${preview.length > 1 ? "s" : ""}`}
           </Button>
         </div>
       </DialogContent>

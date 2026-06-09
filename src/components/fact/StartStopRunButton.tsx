@@ -45,7 +45,7 @@ export function StartStopRunButton({ job, openRun }: Props) {
         <Dialog open={stopOpen} onOpenChange={setStopOpen}>
           <DialogContent onClick={(e) => e.stopPropagation()}>
             <DialogHeader>
-              <DialogTitle>Cerrar corrida · ODF {job.odf}</DialogTitle>
+              <DialogTitle>Cerrar corrida · ODT {job.odf}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div>

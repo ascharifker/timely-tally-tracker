@@ -1,35 +1,63 @@
-## Ship 1 — ODT rollout (input layer + label rename only)
+## Audit: Ship 1 (ODT rollout) vs Fernando's brief
 
-Scheduling engine stays untouched. `schedule.ts`, `duration.ts`, `cascade.ts`, `lanes.ts`, `impact.ts`, `otd.ts` — no edits.
+I pulled the artifact (`otd-hub-lovable-build-prompt-ship-1-odt-rollout-jun-9-2026.md`) and diffed it against current code.
 
-### Task 1 — Hours-per-piece in `CreateJobDialog.tsx`
-- Replace `turnos` state with `hoursPerPiece` (decimal, `min=0.1`, `step=0.1`, placeholder `"ej: 2.5"`).
-- Relabel field to **"Tiempo de maquinado por pieza (horas)"**.
-- Compute `hours_override = hoursPerPiece × qty` (read qty from form). Continue passing `hours_override` to `scheduleJob(...)` unchanged.
-- Helper text: "Total = horas/pieza × cantidad. El calendario reparte ese total sobre los turnos disponibles de la máquina."
-- Remove the "1 turno = X h" helper and all per-shift conversion logic.
-- Add comment: `// v1 = pure ODT. ODF parent layer deferred; future bridge = PO line item → ODT.`
+### What's already done ✅
+- **Task 1 — hours-per-piece input**: `CreateJobDialog.tsx` uses `hoursPerPiece` decimal state, `hours_override = hoursPerPiece × qty`, helper text rewritten, turnos/percent-of-shift logic removed, `// v1 = pure ODT…` comment present.
+- **Task 2 (partial) — ODF→ODT rename**: clean in `CreateJobDialog.tsx`, `MachineGantt.tsx`, `StatusBoard.tsx`, `routes/production.tsx`, `OdfBreakdownDialog.tsx`.
+- **Task 3 — loosened validation**: only `odf` is `required`; qty defaults to 1.
+- **Scheduling engine untouched**: no diff in `schedule.ts`, `duration.ts`, `cascade.ts`, `lanes.ts`, `impact.ts`, `otd.ts`.
 
-### Task 2 — Rename ODF → ODT in production UI only
-Visible label rename, Spanish preserved. DB columns, `jobs` table, and `odf` payload key all unchanged.
+### Gaps before sharing with Fernando ⚠️
 
-Files to touch (text-only):
-- `CreateJobDialog.tsx`: trigger "Nuevo ODF" → "Nuevo ODT"; title "Crear ODF" → "Crear ODT"; label "ODF *" → "ODT *"; toast "ODF creado" → "ODT creado"; submit "Crear ODF" → "Crear ODT".
-- `MachineGantt.tsx`: block labels and tooltips `ODF ${j.odf}` → `ODT ${j.odf}`; "ODFs programadas" → "ODTs programadas"; tooltip "todos los ODFs" → "todas las ODTs".
-- `StatusBoard.tsx`: card label `ODF {j.odf}` → `ODT {j.odf}`; helper copy "Arrastrá una ODF…" + "Total: N ODFs" → ODT; missing-machine tooltip "abrí la ODF" → "abrí la ODT".
+**1. Residual "ODF" in surfaces Fernando WILL navigate to** (brief says "any nav/header text in production"):
+- `src/components/fact/OTDTracker.tsx` — "ODF…requieren atención", "Todos los ODFs al día"
+- `src/components/fact/JobDetailDialog.tsx` — 9 occurrences (title bar, reprogramar copy, toasts, cascade preview)
+- `src/components/fact/JobHistorySheet.tsx` — sheet title "Historial · ODF …"
+- `src/routes/maquina.$id.tsx` — "ODFs activas", "ODFs asignadas", empty state
+- `src/routes/riesgo.tsx` — page copy, table header, count, meta description
+- `src/routes/index.tsx` — dashboard subtitle "N ODFs activos · M máquinas"
 
-Out of scope for the rename in this ship: PO/intake/spreadsheet/OTD-tracker/admin/route files — those are non-production surfaces (PO layer, dashboards, risk page). Keeping the rename strictly to the three production surfaces above matches the prompt and avoids label drift in the PO domain. If you also want PO/dashboard surfaces renamed, say so and I'll extend.
+→ Rename all six files' user-visible "ODF/ODFs" → "ODT/ODTs". DB keys (`job.odf`) and code identifiers stay.
 
-### Task 3 — Loosen create-form validation
-- Keep `required` only on the `odf` (ODT number) field. Remove any other required attributes (currently only `odf` is required, confirm during edit).
-- qty already defaults to 1 — leave as-is.
-- ODT with no machine + no turnos → no `planned_start`/`planned_end` → already excluded from the calendar. No code change needed; verify after edit.
+**2. Publish metadata is still template default**:
+- `src/routes/__root.tsx` still has `title: "Lovable App"`, `description: "Lovable Generated Project"`, and the same on og:title/og:description.
+→ Set real title (e.g. "OTD Hub · MEGO Producción"), real description, matching og:* and twitter:* tags before publish.
 
-### Acceptance
-1. qty=3, hours/pc=2.5, machine 8h/turno → `hours_override=7.5` → Gantt block ≈ one shift.
-2. ODT with only number saves successfully and does not appear on calendar.
-3. All "ODF" text in `CreateJobDialog`, `MachineGantt`, `StatusBoard` reads "ODT".
-4. No diff in `src/lib/scheduling/*`.
+**3. Auth reconciliation — your call, not a code change**:
+The brief flags Alex promised Fernando a self-signup link, but the app is locked-down (`disable_signup`). Recommended path from the brief: provision Fernando's account directly, seed role = `manager`, send him ready credentials instead of a signup link. **I won't touch auth in this pass — confirm how you want to handle it.**
 
-### Not in this ship
-Auth reconciliation, tube_spec decomposition, ODF parent hierarchy, Excel ingest, Raquel report, taller list.
+### Acceptance re-check (manual, after edits)
+1. ODT qty=3, hours/pc=2.5, 8h machine → Gantt block ≈ one shift.
+2. ODT with only number saves and stays off the calendar.
+3. No "ODF" text visible anywhere in production navigation.
+4. Scheduling engine git-clean (already confirmed).
+
+---
+
+## Plan for this pass
+
+### Step 1 — Finish ODF→ODT label sweep (production-adjacent surfaces)
+Edit the six files above, replacing visible "ODF"/"ODFs" with "ODT"/"ODTs". Keep `j.odf` field reads, route names, DB columns, and the `// ODF parent layer deferred` comment in `CreateJobDialog.tsx`.
+
+### Step 2 — Publish metadata
+In `src/routes/__root.tsx`, replace the four "Lovable App"/"Lovable Generated Project" head entries with:
+- title: `OTD Hub · MEGO Producción`
+- description: `Planificación de producción Mego Afek — ODTs, OTD determinístico y cascada de impacto.`
+- og:title / og:description / twitter:title / twitter:description: same values
+- og:type stays `website`
+
+### Step 3 — You decide on auth, then I publish
+Two options for Fernando's account — tell me which:
+- **A. Stay locked-down (recommended by brief):** I leave auth alone; you/Alex create Fernando's user in the backend with role `manager` and send him creds out-of-band. Then I publish.
+- **B. Open self-signup temporarily:** enable signups + email verification, optionally restrict to his email domain, manually promote to `manager` after first login. Riskier; not what the brief recommends.
+
+### Out of scope (deferred, per brief)
+tube_spec decomposition, ODF parent hierarchy, Excel ingest, Raquel report, taller list additions.
+
+### Acceptance for this pass
+- `rg "ODF" src/components/fact src/routes` returns only the deferred-layer code comment.
+- Root head() shows real OTD Hub metadata.
+- Auth path decided and (for option A) Fernando's account exists before I hit publish.
+
+Answer Step 3 (A or B) and I'll execute Steps 1–2 immediately.
