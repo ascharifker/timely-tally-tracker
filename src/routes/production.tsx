@@ -735,12 +735,12 @@ function CreateOdfDialog({
       <DialogContent className="max-w-xl bg-card">
         <DialogHeader>
           <DialogTitle>
-            Crear ODF — {line.purchase_order?.po_number} · L{line.line_number}
+            Crear ODT — {line.purchase_order?.po_number} · L{line.line_number}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-1">
-            <Label>ODF (vacío = auto nnn/yy)</Label>
+            <Label>ODT (vacío = auto nnn/yy)</Label>
             <Input name="odf" placeholder="auto" />
           </div>
           <div className="col-span-1">
