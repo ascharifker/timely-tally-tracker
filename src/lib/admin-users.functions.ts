@@ -24,6 +24,17 @@ const APP_ROLES = [
 ] as const;
 const AppRoleSchema = z.enum(APP_ROLES);
 
+const ALLOWED_INVITE_DOMAINS = ["mego-afek.com"];
+
+function assertAllowedDomain(email: string) {
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  if (!ALLOWED_INVITE_DOMAINS.includes(domain)) {
+    throw new Error(
+      `Only @${ALLOWED_INVITE_DOMAINS.join(", @")} emails can be invited.`,
+    );
+  }
+}
+
 async function assertAdmin(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
@@ -77,38 +88,58 @@ export const inviteUser = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ email: z.string().email(), role: AppRoleSchema }).parse(input),
   )
-  .handler(async ({ context, data }): Promise<{ user_id: string; action_link: string }> => {
+  .handler(async ({ context, data }): Promise<{
+    user_id: string;
+    email_sent: boolean;
+    action_link?: string;
+  }> => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const email = data.email.trim().toLowerCase();
+    assertAllowedDomain(email);
 
-    // Create user (email-confirmed; they'll set password via invite link).
-    const tempPassword = crypto.randomUUID() + "Aa1!";
-    const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: true,
+    // Look up whether this email already has an auth user.
+    const { data: list, error: lookupErr } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 200,
     });
-    if (cErr || !created.user) throw new Error(cErr?.message ?? "createUser failed");
-    const userId = created.user.id;
+    if (lookupErr) throw new Error(lookupErr.message);
+    const existing = list.users.find((u) => u.email?.toLowerCase() === email);
 
+    const redirectTo = redirectFromRequest("/reset-password");
+    let userId: string;
+    let emailSent = false;
+    let actionLink: string | undefined;
+
+    if (!existing) {
+      // New user — Supabase sends the invite email automatically.
+      const { data: invited, error: iErr } =
+        await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
+      if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
+      userId = invited.user.id;
+      emailSent = true;
+    } else {
+      // Existing user — generate a recovery link so they can set/reset a password.
+      userId = existing.id;
+      const { data: link, error: lErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo },
+      });
+      if (lErr || !link.properties?.action_link) {
+        throw new Error(lErr?.message ?? "generateLink failed");
+      }
+      actionLink = link.properties.action_link;
+    }
+
+    // Assign role (replace any existing rows for one-role-per-user simplicity).
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
     const { error: rErr } = await supabaseAdmin
       .from("user_roles")
       .insert({ user_id: userId, role: data.role });
-    if (rErr) {
-      await supabaseAdmin.auth.admin.deleteUser(userId);
-      throw new Error(rErr.message);
-    }
+    if (rErr) throw new Error(rErr.message);
 
-    const { data: link, error: lErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: redirectFromRequest("/reset-password") },
-    });
-    if (lErr || !link.properties?.action_link) {
-      throw new Error(lErr?.message ?? "generateLink failed");
-    }
-    return { user_id: userId, action_link: link.properties.action_link };
+    return { user_id: userId, email_sent: emailSent, action_link: actionLink };
   });
 
 export const copyLinkForUser = createServerFn({ method: "POST" })
