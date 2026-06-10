@@ -136,6 +136,8 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
             flag_reason: l.flag_reason,
             engineering_reviewed_at: l.engineering_reviewed_at,
             engineering_reviewed_by: l.engineering_reviewed_by,
+            eng_step: l.eng_step ?? null,
+            eng_step_started_at: l.eng_step_started_at ?? null,
           },
           po: l.purchase_order
             ? {
