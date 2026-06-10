@@ -140,6 +140,8 @@ export interface POLineItem {
   flag_reason: string | null;
   engineering_reviewed_at: string | null;
   engineering_reviewed_by: string | null;
+  eng_step: string | null;
+  eng_step_started_at: string | null;
 }
 
 export type POLineStatus =
