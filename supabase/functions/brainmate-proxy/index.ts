@@ -10,6 +10,7 @@
 // Lovable AI Gateway with the same prompt contract so the demo always works.
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Kind = "daily_briefing" | "delay_explanation" | "otd_commentary";
 const ALLOWED: Kind[] = ["daily_briefing", "delay_explanation", "otd_commentary"];
@@ -87,6 +88,38 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+  }
+
+  // Require an authenticated Supabase user. Edge functions deploy with
+  // verify_jwt = false by default in Lovable, so enforce auth in code to
+  // prevent unauthenticated callers from burning AI credits.
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnon =
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnon) {
+    return new Response(JSON.stringify({ error: "server_misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const authClient = createClient(supabaseUrl, supabaseAnon, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await authClient.auth.getUser(
+    authHeader.replace("Bearer ", ""),
+  );
+  if (userErr || !userData?.user) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   let body: ProxyRequest;
