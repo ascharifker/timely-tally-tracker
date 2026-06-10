@@ -1,6 +1,159 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  ENGINEERING_STEPS,
+  nextStep,
+  getStep,
+} from "@/lib/engineering-steps";
+
+async function logStepEvent(opts: {
+  po_line_item_id: string;
+  from_step: string | null;
+  to_step: string | null;
+  kind: "advance" | "jump" | "flag" | "unflag" | "complete";
+  actor: string | null;
+  elapsed_ms: number | null;
+  metadata?: Record<string, unknown>;
+}) {
+  await supabaseAdmin.from("po_line_step_events" as never).insert({
+    po_line_item_id: opts.po_line_item_id,
+    from_step: opts.from_step,
+    to_step: opts.to_step,
+    kind: opts.kind,
+    actor: opts.actor,
+    elapsed_ms: opts.elapsed_ms,
+    metadata: opts.metadata ?? {},
+  } as never);
+}
+
+function elapsedMs(startedAt: string | null): number | null {
+  if (!startedAt) return null;
+  const t = new Date(startedAt).getTime();
+  if (Number.isNaN(t)) return null;
+  return Date.now() - t;
+}
+
+/**
+ * Advance a PO line to the next engineering step.
+ * If already on the last step, the line transitions to `ready_for_production`.
+ */
+export const advanceEngStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error: rErr } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .select("eng_step, eng_step_started_at, status")
+      .eq("id", data.id)
+      .single();
+    if (rErr || !row) throw new Error(rErr?.message ?? "Line not found");
+    const line = row as {
+      eng_step: string | null;
+      eng_step_started_at: string | null;
+      status: string;
+    };
+    const current = line.eng_step ?? ENGINEERING_STEPS[0].key;
+    const next = nextStep(current);
+    const now = new Date().toISOString();
+    const actor = context.userId ?? null;
+    const elapsed = elapsedMs(line.eng_step_started_at);
+
+    if (next === null) {
+      // Finished last step → ready for production.
+      const { error } = await supabaseAdmin
+        .from("po_line_items" as never)
+        .update({
+          status: "ready_for_production",
+          eng_step: null,
+          eng_step_started_at: null,
+          engineering_reviewed_at: now,
+          engineering_reviewed_by: actor,
+          flag_reason: null,
+        } as never)
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+      await logStepEvent({
+        po_line_item_id: data.id,
+        from_step: current,
+        to_step: null,
+        kind: "complete",
+        actor,
+        elapsed_ms: elapsed,
+      });
+      return { ok: true, completed: true };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .update({
+        eng_step: next.key,
+        eng_step_started_at: now,
+      } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await logStepEvent({
+      po_line_item_id: data.id,
+      from_step: current,
+      to_step: next.key,
+      kind: "advance",
+      actor,
+      elapsed_ms: elapsed,
+    });
+    return { ok: true, completed: false, to_step: next.key };
+  });
+
+/**
+ * Jump a PO line to a specific engineering step (manual override).
+ */
+export const setEngStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        step: z.string().min(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const target = getStep(data.step);
+    if (!target) throw new Error(`Unknown engineering step: ${data.step}`);
+    const { data: row, error: rErr } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .select("eng_step, eng_step_started_at")
+      .eq("id", data.id)
+      .single();
+    if (rErr || !row) throw new Error(rErr?.message ?? "Line not found");
+    const line = row as {
+      eng_step: string | null;
+      eng_step_started_at: string | null;
+    };
+    const now = new Date().toISOString();
+    const actor = context.userId ?? null;
+    const elapsed = elapsedMs(line.eng_step_started_at);
+
+    const { error } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .update({
+        eng_step: target.key,
+        eng_step_started_at: now,
+      } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await logStepEvent({
+      po_line_item_id: data.id,
+      from_step: line.eng_step,
+      to_step: target.key,
+      kind: "jump",
+      actor,
+      elapsed_ms: elapsed,
+    });
+    return { ok: true };
+  });
 
 // Approve a PO line (engineering OK). Moves directly to ready_for_production.
 export const approvePoLine = createServerFn({ method: "POST" })

@@ -437,6 +437,8 @@ export type Database = {
           committed_date: string | null
           created_at: string
           currency: string | null
+          eng_step: string | null
+          eng_step_started_at: string | null
           engineering_reviewed_at: string | null
           engineering_reviewed_by: string | null
           export_date: string | null
@@ -456,6 +458,8 @@ export type Database = {
           committed_date?: string | null
           created_at?: string
           currency?: string | null
+          eng_step?: string | null
+          eng_step_started_at?: string | null
           engineering_reviewed_at?: string | null
           engineering_reviewed_by?: string | null
           export_date?: string | null
@@ -475,6 +479,8 @@ export type Database = {
           committed_date?: string | null
           created_at?: string
           currency?: string | null
+          eng_step?: string | null
+          eng_step_started_at?: string | null
           engineering_reviewed_at?: string | null
           engineering_reviewed_by?: string | null
           export_date?: string | null
@@ -496,6 +502,50 @@ export type Database = {
             columns: ["purchase_order_id"]
             isOneToOne: false
             referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_line_step_events: {
+        Row: {
+          actor: string | null
+          elapsed_ms: number | null
+          from_step: string | null
+          id: string
+          kind: string
+          metadata: Json
+          occurred_at: string
+          po_line_item_id: string
+          to_step: string | null
+        }
+        Insert: {
+          actor?: string | null
+          elapsed_ms?: number | null
+          from_step?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          occurred_at?: string
+          po_line_item_id: string
+          to_step?: string | null
+        }
+        Update: {
+          actor?: string | null
+          elapsed_ms?: number | null
+          from_step?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          occurred_at?: string
+          po_line_item_id?: string
+          to_step?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_line_step_events_po_line_item_id_fkey"
+            columns: ["po_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_items"
             referencedColumns: ["id"]
           },
         ]
