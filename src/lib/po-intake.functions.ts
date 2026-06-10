@@ -167,8 +167,10 @@ const CommitPoInput = z.object({
 });
 
 export const commitPo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CommitPoInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertCanEditPo(context.userId);
     // 1. Find or create customer.
     let customerId = data.customer.id;
     if (!customerId) {
@@ -261,10 +263,12 @@ export const commitPo = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------
 
 export const getPoDocumentUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ storagePath: z.string().min(1) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertCanEditPo(context.userId);
     const { data: signed, error } = await supabaseAdmin.storage
       .from("po-documents")
       .createSignedUrl(data.storagePath, 60 * 60);
