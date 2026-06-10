@@ -3,6 +3,19 @@ import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+async function assertCanEditPo(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .in("role", ["admin", "po_editor", "coe_reviewer", "third_party_reviewer", "manager"]);
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error("Forbidden: PO editor role required");
+  }
+}
 
 // ---------------------------------------------------------------
 // Shared Zod schemas
@@ -33,10 +46,12 @@ export type ExtractedPoData = z.infer<typeof ExtractedPo>;
 // ---------------------------------------------------------------
 
 export const extractPoFromPdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ storagePath: z.string().min(1) }).parse(input),
   )
-  .handler(async ({ data }): Promise<ExtractedPoData> => {
+  .handler(async ({ data, context }): Promise<ExtractedPoData> => {
+    await assertCanEditPo(context.userId);
     const lovableKey = process.env.LOVABLE_API_KEY;
     if (!lovableKey) throw new Error("LOVABLE_API_KEY no configurada");
 
@@ -152,8 +167,10 @@ const CommitPoInput = z.object({
 });
 
 export const commitPo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CommitPoInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertCanEditPo(context.userId);
     // 1. Find or create customer.
     let customerId = data.customer.id;
     if (!customerId) {
@@ -246,10 +263,12 @@ export const commitPo = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------
 
 export const getPoDocumentUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ storagePath: z.string().min(1) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertCanEditPo(context.userId);
     const { data: signed, error } = await supabaseAdmin.storage
       .from("po-documents")
       .createSignedUrl(data.storagePath, 60 * 60);

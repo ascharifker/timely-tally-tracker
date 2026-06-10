@@ -263,20 +263,6 @@ export const claimAdminIfEligible = createServerFn({ method: "POST" })
     return { admin: true };
   });
 
-// One-off reset: delete an allowlisted user (and their role rows) so they
-// can sign up fresh. Unauthenticated but locked to the allowlist.
-export const resetAllowlistedUser = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ email: z.string().email() }).parse(input))
-  .handler(async ({ data }): Promise<{ deleted: boolean }> => {
-    const email = data.email.trim().toLowerCase();
-    if (!ADMIN_ALLOWLIST.has(email)) throw new Error("Not allowed");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: list, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    if (error) throw new Error(error.message);
-    const u = list.users.find((x) => x.email?.toLowerCase() === email);
-    if (!u) return { deleted: false };
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", u.id);
-    const { error: dErr } = await supabaseAdmin.auth.admin.deleteUser(u.id);
-    if (dErr) throw new Error(dErr.message);
-    return { deleted: true };
-  });
+// resetAllowlistedUser was removed: it was an unauthenticated endpoint that
+// could permanently delete the primary admin account based only on a
+// hard-coded allowlist email visible in the client bundle.
