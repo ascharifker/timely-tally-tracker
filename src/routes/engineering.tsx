@@ -41,6 +41,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowRight, ChevronDown, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EngStepDrawer } from "@/components/fact/EngStepDrawer";
+import type { PoLineWithContext } from "@/hooks/usePoQueues";
 
 export const Route = createFileRoute("/engineering")({
   ssr: false,
@@ -106,6 +108,7 @@ function EngineeringPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [flagOpen, setFlagOpen] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
+  const [drawerLine, setDrawerLine] = useState<PoLineWithContext | null>(null);
 
   const refresh = () =>
     qc.invalidateQueries({ queryKey: ["po_lines_by_status"] });
@@ -248,6 +251,13 @@ function EngineeringPage() {
                   <div className="flex justify-end gap-1">
                     <Button
                       size="sm"
+                      variant="outline"
+                      onClick={() => setDrawerLine(l)}
+                    >
+                      Open
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="default"
                       disabled={busy === l.id}
                       onClick={() => advance(l.id)}
@@ -312,6 +322,12 @@ function EngineeringPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EngStepDrawer
+        line={drawerLine}
+        open={!!drawerLine}
+        onOpenChange={(o) => !o && setDrawerLine(null)}
+      />
     </AppShell>
   );
 }
