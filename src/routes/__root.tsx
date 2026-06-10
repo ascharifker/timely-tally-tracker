@@ -82,6 +82,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "OTD Hub · MEGO Producción" },
       { name: "twitter:description", content: "Planificación de producción Mego Afek — ODTs, OTD determinístico y cascada de impacto." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e1727220-dbd9-40f7-95be-aed797625159/id-preview-237f25f6--7b0b25dd-0985-4bfb-94d5-5e8534369226.lovable.app-1781050235740.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e1727220-dbd9-40f7-95be-aed797625159/id-preview-237f25f6--7b0b25dd-0985-4bfb-94d5-5e8534369226.lovable.app-1781050235740.png" },
     ],
     links: [
       {
