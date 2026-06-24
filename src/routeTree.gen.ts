@@ -24,6 +24,7 @@ import { Route as PurchaseOrdersIndexRouteImport } from './routes/purchase-order
 import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
 import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminImportMaquinadosRouteImport } from './routes/admin.import-maquinados'
 import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -101,6 +102,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminImportMaquinadosRoute = AdminImportMaquinadosRouteImport.update({
+  id: '/admin/import-maquinados',
+  path: '/admin/import-maquinados',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminDelegationsRoute = AdminDelegationsRouteImport.update({
   id: '/admin/delegations',
   path: '/admin/delegations',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/riesgo': typeof RiesgoRoute
   '/settings': typeof SettingsRoute
   '/admin/delegations': typeof AdminDelegationsRoute
+  '/admin/import-maquinados': typeof AdminImportMaquinadosRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/riesgo': typeof RiesgoRoute
   '/settings': typeof SettingsRoute
   '/admin/delegations': typeof AdminDelegationsRoute
+  '/admin/import-maquinados': typeof AdminImportMaquinadosRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/riesgo': typeof RiesgoRoute
   '/settings': typeof SettingsRoute
   '/admin/delegations': typeof AdminDelegationsRoute
+  '/admin/import-maquinados': typeof AdminImportMaquinadosRoute
   '/admin/users': typeof AdminUsersRoute
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/riesgo'
     | '/settings'
     | '/admin/delegations'
+    | '/admin/import-maquinados'
     | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/riesgo'
     | '/settings'
     | '/admin/delegations'
+    | '/admin/import-maquinados'
     | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/riesgo'
     | '/settings'
     | '/admin/delegations'
+    | '/admin/import-maquinados'
     | '/admin/users'
     | '/maquina/$id'
     | '/purchase-orders/$id'
@@ -230,6 +242,7 @@ export interface RootRouteChildren {
   RiesgoRoute: typeof RiesgoRoute
   SettingsRoute: typeof SettingsRoute
   AdminDelegationsRoute: typeof AdminDelegationsRoute
+  AdminImportMaquinadosRoute: typeof AdminImportMaquinadosRoute
   AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
 }
@@ -341,6 +354,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/import-maquinados': {
+      id: '/admin/import-maquinados'
+      path: '/admin/import-maquinados'
+      fullPath: '/admin/import-maquinados'
+      preLoaderRoute: typeof AdminImportMaquinadosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/delegations': {
       id: '/admin/delegations'
       path: '/admin/delegations'
@@ -378,6 +398,7 @@ const rootRouteChildren: RootRouteChildren = {
   RiesgoRoute: RiesgoRoute,
   SettingsRoute: SettingsRoute,
   AdminDelegationsRoute: AdminDelegationsRoute,
+  AdminImportMaquinadosRoute: AdminImportMaquinadosRoute,
   AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
 }

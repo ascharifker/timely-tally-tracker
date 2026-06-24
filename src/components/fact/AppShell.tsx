@@ -12,6 +12,7 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  Upload,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -80,6 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/pending-review", label: t("nav.pending"), icon: ClipboardList, show: showPendingReview },
     { to: "/engineering", label: t("nav.engineering"), icon: Wrench, show: true },
     { to: "/production", label: t("nav.production"), icon: Factory, show: true },
+    { to: "/admin/import-maquinados", label: "Importar MAQ.", icon: Upload, show: showAdmin },
     { to: "/settings", label: showAdmin ? t("nav.settings") : t("nav.config"), icon: Settings, show: true },
   ];
 
