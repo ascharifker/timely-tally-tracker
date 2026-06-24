@@ -537,7 +537,24 @@ function ActiveJobsTable({
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {j.machine_id ? mById[j.machine_id] ?? "—" : "—"}
+                    <div>{j.machine_id ? mById[j.machine_id] ?? "—" : "—"}</div>
+                    {j.planned_start && (() => {
+                      const s = SHIFTS[shiftIndexFromDate(j.planned_start)];
+                      const d = new Date(j.planned_start);
+                      return (
+                        <div
+                          className="mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono"
+                          style={{ backgroundColor: s.tint, color: s.color }}
+                          title={`Arranca ${s.name} ${String(s.startHour).padStart(2, "0")}:00`}
+                        >
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: s.color }}
+                          />
+                          {d.toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" })} · {s.label}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-right font-mono">{j.qty}</TableCell>
                   <TableCell>
