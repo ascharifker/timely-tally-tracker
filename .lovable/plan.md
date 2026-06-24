@@ -1,81 +1,103 @@
+# MAQUINADOS Importer
 
-# Demo Reset + Pending-ODF Importer
+Scope: parse the `MAQUINADOS` sheet only from Fer's `CRONOGRAMA FLOTACION` workbook and bulk-load it into the live database. Admin-only, in-app, with preview + commit.
 
-Two shippable pieces. Do the wipe first (today, pre-demo). Build the importer next as its own small wave so Fer can paste in his backlog when he's ready.
+## Sheet shape (verified against uploaded file)
 
----
+- Rows 1–4: header / title block (ignored).
+- Row 5+ alternates between **machine group headers** (single cell in col A like `MAZAK 1`, `MAZAK 2`, `MAZAK 3`, `MAZAK 4`, `CENTRO DE MAQUINADO`, `MAQUINAS Y HERRAMIENTAS`, `MAQYRO`, `TEC MAQ`) and **data rows** belonging to the most recent header.
+- Data-row columns:
+  1. `No. de P.O.` — multi-line; first non-empty line containing digits → `purchase_orders.po_number`. Whole cell stored as raw.
+  2. `No. de ODF` — e.g. `180/26` → `jobs.odf`.
+  3. `FECHA DE ENTREGA EN PO` — date or text → `po_line_items.committed_date` (+ `jobs.customer_date`).
+  4. `No. de Tuberia utilizada` — long text → `po_line_items.tube_spec`.
+  5. `CODIGO DE PRODUCTO` — long text → `po_line_items.notes` (product description).
+  6. `PIR` — e.g. `103012842 REV B` → `po_line_items.pir`.
+  7. `CANTIDAD A PRODUCIR` — int or text like `"3\n1 DE 3 TOTALES"` → leading int → `po_line_items.qty_ordered` / `jobs.qty`.
+  8. `FECHA` — ignored (it's the workbook-wide date stamp).
+  9. `COMENTARIOS` — schedule notes like `21-may 3er turno .5 pza` → stored on `jobs.notes` AND best-effort parsed into planned `machine_runs`.
 
-## Piece 1 — Demo wipe (transactional + customers)
+## Build pieces
 
-One migration that truncates the demo data in dependency order, in a transaction.
+### 1. Route `/admin/import-maquinados` (admin-only)
 
-**Wiped (CASCADE-safe order):**
-- `machine_runs`
-- `job_steps`
-- `jobs`
-- `briefings`
-- `date_change_log`
-- `status_events`
-- `po_line_step_events`
-- `po_line_items`
-- `purchase_orders`
-- `customers`
-- `odf_sequences` (so ODF numbering restarts at 001/26)
+- Layout: `_authenticated` subtree, guarded by `has_role('admin')` check on mount (redirect to `/` otherwise).
+- File drop zone for `.xlsx`. Parse client-side with `xlsx` (SheetJS) — already a one-off browser concern, no upload until commit.
 
-**Preserved:** `machines`, `vendors`, `part_times`, `user_roles`, `review_delegations`, auth users, storage buckets (object files in `po-documents/` left alone — orphaned but harmless; can purge later if Fer wants).
+### 2. Parser (`src/lib/maquinados-import.ts`, client-safe)
 
-Delivered as a single migration so it goes through the normal approval gate. After it runs, the app boots into an empty state — engineering, production, intake, purchase-orders pages all render with zero rows.
+- `parseMaquinadosSheet(arrayBuffer) → ParsedRow[]`
+- Iterates rows, tracks `currentMachineHeader` whenever a single-cell row matches the known machine-header regex.
+- Emits one `ParsedRow` per data row with: raw cells, derived fields, the machine header string, and `validation: { errors: string[]; warnings: string[] }`.
+- Hard errors block commit on that row: missing PO# digits, missing ODF, missing PIR, qty ≤ 0, no machine header in scope.
+- Warnings (don't block): committed_date unparseable, schedule cell present but no runs parsed.
 
----
+### 3. Machine auto-match
 
-## Piece 2 — Pending-ODF importer (in-app, admin-only)
+- `useMachines()` already exists; the parser is passed the machines list and resolves each header to a `machine_id` by case-insensitive trimmed name match.
+- Unmatched header → all rows under it become row-level errors with message `Crear máquina "MAZAK 5" en Configuración antes de importar.`
+- Importer does NOT auto-create machines (per your "Auto-match by name" answer).
 
-New route `/admin/import` (admin role only, route gated under `_authenticated/`).
+### 4. Schedule cell parser (`parseScheduleCell`)
 
-### Flow
-1. **Drop .xlsx** → parsed in the browser with `xlsx` (SheetJS). No upload until commit.
-2. **Preview grid** → every row shown with parsed values, derived fields (customer match, PO match), and per-row validation status (ok / warning / error). Errors block the row; warnings don't.
-3. **Per-row "Starts at" selector** → dropdown per row: `Engineering · Step 1 (PO Info)` | `Engineering · Step 2 (PIR Verify)` | `Engineering · Step 3 (Components)` | `Engineering · Step 4 (Matrix)` | `Ready for production`. Bulk-set control at the top ("Set all to…").
-4. **Commit** → server function runs the insert in a single transaction, returns counts + any row-level failures.
+- Splits on newlines.
+- Regex per line: `^(\d{1,2})-(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+(1er|2do|3er)\s+turno(?:\s+([\d.]+)\s*pza)?\s*$`
+- Each successful match → one planned `machine_runs` row with computed `started_at` (date + shift start hour from `shifts` table or sensible defaults) and `pieces_completed = matched qty or 0`. Year inferred from `committed_date.year` (fallback current year).
+- Unmatched lines are kept in the raw notes; row gets a warning if 0 of N lines parsed.
+- Full raw `COMENTARIOS` text always goes into `jobs.notes` regardless of parse outcome.
 
-### Assumed column shape (Mego's usual)
-We plan against these; refine when Fer's sheet lands.
+### 5. Preview UI (`MaquinadosImportPreview`)
 
-| Sheet column     | Maps to                                  |
-|------------------|------------------------------------------|
-| Customer         | `customers.name` (fuzzy match → create if new) |
-| PO #             | `purchase_orders.po_number` (group rows) |
-| Line #           | `po_line_items.line_number` (auto if blank) |
-| PIR              | `po_line_items.pir`                      |
-| Tube spec        | `po_line_items.tube_spec`                |
-| Qty              | `po_line_items.qty_ordered`              |
-| Committed date   | `po_line_items.committed_date`           |
-| Export date      | `po_line_items.export_date`              |
-| ODF              | `jobs.odf` (only created if "Ready for production") |
-| Notes            | `po_line_items.notes`                    |
-| Review track     | `purchase_orders.review_track` (default `coe`) |
+Single table grouped by machine header. Columns:
 
-Loose-row tolerance: missing PIR / tube spec / dates are allowed and just keep the row in earlier engineering steps. Missing customer + PO# + qty = hard error.
+- Status pill (✓ OK / ⚠ warnings / ✗ errors)
+- Machine (matched name or red "unmatched")
+- PO# · ODF · PIR · Qty · Committed date
+- Tube spec (truncated, hover for full)
+- Product (truncated, hover for full)
+- **Starts at** — `Select` per row defaulting to `MAZAK` (in-production). Options: `INTAKE`, `PENDIENTE_ING_STEP1..4`, `MAZAK`, `MAQUINADO_LISTO`, `TALLER_EXTERNO`, `TERMINADO`. Bulk-set control above the table.
+- Planned runs count (badge `3 runs parsed` / `0/4 lines`)
+- Notes preview (truncated)
 
-### Commit logic (server function)
-- `bulkImportPendingLines({ rows })` with `requireSupabaseAuth` + admin role check.
-- Per row:
-  1. Upsert customer by name.
-  2. Upsert PO by `(customer_id, po_number)`.
-  3. Insert `po_line_items` with `status` derived from the row's "Starts at" choice (`pending_engineering` + matching `eng_step`, or `ready_for_production`).
-  4. If "Ready for production" AND `odf` provided → insert a `jobs` row linked to the line; otherwise skip job creation (it'll happen in the normal production flow).
-  5. Log a `status_events` row with `metadata.kind='bulk_import'` so cycle-time math doesn't count import as a step.
-- Wrap whole batch in a Postgres function `public.bulk_import_pending_lines(payload jsonb)` so it's truly atomic — partial failure rolls back.
+Header row above table: total rows, breakdown (OK / warn / error), `Commit OK + warnings` button (disabled while any row has hard errors selected for commit; rows with errors are excluded automatically and flagged with a "skipped on commit" badge).
 
-### What we don't build now
-- No Excel template generator (Fer brings his own; importer just maps columns).
-- No edit-in-place in the preview grid — errors must be fixed in Excel and re-uploaded. Keeps v1 small.
-- No re-import / merge semantics. Second import = additional rows.
+### 6. Commit path (server)
 
----
+- `src/lib/maquinados-import.functions.ts` → `bulkImportMaquinados(payload: ParsedRow[])`
+- `.middleware([requireSupabaseAuth])` + admin role check via `has_role`.
+- Loads `supabaseAdmin` inside the handler (privileged, atomic across multiple tables).
+- Calls Postgres function `public.bulk_import_maquinados(payload jsonb) returns jsonb` (created via migration). Function does, in one tx, per row:
+  1. `INSERT … ON CONFLICT DO NOTHING` into `customers` (always `COE` since every row in this sheet is for COE based on the PO header text — single hard-coded customer for v1; flagged in TODOs for multi-customer later).
+  2. Upsert `purchase_orders` by `(customer_id, po_number)` with `review_track='coe'`.
+  3. Insert `po_line_items` (status = the per-row chosen status; PIR / qty / tube_spec / notes / committed_date populated).
+  4. If status is in production set (`MAZAK`, `MAQUINADO_LISTO`, `TALLER_EXTERNO`, `TERMINADO`): insert `jobs` row with `odf`, `machine_id`, `qty`, `customer_date`, `status`, `notes`.
+  5. Insert any parsed `machine_runs` rows linked to the new job.
+  6. Insert one `status_events` row with `metadata.kind='bulk_import_maquinados'`.
+- Returns `{ inserted, skipped, errors: [{rowIndex, message}] }` — surfaced as a result toast + summary card in the UI.
+
+### 7. Migration
+
+- Add `public.bulk_import_maquinados(payload jsonb)` security-definer function with `search_path=public`, executable by `authenticated`. Role check inside the function (`has_role(auth.uid(),'admin')`) so even direct RPC is gated.
+- No new tables.
+
+### 8. Nav
+
+- Add a "Importar MAQUINADOS" link in the admin section of `AppShell` (visible only to admins via existing `useUserRole`).
+
+## Out of scope (call out, build later)
+
+- RIMADORAS / NUEVAS PO / FLOTACION sheets (separate parsers when needed).
+- Multi-customer detection from the PO header (always COE for v1).
+- Re-import / merge semantics — re-running with same ODF/PO will surface a unique-violation error in the result summary; user resolves manually.
+- Editing rows in the preview before commit (read-only with status dropdown only).
+- Saving the uploaded file to storage.
 
 ## Build order
-1. Migration wipe (today, before demo).
-2. After demo + Fer's sheet in hand: column mapping refinement → importer route + preview UI → server fn + Postgres function → smoke test with his actual file.
 
-Approve and I'll start with the wipe migration.
+1. Migration: `bulk_import_maquinados` SQL function.
+2. `src/lib/maquinados-import.ts` parser + schedule parser + machine matcher (pure, unit-testable).
+3. `src/lib/maquinados-import.functions.ts` server fn calling the RPC.
+4. `src/routes/_authenticated/admin.import-maquinados.tsx` route + preview UI.
+5. Add `xlsx` (SheetJS) via `bun add xlsx`.
+6. Nav entry.
+7. Smoke test against the uploaded file end-to-end.
