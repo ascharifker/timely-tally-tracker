@@ -18,6 +18,9 @@ import {
 import { JobStepsTimeline } from "@/components/fact/JobStepsTimeline";
 import { PoDetailDialog } from "@/components/fact/PoDetailDialog";
 import { OdfBreakdownDialog } from "@/components/fact/OdfBreakdownDialog";
+import { JobDetailDialog } from "@/components/fact/JobDetailDialog";
+import { MachineGantt } from "@/components/fact/MachineGantt";
+import { SHIFTS, shiftIndexFromDate } from "@/lib/shifts";
 import { computeOdfOtd, OTD_TONE } from "@/lib/scheduling/odf-otd";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -112,6 +115,7 @@ function ProductionPage() {
   const [active, setActive] = useState<PoLineWithContext | null>(null);
   const [detailPoId, setDetailPoId] = useState<string | null>(null);
   const [detailJob, setDetailJob] = useState<ActiveJob | null>(null);
+  const [editJob, setEditJob] = useState<ActiveJob | null>(null);
 
   const refreshAll = async () => {
     await Promise.all([
@@ -212,9 +216,19 @@ function ProductionPage() {
       <div className="mt-8 mb-4">
         <h2 className="text-2xl font-semibold tracking-tight">Mis ODTs activas</h2>
         <p className="text-sm text-muted-foreground">
-          Pasos en curso, retrasos y acciones rápidas (avanzar, pausar, reportar retraso).
+          Mirá dónde cae cada ODT en el calendario, arrastrá la barra para mover de turno o máquina,
+          y usá los botones para avanzar / pausar / reportar retraso. Clic en una ODT para ver el detalle.
         </p>
       </div>
+      {activeJobs.length > 0 && (
+        <div className="mb-4">
+          <MachineGantt
+            jobs={activeJobs}
+            machines={machines}
+            onJobClick={(j) => setDetailJob(j as ActiveJob)}
+          />
+        </div>
+      )}
       <ActiveJobsTable
         jobs={activeJobs}
         machines={machines}
@@ -252,7 +266,12 @@ function ProductionPage() {
         job={detailJob}
         machines={machines}
         onClose={() => setDetailJob(null)}
+        onEdit={(j) => {
+          setDetailJob(null);
+          setEditJob(j);
+        }}
       />
+      <JobDetailDialog job={editJob} onClose={() => setEditJob(null)} />
     </AppShell>
   );
 }
@@ -518,7 +537,24 @@ function ActiveJobsTable({
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {j.machine_id ? mById[j.machine_id] ?? "—" : "—"}
+                    <div>{j.machine_id ? mById[j.machine_id] ?? "—" : "—"}</div>
+                    {j.planned_start && (() => {
+                      const s = SHIFTS[shiftIndexFromDate(j.planned_start)];
+                      const d = new Date(j.planned_start);
+                      return (
+                        <div
+                          className="mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono"
+                          style={{ backgroundColor: s.tint, color: s.color }}
+                          title={`Arranca ${s.name} ${String(s.startHour).padStart(2, "0")}:00`}
+                        >
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: s.color }}
+                          />
+                          {d.toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" })} · {s.label}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-right font-mono">{j.qty}</TableCell>
                   <TableCell>

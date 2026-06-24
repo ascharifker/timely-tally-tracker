@@ -1,103 +1,37 @@
-# MAQUINADOS Importer
+# Make ODTs feel alive on /production
 
-Scope: parse the `MAQUINADOS` sheet only from Fer's `CRONOGRAMA FLOTACION` workbook and bulk-load it into the live database. Admin-only, in-app, with preview + commit.
+Goal: when Fer opens **Producción**, he should immediately see *where* every active ODT sits on the calendar, and edit it in one or two clicks.
 
-## Sheet shape (verified against uploaded file)
+## What changes
 
-- Rows 1–4: header / title block (ignored).
-- Row 5+ alternates between **machine group headers** (single cell in col A like `MAZAK 1`, `MAZAK 2`, `MAZAK 3`, `MAZAK 4`, `CENTRO DE MAQUINADO`, `MAQUINAS Y HERRAMIENTAS`, `MAQYRO`, `TEC MAQ`) and **data rows** belonging to the most recent header.
-- Data-row columns:
-  1. `No. de P.O.` — multi-line; first non-empty line containing digits → `purchase_orders.po_number`. Whole cell stored as raw.
-  2. `No. de ODF` — e.g. `180/26` → `jobs.odf`.
-  3. `FECHA DE ENTREGA EN PO` — date or text → `po_line_items.committed_date` (+ `jobs.customer_date`).
-  4. `No. de Tuberia utilizada` — long text → `po_line_items.tube_spec`.
-  5. `CODIGO DE PRODUCTO` — long text → `po_line_items.notes` (product description).
-  6. `PIR` — e.g. `103012842 REV B` → `po_line_items.pir`.
-  7. `CANTIDAD A PRODUCIR` — int or text like `"3\n1 DE 3 TOTALES"` → leading int → `po_line_items.qty_ordered` / `jobs.qty`.
-  8. `FECHA` — ignored (it's the workbook-wide date stamp).
-  9. `COMENTARIOS` — schedule notes like `21-may 3er turno .5 pza` → stored on `jobs.notes` AND best-effort parsed into planned `machine_runs`.
+### 1. Gantt strip above "Mis ODTs activas"
+- Reuse `MachineGantt` (already used on `/`) and mount it directly above the active-jobs table on `/production`, filtered to active ODTs only (excludes `YA_SE_ENVIO` and `EN_ESPERA` with no `planned_start`).
+- Default window: today − 1 day → max(committed_date) + 3 days, with prev/next week buttons + "Hoy" reset.
+- Shift bands (mañana/tarde/noche) visible as background tints so you can read shift placement at a glance.
+- Click a bar → opens the same ODT breakdown dialog the table opens (single source of truth).
+- Bars colour-coded by OTD score (on time / at risk / late) reusing `computeOdfOtd` + `OTD_TONE`.
 
-## Build pieces
+### 2. "Editar" button on the breakdown
+- `OdfBreakdownDialog` stays the default click target (read-only summary — Fer's current mental model).
+- Add a primary **Editar ODT** button in the dialog header that swaps the body to the full `JobDetailDialog` content (machine/operator reassign, 1-click shift swap, cascading reschedule with reason).
+- "← Volver al resumen" returns to the breakdown without closing.
+- Both modes share the same dialog frame, so it never feels like two separate things.
 
-### 1. Route `/admin/import-maquinados` (admin-only)
+### 3. Drag-to-reschedule on the Gantt
+- Make ODT bars `draggable`; on drop, snap to the nearest shift boundary of the target machine lane and call `useRescheduleJob` (already exists) with the new `planned_start` / `planned_end` (duration preserved).
+- If the drop crosses a downstream ODT on the same machine, run the existing `cascade()` preview and show a small confirm popover ("Empuja 3 ODTs siguientes — confirmar?") before committing — same logic the dialog uses today, just triggered visually.
+- Visual feedback: ghost bar follows cursor, target shift band highlights, invalid drops (machine with no `hours_per_shift`, past dates) flash red and revert.
 
-- Layout: `_authenticated` subtree, guarded by `has_role('admin')` check on mount (redirect to `/` otherwise).
-- File drop zone for `.xlsx`. Parse client-side with `xlsx` (SheetJS) — already a one-off browser concern, no upload until commit.
+### 4. Row-level calendar hint (small polish)
+- Add a compact chip on each active-jobs row: shift colour dot + "lun 24 jun · M" or "+2d tarde" — so even without scrolling to the Gantt you know when each ODT runs.
+- Uses `SHIFTS` + `shiftIndexFromDate` from `src/lib/shifts.ts`.
 
-### 2. Parser (`src/lib/maquinados-import.ts`, client-safe)
+## Out of scope
+- Multi-day drag selection / resize the bar to change duration (still done via the dialog's reschedule form).
+- New "Calendario" top-level page — the Gantt strip on `/production` covers the need.
+- Changing the breakdown's data shape.
 
-- `parseMaquinadosSheet(arrayBuffer) → ParsedRow[]`
-- Iterates rows, tracks `currentMachineHeader` whenever a single-cell row matches the known machine-header regex.
-- Emits one `ParsedRow` per data row with: raw cells, derived fields, the machine header string, and `validation: { errors: string[]; warnings: string[] }`.
-- Hard errors block commit on that row: missing PO# digits, missing ODF, missing PIR, qty ≤ 0, no machine header in scope.
-- Warnings (don't block): committed_date unparseable, schedule cell present but no runs parsed.
-
-### 3. Machine auto-match
-
-- `useMachines()` already exists; the parser is passed the machines list and resolves each header to a `machine_id` by case-insensitive trimmed name match.
-- Unmatched header → all rows under it become row-level errors with message `Crear máquina "MAZAK 5" en Configuración antes de importar.`
-- Importer does NOT auto-create machines (per your "Auto-match by name" answer).
-
-### 4. Schedule cell parser (`parseScheduleCell`)
-
-- Splits on newlines.
-- Regex per line: `^(\d{1,2})-(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+(1er|2do|3er)\s+turno(?:\s+([\d.]+)\s*pza)?\s*$`
-- Each successful match → one planned `machine_runs` row with computed `started_at` (date + shift start hour from `shifts` table or sensible defaults) and `pieces_completed = matched qty or 0`. Year inferred from `committed_date.year` (fallback current year).
-- Unmatched lines are kept in the raw notes; row gets a warning if 0 of N lines parsed.
-- Full raw `COMENTARIOS` text always goes into `jobs.notes` regardless of parse outcome.
-
-### 5. Preview UI (`MaquinadosImportPreview`)
-
-Single table grouped by machine header. Columns:
-
-- Status pill (✓ OK / ⚠ warnings / ✗ errors)
-- Machine (matched name or red "unmatched")
-- PO# · ODF · PIR · Qty · Committed date
-- Tube spec (truncated, hover for full)
-- Product (truncated, hover for full)
-- **Starts at** — `Select` per row defaulting to `MAZAK` (in-production). Options: `INTAKE`, `PENDIENTE_ING_STEP1..4`, `MAZAK`, `MAQUINADO_LISTO`, `TALLER_EXTERNO`, `TERMINADO`. Bulk-set control above the table.
-- Planned runs count (badge `3 runs parsed` / `0/4 lines`)
-- Notes preview (truncated)
-
-Header row above table: total rows, breakdown (OK / warn / error), `Commit OK + warnings` button (disabled while any row has hard errors selected for commit; rows with errors are excluded automatically and flagged with a "skipped on commit" badge).
-
-### 6. Commit path (server)
-
-- `src/lib/maquinados-import.functions.ts` → `bulkImportMaquinados(payload: ParsedRow[])`
-- `.middleware([requireSupabaseAuth])` + admin role check via `has_role`.
-- Loads `supabaseAdmin` inside the handler (privileged, atomic across multiple tables).
-- Calls Postgres function `public.bulk_import_maquinados(payload jsonb) returns jsonb` (created via migration). Function does, in one tx, per row:
-  1. `INSERT … ON CONFLICT DO NOTHING` into `customers` (always `COE` since every row in this sheet is for COE based on the PO header text — single hard-coded customer for v1; flagged in TODOs for multi-customer later).
-  2. Upsert `purchase_orders` by `(customer_id, po_number)` with `review_track='coe'`.
-  3. Insert `po_line_items` (status = the per-row chosen status; PIR / qty / tube_spec / notes / committed_date populated).
-  4. If status is in production set (`MAZAK`, `MAQUINADO_LISTO`, `TALLER_EXTERNO`, `TERMINADO`): insert `jobs` row with `odf`, `machine_id`, `qty`, `customer_date`, `status`, `notes`.
-  5. Insert any parsed `machine_runs` rows linked to the new job.
-  6. Insert one `status_events` row with `metadata.kind='bulk_import_maquinados'`.
-- Returns `{ inserted, skipped, errors: [{rowIndex, message}] }` — surfaced as a result toast + summary card in the UI.
-
-### 7. Migration
-
-- Add `public.bulk_import_maquinados(payload jsonb)` security-definer function with `search_path=public`, executable by `authenticated`. Role check inside the function (`has_role(auth.uid(),'admin')`) so even direct RPC is gated.
-- No new tables.
-
-### 8. Nav
-
-- Add a "Importar MAQUINADOS" link in the admin section of `AppShell` (visible only to admins via existing `useUserRole`).
-
-## Out of scope (call out, build later)
-
-- RIMADORAS / NUEVAS PO / FLOTACION sheets (separate parsers when needed).
-- Multi-customer detection from the PO header (always COE for v1).
-- Re-import / merge semantics — re-running with same ODF/PO will surface a unique-violation error in the result summary; user resolves manually.
-- Editing rows in the preview before commit (read-only with status dropdown only).
-- Saving the uploaded file to storage.
-
-## Build order
-
-1. Migration: `bulk_import_maquinados` SQL function.
-2. `src/lib/maquinados-import.ts` parser + schedule parser + machine matcher (pure, unit-testable).
-3. `src/lib/maquinados-import.functions.ts` server fn calling the RPC.
-4. `src/routes/_authenticated/admin.import-maquinados.tsx` route + preview UI.
-5. Add `xlsx` (SheetJS) via `bun add xlsx`.
-6. Nav entry.
-7. Smoke test against the uploaded file end-to-end.
+## Technical notes
+- New files: none required. Edits to `src/routes/production.tsx` (mount Gantt + chips), `src/components/fact/MachineGantt.tsx` (drag handlers + cascade confirm), `src/components/fact/OdfBreakdownDialog.tsx` (mode toggle hosting `JobDetailDialog` body).
+- Reschedule path already exists (`useRescheduleJob`, `applyCascadingDelay`, `cascade()`); no new server fns or migrations.
+- All edits are presentation + wiring — no schema, no RLS, no new data model.
