@@ -848,6 +848,7 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_import_maquinados: { Args: { payload: Json }; Returns: Json }
       current_user_can_edit_po: { Args: { _po_id: string }; Returns: boolean }
       current_user_can_edit_production: { Args: never; Returns: boolean }
       has_active_delegation: {
