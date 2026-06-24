@@ -10,7 +10,8 @@ import { useMachineRuns } from "@/hooks/useMachineRuns";
 import { computeOdfOtd, stepDurationHours, OTD_TONE } from "@/lib/scheduling/odf-otd";
 import { runDurationHours } from "@/lib/machine-metrics";
 import { STATUS_LABEL } from "@/lib/fact-types";
-import { Clock, Cpu, User, Calendar, Package, FileText } from "lucide-react";
+import { Clock, Cpu, User, Calendar, Package, FileText, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const STEP_LABEL: Record<string, string> = {
   MAZAK: "Mazak",
@@ -45,10 +46,12 @@ export function OdfBreakdownDialog({
   job,
   machines,
   onClose,
+  onEdit,
 }: {
   job: ActiveJob | null;
   machines: { id: string; name: string }[];
   onClose: () => void;
+  onEdit?: (job: ActiveJob) => void;
 }) {
   const { data: allRuns = [] } = useMachineRuns();
   const mById = useMemo(() => Object.fromEntries(machines.map((m) => [m.id, m.name])), [machines]);
@@ -75,17 +78,30 @@ export function OdfBreakdownDialog({
             </span>
             <span className="font-mono">{job.odf}</span>
             <span className="text-xs text-muted-foreground font-normal">· {STATUS_LABEL[job.status]}</span>
-            <span
-              className="ml-auto inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold"
-              style={{ color: tone.color, backgroundColor: tone.bg }}
-            >
-              OTD · {tone.label}
-              {otd.days_diff !== null && (
-                <span className="font-mono">
-                  {otd.days_diff > 0 ? `+${otd.days_diff}d` : `${otd.days_diff}d`}
-                </span>
+            <div className="ml-auto flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold"
+                style={{ color: tone.color, backgroundColor: tone.bg }}
+              >
+                OTD · {tone.label}
+                {otd.days_diff !== null && (
+                  <span className="font-mono">
+                    {otd.days_diff > 0 ? `+${otd.days_diff}d` : `${otd.days_diff}d`}
+                  </span>
+                )}
+              </span>
+              {onEdit && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 gap-1.5"
+                  onClick={() => onEdit(job)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span className="text-xs">Editar ODT</span>
+                </Button>
               )}
-            </span>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
