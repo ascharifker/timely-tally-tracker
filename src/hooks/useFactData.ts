@@ -494,7 +494,11 @@ export function useRescheduleJob() {
       const extra = data.status ? ` · ${STATUS_LABEL[data.status as JobStatus]}` : "";
       toast.success(`Reprogramado · ${s} → ${e}${extra}`);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["active_jobs"] });
+      qc.invalidateQueries({ queryKey: ["completed_jobs"] });
+    },
   });
 }
 
@@ -549,7 +553,11 @@ export function useUpdateJob() {
     },
     onSuccess: () => toast.success("ODF actualizada"),
     onError: (err) => toast.error("No se pudo guardar", { description: (err as Error).message }),
-    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["active_jobs"] });
+      qc.invalidateQueries({ queryKey: ["completed_jobs"] });
+    },
   });
 }
 
@@ -610,6 +618,8 @@ export function useLogDelay() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["status_events"] });
+      qc.invalidateQueries({ queryKey: ["active_jobs"] });
+      qc.invalidateQueries({ queryKey: ["completed_jobs"] });
     },
   });
 }
@@ -709,6 +719,8 @@ export function useApplyReschedules() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["status_events"] });
+      qc.invalidateQueries({ queryKey: ["active_jobs"] });
+      qc.invalidateQueries({ queryKey: ["completed_jobs"] });
     },
   });
 }
