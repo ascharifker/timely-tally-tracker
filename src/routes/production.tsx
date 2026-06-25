@@ -50,6 +50,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Calendar, Pause, Play, ChevronRight, AlertTriangle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 function renderOtdBadge(j: ActiveJob) {
   const otd = computeOdfOtd(j);
@@ -116,6 +117,11 @@ function ProductionPage() {
   const [detailPoId, setDetailPoId] = useState<string | null>(null);
   const [detailJob, setDetailJob] = useState<ActiveJob | null>(null);
   const [editJob, setEditJob] = useState<ActiveJob | null>(null);
+  const pendingCount = lines.filter((l) => {
+    const planned = plannedByLine[l.id] ?? 0;
+    return Math.max(0, l.qty_ordered - planned) > 0;
+  }).length;
+  const defaultTab = activeJobs.length > 0 ? "calendario" : "crear";
 
   const refreshAll = async () => {
     await Promise.all([
@@ -132,14 +138,56 @@ function ProductionPage() {
   return (
     <AppShell>
       <Toaster theme="dark" position="top-right" />
-      <div className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Producción</h2>
-        <p className="text-sm text-muted-foreground">
-          Partí cada línea en una o más ODTs (numeración nnn/yy) asignándoles máquina, turno y vendor de cementación.
-        </p>
+      <div className="mb-4 flex items-baseline justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Producción</h2>
+          <p className="text-sm text-muted-foreground">
+            Crear ODTs · programar en calendario · seguir en curso · revisar enviadas.
+          </p>
+        </div>
       </div>
 
-      <div className="rounded-md border bg-card">
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="crear">
+            1 · Crear ODT
+            {pendingCount > 0 && (
+              <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-mono text-primary">
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="calendario">
+            2 · Calendario
+            {activeJobs.length > 0 && (
+              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                {activeJobs.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="encurso">
+            3 · En curso
+            {activeJobs.length > 0 && (
+              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                {activeJobs.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="historico">
+            Histórico
+            {completedJobs.length > 0 && (
+              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                {completedJobs.length}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="crear" className="mt-0">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Partí cada línea aprobada en una o más ODTs asignándoles máquina, turno y vendor.
+          </p>
+          <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -212,43 +260,47 @@ function ProductionPage() {
           </TableBody>
         </Table>
       </div>
+        </TabsContent>
 
-      <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Mis ODTs activas</h2>
-        <p className="text-sm text-muted-foreground">
-          Mirá dónde cae cada ODT en el calendario, arrastrá la barra para mover de turno o máquina,
-          y usá los botones para avanzar / pausar / reportar retraso. Clic en una ODT para ver el detalle.
-        </p>
-      </div>
-      {activeJobs.length > 0 && (
-        <div className="mb-4">
-          <MachineGantt
+        <TabsContent value="calendario" className="mt-0">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Arrastrá una barra para cambiar de turno o máquina. Clic abre el desglose.
+          </p>
+          {activeJobs.length === 0 ? (
+            <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
+              Sin ODTs activas para programar.
+            </div>
+          ) : (
+            <MachineGantt
+              jobs={activeJobs}
+              machines={machines}
+              onJobClick={(j) => setDetailJob(j as ActiveJob)}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="encurso" className="mt-0">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Avanzá pasos, pausá, o reportá retrasos. El chip de turno muestra dónde cae cada ODT.
+          </p>
+          <ActiveJobsTable
             jobs={activeJobs}
             machines={machines}
-            onJobClick={(j) => setDetailJob(j as ActiveJob)}
+            onChange={refreshAll}
+            onOpenPo={setDetailPoId}
+            onOpenOdf={setDetailJob}
           />
-        </div>
-      )}
-      <ActiveJobsTable
-        jobs={activeJobs}
-        machines={machines}
-        onChange={refreshAll}
-        onOpenPo={setDetailPoId}
-        onOpenOdf={setDetailJob}
-      />
+        </TabsContent>
 
-      <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">ODTs completadas</h2>
-        <p className="text-sm text-muted-foreground">
-          Histórico de ODTs enviadas. Filtrá por PO o cliente para revisar lo entregado.
-        </p>
-      </div>
-      <CompletedJobsTable
-        jobs={completedJobs}
-        machines={machines}
-        onOpenPo={setDetailPoId}
-        onOpenOdf={setDetailJob}
-      />
+        <TabsContent value="historico" className="mt-0">
+          <CompletedJobsTable
+            jobs={completedJobs}
+            machines={machines}
+            onOpenPo={setDetailPoId}
+            onOpenOdf={setDetailJob}
+          />
+        </TabsContent>
+      </Tabs>
 
       <CreateOdfDialog
         line={active}
@@ -271,7 +323,13 @@ function ProductionPage() {
           setEditJob(j);
         }}
       />
-      <JobDetailDialog job={editJob} onClose={() => setEditJob(null)} />
+      <JobDetailDialog
+        job={editJob}
+        onClose={async () => {
+          setEditJob(null);
+          await refreshAll();
+        }}
+      />
     </AppShell>
   );
 }
