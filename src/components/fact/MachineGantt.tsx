@@ -795,9 +795,9 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             <span className="text-[11px] font-black text-white leading-none truncate">
                               ODT {j.odf}
                             </span>
-                            {j.tube_spec && (
+                            {j.pir && (
                               <span className="text-[9px] text-zinc-400 font-medium uppercase mt-0.5 truncate">
-                                {j.tube_spec}
+                                {j.pir}
                               </span>
                             )}
                           </div>
