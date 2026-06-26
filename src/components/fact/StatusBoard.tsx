@@ -111,6 +111,7 @@ export function StatusBoard({
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
+    <>
     <Card className="border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
         <div>
