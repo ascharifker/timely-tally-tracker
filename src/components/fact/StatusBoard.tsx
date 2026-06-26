@@ -10,6 +10,7 @@ import { Link } from "@tanstack/react-router";
 import { getUrgency, urgencyColor } from "@/lib/job-urgency";
 import { jobDurationHours } from "@/lib/scheduling/duration";
 import { StartStopRunButton } from "./StartStopRunButton";
+import { ShippedDateDialog } from "./ShippedDateDialog";
 
 const STATUS_HELP: Record<JobStatus, string> = {
   PLANNED: "Ingresada, sin asignar a máquina",
@@ -73,6 +74,7 @@ export function StatusBoard({
   const [dragId, setDragId] = useState<string | null>(null);
   const [selectedMachines, setSelectedMachines] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [shipJob, setShipJob] = useState<Job | null>(null);
 
   const machineById = useMemo(
     () => Object.fromEntries(machines.map((m) => [m.id, m])) as Record<string, Machine>,
@@ -109,6 +111,7 @@ export function StatusBoard({
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
+    <>
     <Card className="border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -230,6 +233,10 @@ export function StatusBoard({
                 if (!id) return;
                 const job = jobs.find((j) => j.id === id);
                 if (!job || job.status === status) return;
+                if (status === "YA_SE_ENVIO") {
+                  setShipJob(job);
+                  return;
+                }
                 update.mutate({ id, status });
               }}
               className={`min-h-[180px] rounded-md border p-0 overflow-hidden flex flex-col transition-colors ${
@@ -354,6 +361,8 @@ export function StatusBoard({
         })}
       </div>
     </Card>
+    <ShippedDateDialog job={shipJob} onClose={() => setShipJob(null)} />
+    </>
   );
 }
 
