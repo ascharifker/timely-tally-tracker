@@ -795,9 +795,9 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             <span className="text-[11px] font-black text-white leading-none truncate">
                               ODT {j.odf}
                             </span>
-                            {j.tube_spec && (
+                            {j.pir && (
                               <span className="text-[9px] text-zinc-400 font-medium uppercase mt-0.5 truncate">
-                                {j.tube_spec}
+                                {j.pir}
                               </span>
                             )}
                           </div>
@@ -911,7 +911,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 >
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLOR[j.status] }} />
                   <span className="font-mono font-bold text-white">ODT {j.odf}</span>
-                  {j.tube_spec && <span className="text-zinc-500">{j.tube_spec}</span>}
+                  {j.pir && <span className="text-zinc-500">{j.pir}</span>}
                 </button>
               ))}
             </div>
