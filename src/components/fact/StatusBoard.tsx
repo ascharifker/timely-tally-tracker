@@ -360,6 +360,8 @@ export function StatusBoard({
         })}
       </div>
     </Card>
+    <ShippedDateDialog job={shipJob} onClose={() => setShipJob(null)} />
+    </>
   );
 }
 
