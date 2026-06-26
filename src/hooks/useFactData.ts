@@ -161,7 +161,7 @@ export function useCreateJob() {
 export function useUpdateJobStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; status: JobStatus }) => {
+    mutationFn: async (input: { id: string; status: JobStatus; export_date?: string | null }) => {
       const all = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const job = all.find((j) => j.id === input.id);
       const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
@@ -171,9 +171,13 @@ export function useUpdateJobStatus() {
         planned_start?: string | null;
         planned_end?: string | null;
         machine_id?: string | null;
+        export_date?: string | null;
       } = {
         status: input.status,
       };
+      if (input.export_date !== undefined) {
+        patch.export_date = input.export_date;
+      }
       if (job) {
         const currentMachine = machines.find((m) => m.id === job.machine_id);
         if (input.status === "TALLER_EXTERNO") {
@@ -208,7 +212,7 @@ export function useUpdateJobStatus() {
       if (error) throw error;
       return patch;
     },
-    onMutate: async ({ id, status }) => {
+    onMutate: async ({ id, status, export_date }) => {
       await qc.cancelQueries({ queryKey: ["jobs"] });
       const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const job = previous.find((j) => j.id === id);
@@ -245,7 +249,16 @@ export function useUpdateJobStatus() {
       qc.setQueryData<Job[]>(
         ["jobs"],
         previous.map((j) =>
-          j.id === id ? { ...j, status, planned_start, planned_end, machine_id } : j,
+          j.id === id
+            ? {
+                ...j,
+                status,
+                planned_start,
+                planned_end,
+                machine_id,
+                ...(export_date !== undefined ? { export_date } : {}),
+              }
+            : j,
         ),
       );
       return { previous, job };
