@@ -83,6 +83,7 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
     [jobRuns],
   );
   const realHoursAcum = jobRuns.reduce((acc, r) => acc + (r.ended_at ? runDurationHours(r) : 0), 0);
+  const canRunHere = job?.status === "MAZAK" || job?.status === "TALLER_EXTERNO";
 
   const preview = useMemo(() => {
     if (!job) return [];
