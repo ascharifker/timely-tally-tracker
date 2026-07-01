@@ -436,6 +436,12 @@ function renderCard({
             </Link>
           )}
           <span className="font-mono font-semibold truncate">ODT {j.odf}</span>
+          {hasOpenRun && (
+            <span
+              className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 animate-pulse"
+              title="Corrida en curso"
+            />
+          )}
         </div>
         {urgency && (
           <Badge
@@ -446,12 +452,6 @@ function renderCard({
           </Badge>
         )}
       </div>
-      {j.tube_spec && <div className="text-muted-foreground truncate mt-0.5">{j.tube_spec}</div>}
-      {showRunControl && machine && (
-        <div className="mt-1.5 flex items-center justify-end">
-          <StartStopRunButton job={j} openRun={openRun} />
-        </div>
-      )}
     </div>
   );
 }
