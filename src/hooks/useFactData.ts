@@ -9,6 +9,7 @@ import { STATUS_LABEL } from "@/lib/fact-types";
 import { nextShiftBoundary } from "@/lib/shifts";
 import { jobDurationHours } from "@/lib/scheduling/duration";
 import { scheduleJob } from "@/lib/scheduling/schedule";
+import { showUndoToast, snapshotJobs } from "@/lib/undo-toast";
 
 /**
  * Keep status ↔ machine in sync. MAZAK belongs to internal machines;
@@ -501,11 +502,12 @@ export function useRescheduleJob() {
       if (ctx?.previous) qc.setQueryData(["jobs"], ctx.previous);
       toast.error("No se pudo reprogramar", { description: (err as Error).message });
     },
-    onSuccess: (data) => {
+    onSuccess: (data, _vars, ctx) => {
       const s = new Date(data.planned_start).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
       const e = new Date(data.planned_end).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
       const extra = data.status ? ` · ${STATUS_LABEL[data.status as JobStatus]}` : "";
-      toast.success(`Reprogramado · ${s} → ${e}${extra}`);
+      const snaps = ctx?.previous ? snapshotJobs(ctx.previous, [data.id]) : [];
+      showUndoToast(qc, `Reprogramado · ${s} → ${e}${extra}`, snaps);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
@@ -628,6 +630,15 @@ export function useLogDelay() {
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(["jobs"], ctx.previous);
     },
+    onSuccess: (data, _vars, ctx) => {
+      const ids = data.changes.map((c) => c.job_id);
+      const snaps = ctx?.previous ? snapshotJobs(ctx.previous, ids) : [];
+      showUndoToast(
+        qc,
+        `Retraso aplicado · ${data.changes.length} ODT${data.changes.length === 1 ? "" : "s"} reprogramada${data.changes.length === 1 ? "" : "s"}`,
+        snaps,
+      );
+    },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["status_events"] });
@@ -723,8 +734,31 @@ export function useApplyReschedules() {
 
       return { count: moves.length };
     },
-    onSuccess: ({ count }) => {
-      toast.success(`${count} movimiento${count === 1 ? "" : "s"} aplicado${count === 1 ? "" : "s"}`);
+    onMutate: async ({ moves }) => {
+      const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
+      // affected = each move + downstream cascade on the original schedule
+      const affected = new Set<string>();
+      for (const m of moves) {
+        affected.add(m.jobId);
+        const orig = previous.find((j) => j.id === m.jobId);
+        if (!orig?.planned_end) continue;
+        const shiftedHours =
+          (new Date(m.planned_end).getTime() - new Date(orig.planned_end).getTime()) /
+          (60 * 60 * 1000);
+        if (shiftedHours === 0) continue;
+        const changes = cascade({ jobs: previous, delayedJobId: m.jobId, delayHours: shiftedHours });
+        for (const c of changes) affected.add(c.job_id);
+      }
+      return { previous, affected: [...affected] };
+    },
+    onSuccess: ({ count }, _vars, ctx) => {
+      const snaps =
+        ctx?.previous && ctx?.affected ? snapshotJobs(ctx.previous, ctx.affected) : [];
+      showUndoToast(
+        qc,
+        `${count} movimiento${count === 1 ? "" : "s"} aplicado${count === 1 ? "" : "s"}`,
+        snaps,
+      );
     },
     onError: (err) => {
       toast.error("No se pudo aplicar la reprogramación", { description: (err as Error).message });
