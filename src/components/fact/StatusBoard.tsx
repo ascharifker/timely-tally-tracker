@@ -325,8 +325,7 @@ export function StatusBoard({
                                 dimmed: !isVisible(j),
                                 showMachineChip: true,
                                 missingMachine: !g.machine,
-                                openRun: openRunByJob.get(j.id) ?? null,
-                                showRunControl: true,
+                                hasOpenRun: !!openRunByJob.get(j.id),
                               }),
                             )}
                         </div>
@@ -344,8 +343,7 @@ export function StatusBoard({
                         dimmed: !isVisible(j),
                         showMachineChip: false,
                         missingMachine: false,
-                        openRun: null,
-                        showRunControl: false,
+                        hasOpenRun: false,
                       }),
                     )}
               </div>
@@ -376,8 +374,7 @@ interface RenderCardArgs {
   dimmed: boolean;
   showMachineChip: boolean;
   missingMachine: boolean;
-  openRun: import("@/lib/fact-types").MachineRun | null;
-  showRunControl: boolean;
+  hasOpenRun: boolean;
 }
 
 function renderCard({
@@ -391,8 +388,7 @@ function renderCard({
   dimmed,
   showMachineChip,
   missingMachine,
-  openRun,
-  showRunControl,
+  hasOpenRun,
 }: RenderCardArgs) {
   const urgency = getUrgency(j);
   const mColor = machine ? machineColor(machine) : "var(--status-risk)";
