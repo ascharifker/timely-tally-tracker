@@ -27,6 +27,7 @@ import { SHIFTS, shiftIndexFromDate, snapToShift } from "@/lib/shifts";
 import { MachineRunsTable } from "./MachineRunsTable";
 import { useMachineRuns } from "@/hooks/useMachineRuns";
 import { runDurationHours } from "@/lib/machine-metrics";
+import { StartStopRunButton } from "./StartStopRunButton";
 
 interface Props {
   job: Job | null;
@@ -77,7 +78,12 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
     () => (job ? allRuns.filter((r) => r.job_id === job.id) : []),
     [allRuns, job],
   );
+  const openRun = useMemo(
+    () => jobRuns.find((r) => !r.ended_at) ?? null,
+    [jobRuns],
+  );
   const realHoursAcum = jobRuns.reduce((acc, r) => acc + (r.ended_at ? runDurationHours(r) : 0), 0);
+  const canRunHere = job?.status === "MAZAK" || job?.status === "TALLER_EXTERNO";
 
   const preview = useMemo(() => {
     if (!job) return [];
@@ -163,6 +169,20 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
           <Field label="Fecha cliente" value={job.customer_date} />
           <Field label="Operador" value={job.operator_name} />
         </div>
+
+        {canRunHere && job.machine_id && (
+          <div className="mt-4 rounded border border-border bg-sidebar/20 p-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Ejecución en máquina</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {openRun
+                  ? "Corrida abierta — cerrala al terminar el turno."
+                  : "Iniciá la corrida cuando arranque la producción."}
+              </p>
+            </div>
+            <StartStopRunButton job={job} openRun={openRun} />
+          </div>
+        )}
 
         <div className="mt-4 rounded border border-border bg-sidebar/20 p-3">
           <div className="flex items-center justify-between mb-2">

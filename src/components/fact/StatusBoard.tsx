@@ -9,7 +9,6 @@ import { ChevronRight, ChevronDown, GripVertical, AlertTriangle } from "lucide-r
 import { Link } from "@tanstack/react-router";
 import { getUrgency, urgencyColor } from "@/lib/job-urgency";
 import { jobDurationHours } from "@/lib/scheduling/duration";
-import { StartStopRunButton } from "./StartStopRunButton";
 import { ShippedDateDialog } from "./ShippedDateDialog";
 
 const STATUS_HELP: Record<JobStatus, string> = {
@@ -326,8 +325,7 @@ export function StatusBoard({
                                 dimmed: !isVisible(j),
                                 showMachineChip: true,
                                 missingMachine: !g.machine,
-                                openRun: openRunByJob.get(j.id) ?? null,
-                                showRunControl: true,
+                                hasOpenRun: !!openRunByJob.get(j.id),
                               }),
                             )}
                         </div>
@@ -345,8 +343,7 @@ export function StatusBoard({
                         dimmed: !isVisible(j),
                         showMachineChip: false,
                         missingMachine: false,
-                        openRun: null,
-                        showRunControl: false,
+                        hasOpenRun: false,
                       }),
                     )}
               </div>
@@ -377,8 +374,7 @@ interface RenderCardArgs {
   dimmed: boolean;
   showMachineChip: boolean;
   missingMachine: boolean;
-  openRun: import("@/lib/fact-types").MachineRun | null;
-  showRunControl: boolean;
+  hasOpenRun: boolean;
 }
 
 function renderCard({
@@ -392,8 +388,7 @@ function renderCard({
   dimmed,
   showMachineChip,
   missingMachine,
-  openRun,
-  showRunControl,
+  hasOpenRun,
 }: RenderCardArgs) {
   const urgency = getUrgency(j);
   const mColor = machine ? machineColor(machine) : "var(--status-risk)";
@@ -441,6 +436,12 @@ function renderCard({
             </Link>
           )}
           <span className="font-mono font-semibold truncate">ODT {j.odf}</span>
+          {hasOpenRun && (
+            <span
+              className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 animate-pulse"
+              title="Corrida en curso"
+            />
+          )}
         </div>
         {urgency && (
           <Badge
@@ -451,12 +452,6 @@ function renderCard({
           </Badge>
         )}
       </div>
-      {j.tube_spec && <div className="text-muted-foreground truncate mt-0.5">{j.tube_spec}</div>}
-      {showRunControl && machine && (
-        <div className="mt-1.5 flex items-center justify-end">
-          <StartStopRunButton job={j} openRun={openRun} />
-        </div>
-      )}
     </div>
   );
 }
