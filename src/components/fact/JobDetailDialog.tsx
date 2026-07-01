@@ -27,6 +27,7 @@ import { SHIFTS, shiftIndexFromDate, snapToShift } from "@/lib/shifts";
 import { MachineRunsTable } from "./MachineRunsTable";
 import { useMachineRuns } from "@/hooks/useMachineRuns";
 import { runDurationHours } from "@/lib/machine-metrics";
+import { StartStopRunButton } from "./StartStopRunButton";
 
 interface Props {
   job: Job | null;
@@ -76,6 +77,10 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
   const jobRuns = useMemo(
     () => (job ? allRuns.filter((r) => r.job_id === job.id) : []),
     [allRuns, job],
+  );
+  const openRun = useMemo(
+    () => jobRuns.find((r) => !r.ended_at) ?? null,
+    [jobRuns],
   );
   const realHoursAcum = jobRuns.reduce((acc, r) => acc + (r.ended_at ? runDurationHours(r) : 0), 0);
 
