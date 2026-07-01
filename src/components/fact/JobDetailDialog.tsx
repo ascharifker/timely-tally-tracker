@@ -170,6 +170,20 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
           <Field label="Operador" value={job.operator_name} />
         </div>
 
+        {canRunHere && job.machine_id && (
+          <div className="mt-4 rounded border border-border bg-sidebar/20 p-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Ejecución en máquina</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {openRun
+                  ? "Corrida abierta — cerrala al terminar el turno."
+                  : "Iniciá la corrida cuando arranque la producción."}
+              </p>
+            </div>
+            <StartStopRunButton job={job} openRun={openRun} />
+          </div>
+        )}
+
         <div className="mt-4 rounded border border-border bg-sidebar/20 p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold">Asignar / Editar</h3>
