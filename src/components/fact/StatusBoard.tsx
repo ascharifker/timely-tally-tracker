@@ -9,7 +9,6 @@ import { ChevronRight, ChevronDown, GripVertical, AlertTriangle } from "lucide-r
 import { Link } from "@tanstack/react-router";
 import { getUrgency, urgencyColor } from "@/lib/job-urgency";
 import { jobDurationHours } from "@/lib/scheduling/duration";
-import { StartStopRunButton } from "./StartStopRunButton";
 import { ShippedDateDialog } from "./ShippedDateDialog";
 
 const STATUS_HELP: Record<JobStatus, string> = {
