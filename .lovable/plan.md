@@ -1,52 +1,29 @@
-## 1. Undo for calendar movements
+## Objetivo
 
-**Goal:** After any reschedule (drag on `MachineGantt`, shift-change buttons in `JobDetailDialog`, or a cascading delay via `useLogDelay`), show a toast with an **Undo** button that restores the previous `planned_start` / `planned_end` for every affected job.
+Dejar el OTD Hub completamente en blanco, borrando toda la data operativa acumulada, pero conservando la configuración maestra (clientes, vendors, máquinas, usuarios/roles, delegaciones, part_times, shifts, secuencias ODF).
 
-### Approach
+## Qué se borra
 
-- New lightweight in-memory undo stack in `src/lib/undo-stack.ts`:
-  - `pushUndo(label, snapshots: { id, planned_start, planned_end }[])` — keeps last 10 entries; returns an id.
-  - `popUndo(id)` — returns snapshots.
-- New server function `revertScheduleSnapshots` in `src/lib/odf.functions.ts` that takes `{ id, planned_start, planned_end }[]` and writes them back in one call (auth-gated).
-- Wire capture points (snapshot BEFORE mutating):
-  1. `MachineGantt.tsx` drag-drop reschedule (single job + any cascaded jobs it already computes).
-  2. `JobDetailDialog.tsx` `moveToShift` (single job).
-  3. `useLogDelay` cascade path — snapshot every job in the `cascade()` preview before calling the server fn.
-- After each mutation resolves, call `toast.success("…", { action: { label: "Deshacer", onClick: () => revert(id) } })` (sonner supports action). Duration ~8s.
-- `revert()` calls `revertScheduleSnapshots`, then `refreshAll()` to update Gantt/table/kanban.
+Vía el tool de inserts (DELETE), en este orden para respetar FKs:
 
-### Scope note
+1. `date_change_log`
+2. `status_events`
+3. `machine_runs`
+4. `job_steps`
+5. `jobs`
+6. `po_line_step_events`
+7. `po_line_items`
+8. `purchase_orders`
+9. `briefings`
 
-Undo covers **schedule times only** (planned_start/end). Status changes (kanban drop) and shipped-date are out of scope for this pass — can be added later using the same pattern.
+## Qué se conserva
 
-## 2. Slimmer MAZAK / TALLER_EXTERNO kanban cards
+- `customers`, `vendors`, `machines`
+- `user_roles`, `review_delegations`
+- `part_times`, `shifts`
+- `odf_sequences` (se mantiene la numeración; si prefieres reiniciarla a 0, dilo y la incluyo)
 
-The card currently shows: machine chip + ODT + urgency badge + `tube_spec` + `StartStopRunButton`. In grouped MAZAK columns this makes the column extremely tall.
+## Fuera de alcance
 
-### Changes in `src/components/fact/StatusBoard.tsx`
-
-- **Remove** `StartStopRunButton` from `renderCard` entirely (drop the `showRunControl` / `openRun` props + related plumbing and the `useMachineRuns` hook usage).
-- **Remove** the `tube_spec` line from the card. Replace with a compact right-aligned run indicator: a small dot (`•` colored green with pulse) when `openRun` exists for the job, plus the elapsed hours in mono (e.g. `▶ 2.3h`). Non-clickable — just status.
-- Keep card to a single row: `[machine chip] ODT 1234   [▶ 2.3h] [urgency]`.
-- Group headers unchanged.
-
-### Move controls into `JobDetailDialog.tsx`
-
-- Add a new "Ejecución en máquina" section near the top (above "Asignar / Editar") that renders `<StartStopRunButton job={job} openRun={openRun} />` — only when `job.status` is `MAZAK` or `TALLER_EXTERNO` and a machine is assigned.
-- Look up `openRun` locally from the existing `useMachineRuns()` call already in the dialog.
-
-## Technical details
-
-- Files touched:
-  - New: `src/lib/undo-stack.ts`
-  - Edit: `src/lib/odf.functions.ts` (add `revertScheduleSnapshots`)
-  - Edit: `src/components/fact/MachineGantt.tsx`, `src/components/fact/JobDetailDialog.tsx`, `src/components/fact/StatusBoard.tsx`
-  - Edit: `src/hooks/useFactData.ts` (`useLogDelay` — snapshot cascade preview before mutation, expose returned undo id via toast helper or accept an `onUndoReady` callback).
-- Sonner action toast API: `toast.success(msg, { action: { label, onClick }, duration: 8000 })`.
-- No schema changes; `revertScheduleSnapshots` reuses existing `jobs` update path with `requireSupabaseAuth`.
-
-## Out of scope
-
-- Undo for status changes, shipped-date, or job creation.
-- Persistent multi-session undo (in-memory only).
-- Redo.
+- Storage bucket `po-documents` (los PDFs subidos permanecen; puedo limpiarlos también si lo pides).
+- Cambios de esquema o de código — sólo borrado de datos.
