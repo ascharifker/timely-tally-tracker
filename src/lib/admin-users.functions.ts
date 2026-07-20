@@ -142,6 +142,46 @@ export const inviteUser = createServerFn({ method: "POST" })
     return { user_id: userId, email_sent: emailSent, action_link: actionLink };
   });
 
+export const resendInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ user_id: z.string().uuid(), email: z.string().email(), role: AppRoleSchema }).parse(input),
+  )
+  .handler(async ({ context, data }): Promise<{ user_id: string; email_sent: boolean }> => {
+    await assertAdmin(context.userId);
+    if (data.user_id === context.userId) {
+      throw new Error("Refusing to resend invite for your own account.");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const email = data.email.trim().toLowerCase();
+    assertAllowedDomain(email);
+
+    // Delete the stale auth account so Supabase will send a brand-new invite email.
+    const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (delErr) throw new Error(delErr.message);
+
+    // Re-invite fresh. Supabase Auth sends the email automatically.
+    const redirectTo = redirectFromRequest("/reset-password");
+    const { data: invited, error: iErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
+    if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
+    const newUserId = invited.user.id;
+
+    // Restore the role assignment on the new user id.
+    const { error: rErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: newUserId, role: data.role });
+    if (rErr) throw new Error(rErr.message);
+
+    // Migrate any review delegations that referenced the old user id.
+    const oldId = data.user_id;
+    await supabaseAdmin.from("review_delegations").update({ created_by: newUserId }).eq("created_by", oldId);
+    await supabaseAdmin.from("review_delegations").update({ from_user_id: newUserId }).eq("from_user_id", oldId);
+    await supabaseAdmin.from("review_delegations").update({ to_user_id: newUserId }).eq("to_user_id", oldId);
+
+    return { user_id: newUserId, email_sent: true };
+  });
+
 export const copyLinkForUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>

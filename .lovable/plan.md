@@ -1,29 +1,48 @@
-## Objetivo
 
-Dejar el OTD Hub completamente en blanco, borrando toda la data operativa acumulada, pero conservando la configuración maestra (clientes, vendors, máquinas, usuarios/roles, delegaciones, part_times, shifts, secuencias ODF).
+## Problem
 
-## Qué se borra
+1. Peter's screenshot is the Lovable project access wall, not the app. He clicked a Lovable editor/preview URL (`lovable.dev/...` or `id-preview--...lovable.app`) instead of the published app (`https://mego-produccion.lovable.app`).
+2. The Users panel has an **"Invite link"** button for pending users, but it's not obvious that this is how you resend an invite. There's no explicit **"Resend invite"** action.
 
-Vía el tool de inserts (DELETE), en este orden para respetar FKs:
+## Plan
 
-1. `date_change_log`
-2. `status_events`
-3. `machine_runs`
-4. `job_steps`
-5. `jobs`
-6. `po_line_step_events`
-7. `po_line_items`
-8. `purchase_orders`
-9. `briefings`
+### 1. Improve the Users panel actions
 
-## Qué se conserva
+In `src/components/settings/UsersPanel.tsx`:
 
-- `customers`, `vendors`, `machines`
-- `user_roles`, `review_delegations`
-- `part_times`, `shifts`
-- `odf_sequences` (se mantiene la numeración; si prefieres reiniciarla a 0, dilo y la incluyo)
+- For users with status **"Invited"** (never signed in), replace the ambiguous **"Invite link"** button with two clear actions:
+  - **"Resend invite"** — calls the existing `inviteUser` server function again, which sends a fresh Supabase invite email to the same address with the same role.
+  - **"Copy link"** — keeps the current fallback for cases where email is blocked.
+- For users with status **"Active"**, keep **"Reset link"** as-is.
+- Add a small inline note under the Users heading: "Invited users must open the link in their email, not the Lovable editor URL."
 
-## Fuera de alcance
+### 2. Make `inviteUser` idempotent and safe to re-run
 
-- Storage bucket `po-documents` (los PDFs subidos permanecen; puedo limpiarlos también si lo pides).
-- Cambios de esquema o de código — sólo borrado de datos.
+In `src/lib/admin-users.functions.ts`:
+
+- If the email already has an auth user but has **never signed in**, treat re-invite as a fresh invite: generate a new invite/recovery link and optionally re-send via Supabase Auth. Currently it falls through to `generateLink({ type: "recovery" })`, which works but is labeled confusingly in the UI.
+- Keep role assignment unchanged (it already deletes and re-inserts the role row).
+- Ensure the returned payload clearly distinguishes `email_sent: true` vs `action_link` so the UI can show the right toast.
+
+### 3. Add a visible help banner on the Users tab
+
+Add a short info box at the top of `UsersPanel` explaining:
+
+- New users get an email from the app with a "Set your password" link.
+- They must click that link and set a password; then they sign in at `https://mego-produccion.lovable.app`.
+- The Lovable editor/preview URLs are only for project editors; app users should never use them.
+
+### 4. Verify the published app URL is correct
+
+Confirm `https://mego-produccion.lovable.app` is the live published URL and that the `/reset-password` route handles the invite token correctly. No code changes expected here — the existing flow already redirects invite emails to `/reset-password`.
+
+## Outcome
+
+- You can delete Peter, re-add him, and click **"Resend invite"** as many times as needed.
+- The UI will clearly tell you whether an email was sent or a manual link was generated.
+- Peter will know to use the app URL, not the Lovable editor URL.
+
+## No-go items (not in this plan)
+
+- Changing Lovable workspace/project sharing — that stays a manual Share-button action in the Lovable editor.
+- Adding email-domain setup — app invites already use Supabase Auth emails; if they stop arriving we troubleshoot deliverability separately.

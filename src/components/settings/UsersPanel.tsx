@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Plus, Copy, Trash2, KeyRound } from "lucide-react";
+import { Loader2, Plus, Copy, Trash2, KeyRound, Mail, Info } from "lucide-react";
 import { type AppRole } from "@/hooks/useUserRole";
 import { ROLE_LABEL } from "@/lib/rbac";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ import {
 import {
   listUsers,
   inviteUser,
+  resendInvite,
   copyLinkForUser,
   changeUserRole,
   deleteUser,
@@ -57,6 +58,7 @@ export function UsersPanel() {
   const qc = useQueryClient();
   const listFn = useServerFn(listUsers);
   const inviteFn = useServerFn(inviteUser);
+  const resendFn = useServerFn(resendInvite);
   const linkFn = useServerFn(copyLinkForUser);
   const roleFn = useServerFn(changeUserRole);
   const deleteFn = useServerFn(deleteUser);
@@ -95,6 +97,19 @@ export function UsersPanel() {
       }
     },
     onError: (e: Error) => toast.error("Invite failed", { description: e.message }),
+  });
+
+  const resendMut = useMutation({
+    mutationFn: (v: { user_id: string; email: string; role: AppRole }) => resendFn({ data: v }),
+    onSuccess: (res, v) => {
+      invalidate();
+      if (res.email_sent) {
+        toast.success("Fresh invite emailed", { description: v.email });
+      } else {
+        toast.success("Invite re-sent", { description: v.email });
+      }
+    },
+    onError: (e: Error) => toast.error("Resend failed", { description: e.message }),
   });
 
   const roleMut = useMutation({
@@ -168,6 +183,15 @@ export function UsersPanel() {
         </Dialog>
       </div>
 
+      <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground flex gap-2.5 items-start">
+        <Info className="h-4 w-4 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">How invites work</p>
+          <p>New users receive an email with a "Set your password" link. After setting a password they sign in at <span className="font-mono text-foreground">https://mego-produccion.lovable.app</span>.</p>
+          <p>Do <strong>not</strong> send them a Lovable editor or preview URL — those are for project editors only and will show "Access denied".</p>
+        </div>
+      </div>
+
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
@@ -216,10 +240,26 @@ export function UsersPanel() {
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
-                        {u.email ? (
-                          <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, neverSignedIn ? "invite" : "recovery")}>
+                        {u.email && neverSignedIn ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={resendMut.isPending}
+                              onClick={() => resendMut.mutate({ user_id: u.id, email: u.email!, role: currentRole })}
+                            >
+                              {resendMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-1" />}
+                              Resend invite
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, "invite")}>
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              Copy link
+                            </Button>
+                          </>
+                        ) : u.email ? (
+                          <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, "recovery")}>
                             <KeyRound className="h-3.5 w-3.5 mr-1" />
-                            {neverSignedIn ? "Invite link" : "Reset link"}
+                            Reset link
                           </Button>
                         ) : null}
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setToDelete(u)}>
