@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Plus, Copy, Trash2, KeyRound } from "lucide-react";
+import { Loader2, Plus, Copy, Trash2, KeyRound, Mail, Info } from "lucide-react";
 import { type AppRole } from "@/hooks/useUserRole";
 import { ROLE_LABEL } from "@/lib/rbac";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ import {
 import {
   listUsers,
   inviteUser,
+  resendInvite,
   copyLinkForUser,
   changeUserRole,
   deleteUser,
