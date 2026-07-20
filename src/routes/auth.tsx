@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { claimAdminIfEligible } from "@/lib/admin-users.functions";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, Info, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -29,8 +29,8 @@ function AuthPage() {
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!error && data.user) {
         claimAdmin({}).catch(() => {});
         navigate({ to: "/purchase-orders" });
       }
@@ -85,6 +85,15 @@ function AuthPage() {
             <h1 className="text-lg font-semibold tracking-tight">MEGO OTD Hub</h1>
             <p className="text-xs text-muted-foreground">On-Time Delivery Hub</p>
           </div>
+        </div>
+        <div className="rounded-md border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground">
+          <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
+            <Info className="h-3.5 w-3.5" />
+            Live app access
+          </div>
+          <p>
+            Use <span className="font-mono text-foreground">https://mego-produccion.lovable.app</span>. If you already set a password, sign in here instead of reusing the invite link.
+          </p>
         </div>
         <form onSubmit={handleSignIn} className="space-y-4">
           <div className="space-y-1.5">

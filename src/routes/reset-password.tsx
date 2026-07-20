@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, AlertCircle, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
@@ -17,18 +17,20 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<"validating" | "ready" | "invalid">("validating");
+  const [message, setMessage] = useState("This link may already be used or expired.");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[reset-password] auth event", event, !!session);
       if (session && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
-        setReady(true);
+        setStatus("ready");
       }
     });
 
@@ -43,16 +45,22 @@ function ResetPasswordPage() {
       const refresh_token = params.get("refresh_token");
       const errorDesc = params.get("error_description");
       if (errorDesc) {
-        toast.error("Invalid or expired link", { description: errorDesc });
+        if (!cancelled) {
+          setMessage(errorDesc);
+          setStatus("invalid");
+        }
         return false;
       }
       if (access_token && refresh_token) {
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) {
-          toast.error("Could not validate link", { description: error.message });
+          if (!cancelled) {
+            setMessage(error.message);
+            setStatus("invalid");
+          }
           return false;
         }
-        if (!cancelled) setReady(true);
+        if (!cancelled) setStatus("ready");
         return true;
       }
       return false;
@@ -61,7 +69,7 @@ function ResetPasswordPage() {
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        if (!cancelled) setReady(true);
+        if (!cancelled) setStatus("ready");
         return;
       }
       const ok = await tryFromHash();
@@ -71,10 +79,11 @@ function ResetPasswordPage() {
         await new Promise((r) => setTimeout(r, 200));
         const { data: d2 } = await supabase.auth.getSession();
         if (d2.session) {
-          if (!cancelled) setReady(true);
+          if (!cancelled) setStatus("ready");
           return;
         }
       }
+      if (!cancelled) setStatus("invalid");
     })();
 
     return () => {
@@ -104,6 +113,26 @@ function ResetPasswordPage() {
     navigate({ to: "/purchase-orders" });
   };
 
+  const requestReset = async () => {
+    const cleanEmail = resetEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      toast.error("Enter your email first.");
+      return;
+    }
+    setResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetting(false);
+    if (error) {
+      toast.error("Could not send reset email", { description: error.message });
+      return;
+    }
+    toast.success("Password reset email sent", {
+      description: `Check ${cleanEmail} for a fresh link.`,
+    });
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Toaster theme="dark" position="top-right" />
@@ -117,8 +146,36 @@ function ResetPasswordPage() {
             <p className="text-xs text-muted-foreground">Welcome to MEGO OTD Hub</p>
           </div>
         </div>
-        {!ready ? (
+        {status === "validating" ? (
           <p className="text-sm text-muted-foreground">Validating link…</p>
+        ) : status === "invalid" ? (
+          <div className="space-y-4">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-muted-foreground">
+              <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                Link already used or expired
+              </div>
+              <p>{message}</p>
+            </div>
+            <Button type="button" className="w-full" onClick={() => navigate({ to: "/auth" })}>
+              Go to sign in
+            </Button>
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label htmlFor="reset-email">Need a fresh password reset?</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="name@mego-afek.com"
+                autoComplete="email"
+              />
+              <Button type="button" variant="outline" className="w-full" disabled={resetting} onClick={requestReset}>
+                {resetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send fresh reset email
+              </Button>
+            </div>
+          </div>
         ) : (
           <>
             <div className="space-y-1.5">
