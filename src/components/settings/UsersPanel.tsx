@@ -240,10 +240,26 @@ export function UsersPanel() {
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
-                        {u.email ? (
-                          <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, neverSignedIn ? "invite" : "recovery")}>
+                        {u.email && neverSignedIn ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={resendMut.isPending}
+                              onClick={() => resendMut.mutate({ user_id: u.id, email: u.email!, role: currentRole })}
+                            >
+                              {resendMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-1" />}
+                              Resend invite
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, "invite")}>
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              Copy link
+                            </Button>
+                          </>
+                        ) : u.email ? (
+                          <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, "recovery")}>
                             <KeyRound className="h-3.5 w-3.5 mr-1" />
-                            {neverSignedIn ? "Invite link" : "Reset link"}
+                            Reset link
                           </Button>
                         ) : null}
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setToDelete(u)}>
