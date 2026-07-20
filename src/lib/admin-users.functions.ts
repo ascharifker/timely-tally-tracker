@@ -165,14 +165,21 @@ export const resendInvite = createServerFn({ method: "POST" })
     const redirectTo = redirectFromRequest("/reset-password");
     const { data: invited, error: iErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
+    const newUserId = invited.user.id;
 
     // Restore the role assignment on the new user id.
     const { error: rErr } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: invited.user.id, role: data.role });
+      .insert({ user_id: newUserId, role: data.role });
     if (rErr) throw new Error(rErr.message);
 
-    return { user_id: invited.user.id, email_sent: true };
+    // Migrate any review delegations that referenced the old user id.
+    const oldId = data.user_id;
+    await supabaseAdmin.from("review_delegations").update({ created_by: newUserId }).eq("created_by", oldId);
+    await supabaseAdmin.from("review_delegations").update({ from_user_id: newUserId }).eq("from_user_id", oldId);
+    await supabaseAdmin.from("review_delegations").update({ to_user_id: newUserId }).eq("to_user_id", oldId);
+
+    return { user_id: newUserId, email_sent: true };
   });
 
 export const copyLinkForUser = createServerFn({ method: "POST" })
