@@ -99,6 +99,19 @@ export function UsersPanel() {
     onError: (e: Error) => toast.error("Invite failed", { description: e.message }),
   });
 
+  const resendMut = useMutation({
+    mutationFn: (v: { user_id: string; email: string; role: AppRole }) => resendFn({ data: v }),
+    onSuccess: (res, v) => {
+      invalidate();
+      if (res.email_sent) {
+        toast.success("Fresh invite emailed", { description: v.email });
+      } else {
+        toast.success("Invite re-sent", { description: v.email });
+      }
+    },
+    onError: (e: Error) => toast.error("Resend failed", { description: e.message }),
+  });
+
   const roleMut = useMutation({
     mutationFn: (v: { user_id: string; role: AppRole }) => roleFn({ data: v }),
     onSuccess: () => {
