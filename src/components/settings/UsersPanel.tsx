@@ -58,6 +58,7 @@ export function UsersPanel() {
   const qc = useQueryClient();
   const listFn = useServerFn(listUsers);
   const inviteFn = useServerFn(inviteUser);
+  const resendFn = useServerFn(resendInvite);
   const linkFn = useServerFn(copyLinkForUser);
   const roleFn = useServerFn(changeUserRole);
   const deleteFn = useServerFn(deleteUser);
