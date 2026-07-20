@@ -1,48 +1,44 @@
+## What I found
 
-## Problem
+- Peter’s account exists in the app backend.
+- His email is confirmed.
+- He has a password set.
+- He has already successfully signed in once.
+- His role is `PO Editor`, so he should have app access.
 
-1. Peter's screenshot is the Lovable project access wall, not the app. He clicked a Lovable editor/preview URL (`lovable.dev/...` or `id-preview--...lovable.app`) instead of the published app (`https://mego-produccion.lovable.app`).
-2. The Users panel has an **"Invite link"** button for pending users, but it's not obvious that this is how you resend an invite. There's no explicit **"Resend invite"** action.
+That means this is likely **not** an invite creation problem anymore. The most likely causes are:
+1. Peter is still opening the wrong URL — a Lovable editor/preview URL instead of the live app URL.
+2. He is signing into the app but getting stuck because the current route guard/auth state handling is fragile.
+3. He is using an old invite/reset link after already setting his password.
 
 ## Plan
 
-### 1. Improve the Users panel actions
+### 1. Make the login page clearer for already-invited users
+Update the sign-in screen to clearly say:
+- Use this live app URL: `https://mego-produccion.lovable.app`
+- If you already created a password, sign in normally — do not reuse the invite link.
+- If you forgot the password, use “Forgot password?”
 
-In `src/components/settings/UsersPanel.tsx`:
+### 2. Harden the auth session check
+Update the app auth hook to use the backend-validated user check for deciding whether someone is logged in, instead of relying only on the cached browser session. This should make login state more reliable after invite/password setup.
 
-- For users with status **"Invited"** (never signed in), replace the ambiguous **"Invite link"** button with two clear actions:
-  - **"Resend invite"** — calls the existing `inviteUser` server function again, which sends a fresh Supabase invite email to the same address with the same role.
-  - **"Copy link"** — keeps the current fallback for cases where email is blocked.
-- For users with status **"Active"**, keep **"Reset link"** as-is.
-- Add a small inline note under the Users heading: "Invited users must open the link in their email, not the Lovable editor URL."
+### 3. Improve the reset/invite link page
+Update `/reset-password` so if a user opens an old or already-used invite link, it shows a clear message:
+- “This link was already used or expired.”
+- Button to go sign in.
+- Button to request a password reset.
 
-### 2. Make `inviteUser` idempotent and safe to re-run
+This prevents the confusing “validating link” or “invalid link” dead end.
 
-In `src/lib/admin-users.functions.ts`:
+### 4. Add admin-facing status clarity in Users
+In the Users panel, show clearer status details for invited users:
+- “Invited” if never signed in.
+- “Active” if they signed in.
+- For active users like Peter, show that they should use normal sign-in or password reset, not resend invite.
 
-- If the email already has an auth user but has **never signed in**, treat re-invite as a fresh invite: generate a new invite/recovery link and optionally re-send via Supabase Auth. Currently it falls through to `generateLink({ type: "recovery" })`, which works but is labeled confusingly in the UI.
-- Keep role assignment unchanged (it already deletes and re-inserts the role row).
-- Ensure the returned payload clearly distinguishes `email_sent: true` vs `action_link` so the UI can show the right toast.
-
-### 3. Add a visible help banner on the Users tab
-
-Add a short info box at the top of `UsersPanel` explaining:
-
-- New users get an email from the app with a "Set your password" link.
-- They must click that link and set a password; then they sign in at `https://mego-produccion.lovable.app`.
-- The Lovable editor/preview URLs are only for project editors; app users should never use them.
-
-### 4. Verify the published app URL is correct
-
-Confirm `https://mego-produccion.lovable.app` is the live published URL and that the `/reset-password` route handles the invite token correctly. No code changes expected here — the existing flow already redirects invite emails to `/reset-password`.
-
-## Outcome
-
-- You can delete Peter, re-add him, and click **"Resend invite"** as many times as needed.
-- The UI will clearly tell you whether an email was sent or a manual link was generated.
-- Peter will know to use the app URL, not the Lovable editor URL.
-
-## No-go items (not in this plan)
-
-- Changing Lovable workspace/project sharing — that stays a manual Share-button action in the Lovable editor.
-- Adding email-domain setup — app invites already use Supabase Auth emails; if they stop arriving we troubleshoot deliverability separately.
+### 5. Verify after implementation
+After changes, verify:
+- `/auth` renders correctly.
+- Peter’s status appears as Active in Users.
+- The live app URL guidance is visible.
+- The reset page no longer leaves users stuck on a vague validation state.
