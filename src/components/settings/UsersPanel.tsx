@@ -183,6 +183,15 @@ export function UsersPanel() {
         </Dialog>
       </div>
 
+      <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground flex gap-2.5 items-start">
+        <Info className="h-4 w-4 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">How invites work</p>
+          <p>New users receive an email with a "Set your password" link. After setting a password they sign in at <span className="font-mono text-foreground">https://mego-produccion.lovable.app</span>.</p>
+          <p>Do <strong>not</strong> send them a Lovable editor or preview URL — those are for project editors only and will show "Access denied".</p>
+        </div>
+      </div>
+
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
