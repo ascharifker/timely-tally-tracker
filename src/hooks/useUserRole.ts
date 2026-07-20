@@ -25,16 +25,23 @@ export function useAuthSession() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
+    const loadVerifiedUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
       if (cancelled) return;
-      const u = data.session?.user;
+      const u = error ? null : data.user;
       setSession(u ? { userId: u.id, email: u.email ?? null } : null);
       setLoading(false);
-    });
+    };
+
+    loadVerifiedUser();
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      const u = s?.user;
-      setSession(u ? { userId: u.id, email: u.email ?? null } : null);
-      if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+      if (event === "SIGNED_OUT") {
+        setSession(null);
+        setLoading(false);
+      } else if (s && (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "INITIAL_SESSION")) {
+        loadVerifiedUser();
+      }
+      if (event === "SIGNED_OUT" || event === "SIGNED_IN" || event === "USER_UPDATED") {
         qc.invalidateQueries({ queryKey: ["user_roles"] });
       }
     });

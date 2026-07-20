@@ -232,7 +232,10 @@ export function UsersPanel() {
                       {neverSignedIn ? (
                         <Badge variant="outline">Invited</Badge>
                       ) : (
-                        <Badge>Active</Badge>
+                        <div className="space-y-1">
+                          <Badge>Active</Badge>
+                          <p className="text-[11px] text-muted-foreground">Use normal sign-in or password reset.</p>
+                        </div>
                       )}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground font-mono text-xs">
@@ -259,7 +262,7 @@ export function UsersPanel() {
                         ) : u.email ? (
                           <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, "recovery")}>
                             <KeyRound className="h-3.5 w-3.5 mr-1" />
-                            Reset link
+                            Password reset
                           </Button>
                         ) : null}
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setToDelete(u)}>
