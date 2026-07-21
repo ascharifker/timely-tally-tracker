@@ -1,16 +1,32 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getRequest } from "@tanstack/react-start/server";
 
-function redirectFromRequest(path: string): string {
-  try {
-    const req = getRequest();
-    const url = new URL(req.url);
-    return `${url.origin}${path}`;
-  } catch {
-    return path;
+const PUBLIC_APP_URL = "https://mego-produccion.lovable.app";
+const PASSWORD_SETUP_URL = `${PUBLIC_APP_URL}/reset-password`;
+
+type PasswordLinkType = "invite" | "recovery";
+
+function publicPasswordLink(tokenHash: string | undefined, type: PasswordLinkType, fallback: string): string {
+  if (!tokenHash) return fallback;
+  const url = new URL(PASSWORD_SETUP_URL);
+  url.searchParams.set("token_hash", tokenHash);
+  url.searchParams.set("type", type);
+  return url.toString();
+}
+
+async function generatePublicPasswordLink(email: string, type: PasswordLinkType): Promise<string> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
+    type,
+    email,
+    options: { redirectTo: PASSWORD_SETUP_URL },
+  });
+  if (error || !link.properties?.action_link) {
+    throw new Error(error?.message ?? "generateLink failed");
   }
+  const tokenHash = (link.properties as { hashed_token?: string }).hashed_token;
+  return publicPasswordLink(tokenHash, type, link.properties.action_link);
 }
 
 const APP_ROLES = [
@@ -106,7 +122,7 @@ export const inviteUser = createServerFn({ method: "POST" })
     if (lookupErr) throw new Error(lookupErr.message);
     const existing = list.users.find((u) => u.email?.toLowerCase() === email);
 
-    const redirectTo = redirectFromRequest("/reset-password");
+    const redirectTo = PASSWORD_SETUP_URL;
     let userId: string;
     let emailSent = false;
     let actionLink: string | undefined;
@@ -118,18 +134,11 @@ export const inviteUser = createServerFn({ method: "POST" })
       if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
       userId = invited.user.id;
       emailSent = true;
+      actionLink = await generatePublicPasswordLink(email, "invite");
     } else {
       // Existing user — generate a recovery link so they can set/reset a password.
       userId = existing.id;
-      const { data: link, error: lErr } = await supabaseAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-        options: { redirectTo },
-      });
-      if (lErr || !link.properties?.action_link) {
-        throw new Error(lErr?.message ?? "generateLink failed");
-      }
-      actionLink = link.properties.action_link;
+      actionLink = await generatePublicPasswordLink(email, "recovery");
     }
 
     // Assign role (replace any existing rows for one-role-per-user simplicity).
@@ -147,7 +156,7 @@ export const resendInvite = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ user_id: z.string().uuid(), email: z.string().email(), role: AppRoleSchema }).parse(input),
   )
-  .handler(async ({ context, data }): Promise<{ user_id: string; email_sent: boolean }> => {
+  .handler(async ({ context, data }): Promise<{ user_id: string; email_sent: boolean; action_link: string }> => {
     await assertAdmin(context.userId);
     if (data.user_id === context.userId) {
       throw new Error("Refusing to resend invite for your own account.");
@@ -162,10 +171,11 @@ export const resendInvite = createServerFn({ method: "POST" })
     if (delErr) throw new Error(delErr.message);
 
     // Re-invite fresh. Supabase Auth sends the email automatically.
-    const redirectTo = redirectFromRequest("/reset-password");
+    const redirectTo = PASSWORD_SETUP_URL;
     const { data: invited, error: iErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
     const newUserId = invited.user.id;
+    const actionLink = await generatePublicPasswordLink(email, "invite");
 
     // Restore the role assignment on the new user id.
     const { error: rErr } = await supabaseAdmin
@@ -179,7 +189,7 @@ export const resendInvite = createServerFn({ method: "POST" })
     await supabaseAdmin.from("review_delegations").update({ from_user_id: newUserId }).eq("from_user_id", oldId);
     await supabaseAdmin.from("review_delegations").update({ to_user_id: newUserId }).eq("to_user_id", oldId);
 
-    return { user_id: newUserId, email_sent: true };
+    return { user_id: newUserId, email_sent: true, action_link: actionLink };
   });
 
 export const copyLinkForUser = createServerFn({ method: "POST" })
@@ -191,16 +201,7 @@ export const copyLinkForUser = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<{ action_link: string }> => {
     await assertAdmin(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: data.type,
-      email: data.email,
-      options: { redirectTo: redirectFromRequest("/reset-password") },
-    });
-    if (error || !link.properties?.action_link) {
-      throw new Error(error?.message ?? "generateLink failed");
-    }
-    return { action_link: link.properties.action_link };
+    return { action_link: await generatePublicPasswordLink(data.email, data.type) };
   });
 
 export const changeUserRole = createServerFn({ method: "POST" })
@@ -272,15 +273,7 @@ export const bootstrapFirstAdmin = createServerFn({ method: "POST" })
       .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
     if (insErr) throw new Error(insErr.message);
 
-    const { data: link, error: lErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: redirectFromRequest("/reset-password") },
-    });
-    if (lErr || !link.properties?.action_link) {
-      throw new Error(lErr?.message ?? "generateLink failed");
-    }
-    return { user_id: userId, action_link: link.properties.action_link };
+    return { user_id: userId, action_link: await generatePublicPasswordLink(email, "recovery") };
   });
 
 // Hard-coded allowlist of emails that should automatically receive the admin

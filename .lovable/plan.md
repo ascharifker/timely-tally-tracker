@@ -1,44 +1,31 @@
-## What I found
+## What’s happening
+Peter is not failing inside the MEGO app login. He is being sent to Lovable’s project access wall, which means the invite/reset link is resolving to the editor/preview environment instead of the published app URL.
 
-- Peter’s account exists in the app backend.
-- His email is confirmed.
-- He has a password set.
-- He has already successfully signed in once.
-- His role is `PO Editor`, so he should have app access.
+## Fix plan
 
-That means this is likely **not** an invite creation problem anymore. The most likely causes are:
-1. Peter is still opening the wrong URL — a Lovable editor/preview URL instead of the live app URL.
-2. He is signing into the app but getting stuck because the current route guard/auth state handling is fragile.
-3. He is using an old invite/reset link after already setting his password.
+1. **Make invite links always target the published app**
+   - Update the invite, resend invite, reset-link, and bootstrap admin flows so their password setup redirect always points to:
+     `https://mego-produccion.lovable.app/reset-password`
+   - Do not derive this from the current browser/editor URL anymore.
 
-## Plan
+2. **Harden the Users panel**
+   - Make “Resend invite” and “Copy link” generate links for the published app only.
+   - Add a clearer warning that invites copied from the Lovable preview/editor will not work for external users.
 
-### 1. Make the login page clearer for already-invited users
-Update the sign-in screen to clearly say:
-- Use this live app URL: `https://mego-produccion.lovable.app`
-- If you already created a password, sign in normally — do not reuse the invite link.
-- If you forgot the password, use “Forgot password?”
+3. **Harden the reset-password page**
+   - Keep the set-password flow public and resilient.
+   - If a user lands there without a valid auth token, show a clear “request a fresh invite/reset” path instead of getting stuck.
 
-### 2. Harden the auth session check
-Update the app auth hook to use the backend-validated user check for deciding whether someone is logged in, instead of relying only on the cached browser session. This should make login state more reliable after invite/password setup.
+4. **Auth settings check**
+   - Ensure the backend auth redirect allow-list accepts the published app reset URL.
+   - Keep public signup disabled so this remains invite-only for MEGO Afek users.
 
-### 3. Improve the reset/invite link page
-Update `/reset-password` so if a user opens an old or already-used invite link, it shows a clear message:
-- “This link was already used or expired.”
-- Button to go sign in.
-- Button to request a password reset.
+5. **Verification**
+   - Generate a fresh invite/reset link and confirm its redirect target is the published app domain.
+   - Verify `/reset-password` loads publicly and does not hit the Lovable access wall.
 
-This prevents the confusing “validating link” or “invalid link” dead end.
+## Immediate workaround until the fix is applied
+If you need to send Peter something right now, resend/copy the invite from the **published app** only:
+`https://mego-produccion.lovable.app`
 
-### 4. Add admin-facing status clarity in Users
-In the Users panel, show clearer status details for invited users:
-- “Invited” if never signed in.
-- “Active” if they signed in.
-- For active users like Peter, show that they should use normal sign-in or password reset, not resend invite.
-
-### 5. Verify after implementation
-After changes, verify:
-- `/auth` renders correctly.
-- Peter’s status appears as Active in Users.
-- The live app URL guidance is visible.
-- The reset page no longer leaves users stuck on a vague validation state.
+Do not send him links from the Lovable editor, preview, or any `supabase.co` preview card that resolves to the internal project wall.

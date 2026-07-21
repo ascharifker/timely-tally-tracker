@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Activity, AlertCircle, Loader2 } from "lucide-react";
 
+const PUBLIC_APP_URL = "https://mego-produccion.lovable.app";
+const PASSWORD_SETUP_URL = `${PUBLIC_APP_URL}/reset-password`;
+
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
   head: () => ({
@@ -66,12 +69,35 @@ function ResetPasswordPage() {
       return false;
     };
 
+    const tryFromQuery = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type") ?? "recovery";
+      if (!tokenHash || (type !== "invite" && type !== "recovery")) return false;
+
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type,
+      });
+      if (error) {
+        if (!cancelled) {
+          setMessage(error.message);
+          setStatus("invalid");
+        }
+        return false;
+      }
+      if (!cancelled) setStatus("ready");
+      return true;
+    };
+
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         if (!cancelled) setStatus("ready");
         return;
       }
+      const queryOk = await tryFromQuery();
+      if (queryOk) return;
       const ok = await tryFromHash();
       if (ok) return;
       // Last resort: poll briefly for the SDK to finish auto-detect.
@@ -121,7 +147,7 @@ function ResetPasswordPage() {
     }
     setResetting(true);
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: PASSWORD_SETUP_URL,
     });
     setResetting(false);
     if (error) {
@@ -153,9 +179,10 @@ function ResetPasswordPage() {
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-muted-foreground">
               <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
                 <AlertCircle className="h-4 w-4 text-destructive" />
-                Link already used or expired
+                Link already used, expired, or opened from the wrong app URL
               </div>
               <p>{message}</p>
+              <p className="mt-2">Use the live MEGO app link only: <span className="font-mono text-foreground">{PUBLIC_APP_URL}</span></p>
             </div>
             <Button type="button" className="w-full" onClick={() => navigate({ to: "/auth" })}>
               Go to sign in
