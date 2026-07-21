@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, ExternalLink, Search } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   PO_LINE_STATUS_LABEL_EN,
@@ -42,8 +43,31 @@ import {
 import { ExportLinesDialog } from "@/components/fact/ExportLinesDialog";
 
 type Mode = "intake" | "pending";
-type EditableField = "pir" | "tube_spec" | "qty_ordered" | "committed_date" | "notes";
+type EditableField =
+  | "pir"
+  | "tube_spec"
+  | "qty_ordered"
+  | "committed_date"
+  | "notes"
+  | "hb_price";
 type Preset = "all" | "pending" | "production" | "shipped" | "late";
+type SortMode = "po_asc" | "po_desc" | "date_asc";
+
+const SORT_KEY = "po_lines_sort_mode_v1";
+const EXPANDED_KEY = "po_lines_expanded_v1";
+
+function fmtMoney(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(Number(v))) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(Number(v));
+}
+
+function naturalCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
 
 const PRESET_STATUSES: Record<Exclude<Preset, "all" | "late">, POLineStatus[]> = {
   pending: ["pending_engineering", "engineering_flagged"],
@@ -131,6 +155,36 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [preset, setPreset] = useState<Preset>(defaultPreset);
   const [onlyChanges, setOnlyChanges] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>(() => {
+    if (typeof window === "undefined") return "po_asc";
+    return (localStorage.getItem(SORT_KEY) as SortMode) || "po_asc";
+  });
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = localStorage.getItem(EXPANDED_KEY);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem(SORT_KEY, sortMode);
+  }, [sortMode]);
+  useEffect(() => {
+    if (typeof window !== "undefined")
+      localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded]));
+  }, [expanded]);
+
+  const toggleGroup = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // Re-sync preset when the parent changes defaultPreset (e.g. via URL).
   useEffect(() => {
@@ -222,20 +276,91 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
     // then closed (by shipped_at desc).
     const isClosed = (r: SpreadsheetRow) =>
       r.line.status === "completed" || r.line.status === "cancelled";
-    return list.slice().sort((a, b) => {
-      const ca = isClosed(a) ? 1 : 0;
-      const cb = isClosed(b) ? 1 : 0;
-      if (ca !== cb) return ca - cb;
-      if (ca === 1) {
-        const sa = a.shipped_at ?? "";
-        const sb = b.shipped_at ?? "";
-        return sb.localeCompare(sa);
-      }
-      const da = a.line.committed_date ?? "9999-12-31";
-      const db = b.line.committed_date ?? "9999-12-31";
-      return da.localeCompare(db);
-    });
+    void isClosed;
+    return list;
   }, [rows, query, customerFilter, statusFilter, preset, onlyChanges, changes, track]);
+
+  // Group filtered rows by PO id. Rows without a PO fall into a synthetic
+  // "No PO" bucket rendered at the end.
+  interface Group {
+    key: string;
+    poId: string | null;
+    poNumber: string;
+    customerName: string;
+    reviewTrack: string | null;
+    lines: SpreadsheetRow[];
+    totalQty: number;
+    totalPending: number;
+    totalHb: number;
+    hasHb: boolean;
+    earliestDate: string | null;
+    statusCounts: Record<string, number>;
+  }
+  const groups = useMemo<Group[]>(() => {
+    const map = new Map<string, Group>();
+    for (const r of filtered) {
+      const key = r.po?.id ?? "__no_po__";
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          key,
+          poId: r.po?.id ?? null,
+          poNumber: r.po?.po_number ?? "— No PO —",
+          customerName: r.customer?.name ?? "—",
+          reviewTrack: r.po?.review_track ?? null,
+          lines: [],
+          totalQty: 0,
+          totalPending: 0,
+          totalHb: 0,
+          hasHb: false,
+          earliestDate: null,
+          statusCounts: {},
+        };
+        map.set(key, g);
+      }
+      g.lines.push(r);
+      g.totalQty += r.line.qty_ordered ?? 0;
+      g.totalPending += Math.max(
+        0,
+        (r.line.qty_ordered ?? 0) - r.total_pieces_completed,
+      );
+      if (r.line.total_hb != null) {
+        g.totalHb += Number(r.line.total_hb);
+        g.hasHb = true;
+      } else if (r.line.hb_price != null) {
+        g.totalHb += Number(r.line.hb_price) * (r.line.qty_ordered ?? 0);
+        g.hasHb = true;
+      }
+      const d = r.line.committed_date;
+      if (d && (!g.earliestDate || d < g.earliestDate)) g.earliestDate = d;
+      g.statusCounts[r.line.status] = (g.statusCounts[r.line.status] ?? 0) + 1;
+    }
+    for (const g of map.values()) {
+      g.lines.sort((a, b) => a.line.line_number - b.line.line_number);
+    }
+    const arr = [...map.values()];
+    arr.sort((a, b) => {
+      // Always push "no PO" bucket to the end.
+      if (a.poId === null && b.poId !== null) return 1;
+      if (b.poId === null && a.poId !== null) return -1;
+      if (sortMode === "date_asc") {
+        const da = a.earliestDate ?? "9999-12-31";
+        const db = b.earliestDate ?? "9999-12-31";
+        const cmp = da.localeCompare(db);
+        if (cmp !== 0) return cmp;
+        return naturalCompare(a.poNumber, b.poNumber);
+      }
+      const cmp = naturalCompare(a.poNumber, b.poNumber);
+      return sortMode === "po_asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sortMode]);
+
+  const searchActive = query.trim().length > 0 || onlyChanges;
+  const isGroupOpen = (key: string) => searchActive || expanded.has(key);
+
+  const expandAll = () => setExpanded(new Set(groups.map((g) => g.key)));
+  const collapseAll = () => setExpanded(new Set());
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });
@@ -341,17 +466,44 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
         </div>
       </div>
 
+      {/* Sort + expand controls */}
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-muted-foreground">Sort:</span>
+        <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+          <SelectTrigger className="h-7 w-40 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="po_asc">PO # ↑</SelectItem>
+            <SelectItem value="po_desc">PO # ↓</SelectItem>
+            <SelectItem value="date_asc">Earliest date</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={expandAll}>
+          Expand all
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={collapseAll}>
+          Collapse all
+        </Button>
+        <span className="text-muted-foreground ml-auto">
+          {groups.length} PO{groups.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
       {/* Grid */}
       <div className="rounded-md border bg-card overflow-auto max-h-[calc(100vh-220px)]">
         <table className="w-full border-collapse text-[12px] font-mono">
           <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground font-sans">
+              <Th className="w-6"></Th>
               <Th className="w-32">Customer</Th>
               <Th className="w-28">PO #</Th>
               <Th className="w-32">PIR</Th>
               <Th className="min-w-[260px]">Description</Th>
               <Th className="w-16 text-right">Qty</Th>
               <Th className="w-16 text-right">Pend</Th>
+              <Th className="w-24 text-right">HB Price</Th>
+              <Th className="w-24 text-right">Total HB</Th>
               <Th className="w-32">Customer date</Th>
               <Th className="w-32">Export date</Th>
               <Th className="w-28">Shipped</Th>
@@ -364,19 +516,253 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={13} className="text-center text-muted-foreground py-8">
+                <td colSpan={16} className="text-center text-muted-foreground py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={13} className="text-center text-muted-foreground py-8">
+                <td colSpan={16} className="text-center text-muted-foreground py-8">
                   No lines match.
                 </td>
               </tr>
             )}
-            {filtered.map((r, idx) => {
+            {groups.map((g) => {
+              const open = isGroupOpen(g.key);
+              const statusPill = Object.entries(g.statusCounts)
+                .map(([s, n]) => `${n} ${PO_LINE_STATUS_LABEL_EN[s as POLineStatus] ?? s}`)
+                .join(" · ");
+              return (
+                <>
+                  <tr
+                    key={`hdr-${g.key}`}
+                    className="border-t border-border bg-muted/40 hover:bg-muted/60 cursor-pointer"
+                    onClick={() => toggleGroup(g.key)}
+                  >
+                    <Td className="text-center">
+                      {open ? (
+                        <ChevronDown className="h-3.5 w-3.5 inline" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 inline" />
+                      )}
+                    </Td>
+                    <Td>
+                      <span className="font-sans font-medium truncate block">
+                        {g.customerName}
+                      </span>
+                    </Td>
+                    <Td>
+                      {g.poId ? (
+                        <Link
+                          to="/purchase-orders/$id"
+                          params={{ id: g.poId }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                        >
+                          {g.poNumber}
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">{g.poNumber}</span>
+                      )}
+                    </Td>
+                    <Td className="text-muted-foreground font-sans text-[11px]">
+                      {g.lines.length} line{g.lines.length === 1 ? "" : "s"}
+                    </Td>
+                    <Td className="text-muted-foreground font-sans text-[11px] truncate">
+                      {statusPill}
+                    </Td>
+                    <Td className="text-right">{g.totalQty}</Td>
+                    <Td className="text-right">{g.totalPending}</Td>
+                    <Td className="text-right text-muted-foreground">—</Td>
+                    <Td className="text-right font-medium">
+                      {g.hasHb ? fmtMoney(g.totalHb) : "—"}
+                    </Td>
+                    <Td className="text-muted-foreground text-[11px]">
+                      {g.earliestDate ?? "—"}
+                    </Td>
+                    <Td colSpan={6}></Td>
+                  </tr>
+                  {open &&
+                    g.lines.map((r, idx) => {
+                      const d = daysUntil(r.line.committed_date);
+                      const isLate =
+                        d !== null && d < 0 && r.line.status !== "completed";
+                      const isClosedRow =
+                        r.line.status === "completed" ||
+                        r.line.status === "cancelled";
+                      const mexEnd = r.jobs
+                        .map((j) => j.planned_end)
+                        .filter((x): x is string => !!x)
+                        .sort()
+                        .pop();
+                      return (
+                        <tr
+                          key={r.line.id}
+                          className={cn(
+                            "border-t border-border hover:bg-muted/30",
+                            idx % 2 === 1 && "bg-muted/10",
+                            isClosedRow && "text-muted-foreground",
+                          )}
+                        >
+                          <Td className="text-center text-muted-foreground font-sans text-[10px]">
+                            L{r.line.line_number}
+                          </Td>
+                          <Td>
+                            <span className="pl-3 text-muted-foreground truncate block text-[11px]">
+                              ↳
+                            </span>
+                          </Td>
+                          <Td className="text-muted-foreground">·</Td>
+                          <EditableCell
+                            value={r.line.pir ?? ""}
+                            onCommit={(v) => handleEdit(r.line.id, "pir", v || null)}
+                            change={getChange(changes, r.line.id, "pir")}
+                            readOnly={!canEdit}
+                          />
+                          <EditableCell
+                            value={r.line.tube_spec ?? ""}
+                            onCommit={(v) =>
+                              handleEdit(r.line.id, "tube_spec", v || null)
+                            }
+                            change={getChange(changes, r.line.id, "tube_spec")}
+                            readOnly={!canEdit}
+                          />
+                          <EditableCell
+                            value={String(r.line.qty_ordered)}
+                            align="right"
+                            onCommit={(v) => {
+                              const n = parseInt(v, 10);
+                              if (!Number.isFinite(n) || n < 1) {
+                                toast.error("Invalid qty");
+                                return;
+                              }
+                              handleEdit(r.line.id, "qty_ordered", n);
+                            }}
+                            change={getChange(changes, r.line.id, "qty_ordered")}
+                            readOnly={!canEdit}
+                          />
+                          <Td className="text-right">
+                            {Math.max(
+                              0,
+                              r.line.qty_ordered - r.total_pieces_completed,
+                            )}
+                          </Td>
+                          <EditableCell
+                            value={
+                              r.line.hb_price == null ? "" : String(r.line.hb_price)
+                            }
+                            align="right"
+                            onCommit={(v) => {
+                              const trimmed = v.trim();
+                              if (trimmed === "") {
+                                handleEdit(r.line.id, "hb_price", null);
+                                return;
+                              }
+                              const n = Number(trimmed.replace(/[$,]/g, ""));
+                              if (!Number.isFinite(n) || n < 0) {
+                                toast.error("Invalid HB price");
+                                return;
+                              }
+                              handleEdit(r.line.id, "hb_price", n);
+                            }}
+                            change={undefined}
+                            readOnly={!canEdit}
+                          />
+                          <Td className="text-right font-medium">
+                            {fmtMoney(r.line.total_hb)}
+                          </Td>
+                          <EditableCell
+                            type="date"
+                            value={r.line.committed_date ?? ""}
+                            onCommit={(v) =>
+                              handleEdit(r.line.id, "committed_date", v || null)
+                            }
+                            change={getChange(changes, r.line.id, "committed_date")}
+                            readOnly={!canEdit}
+                          />
+                          <Td className="text-muted-foreground">
+                            {mexEnd ? mexEnd.slice(0, 10) : "—"}
+                          </Td>
+                          <Td className="text-muted-foreground">
+                            {r.shipped_at ? r.shipped_at.slice(0, 10) : "—"}
+                          </Td>
+                          <Td className="text-right">
+                            {d === null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <span
+                                className={cn(
+                                  isLate
+                                    ? "text-red-400"
+                                    : d <= 3
+                                      ? "text-amber-300"
+                                      : "text-muted-foreground",
+                                )}
+                              >
+                                {d > 0 ? `+${d}` : d}
+                              </span>
+                            )}
+                          </Td>
+                          <Td>
+                            {r.jobs.length === 0 ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <div className="flex flex-col gap-0.5">
+                                {r.jobs.map((j) => (
+                                  <div
+                                    key={j.id}
+                                    className="flex items-center gap-1.5"
+                                  >
+                                    <span className="font-mono text-[11px]">
+                                      {j.odf}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "rounded border px-1.5 text-[9px] uppercase tracking-wide",
+                                        JOB_STAGE_TONE[j.status] ??
+                                          "border-muted-foreground/40 text-muted-foreground",
+                                      )}
+                                    >
+                                      {JOB_STAGE_LABEL[j.status] ?? j.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </Td>
+                          <Td>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] font-normal",
+                                STATUS_TONE[r.line.status] ?? "",
+                              )}
+                            >
+                              {PO_LINE_STATUS_LABEL_EN[r.line.status]}
+                            </Badge>
+                            {r.line.flag_reason && (
+                              <div className="text-[10px] text-red-300/80 mt-0.5 truncate max-w-[180px]">
+                                {r.line.flag_reason}
+                              </div>
+                            )}
+                          </Td>
+                          <EditableCell
+                            value={r.line.notes ?? ""}
+                            onCommit={(v) =>
+                              handleEdit(r.line.id, "notes", v || null)
+                            }
+                            change={getChange(changes, r.line.id, "notes")}
+                            readOnly={!canEdit}
+                          />
+                        </tr>
+                      );
+                    })}
+                </>
+              );
+            })}
+            {false && filtered.map((r, idx) => {
               const d = daysUntil(r.line.committed_date);
               const isLate = d !== null && d < 0 && r.line.status !== "completed";
               const isClosed = r.line.status === "completed" || r.line.status === "cancelled";
