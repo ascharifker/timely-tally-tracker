@@ -964,7 +964,7 @@ function PresetChip({
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
       className={cn(
