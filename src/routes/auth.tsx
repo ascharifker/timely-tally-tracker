@@ -9,6 +9,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { claimAdminIfEligible } from "@/lib/admin-users.functions";
 import { Activity, Info, Loader2 } from "lucide-react";
 
+const PUBLIC_APP_URL = "https://mego-produccion.lovable.app";
+const PASSWORD_SETUP_URL = `${PUBLIC_APP_URL}/reset-password`;
+
 export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
@@ -61,7 +64,7 @@ function AuthPage() {
     }
     setResetting(true);
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: PASSWORD_SETUP_URL,
     });
     setResetting(false);
     if (error) {
@@ -92,7 +95,7 @@ function AuthPage() {
             Live app access
           </div>
           <p>
-            Use <span className="font-mono text-foreground">https://mego-produccion.lovable.app</span>. If you already set a password, sign in here instead of reusing the invite link.
+            Use <span className="font-mono text-foreground">{PUBLIC_APP_URL}</span>. If you already set a password, sign in here instead of reusing the invite link.
           </p>
         </div>
         <form onSubmit={handleSignIn} className="space-y-4">

@@ -54,6 +54,8 @@ const ROLE_OPTIONS: AppRole[] = [
   "viewer",
 ];
 
+const PUBLIC_APP_URL = "https://mego-produccion.lovable.app";
+
 export function UsersPanel() {
   const qc = useQueryClient();
   const listFn = useServerFn(listUsers);
@@ -88,10 +90,11 @@ export function UsersPanel() {
       setInviteEmail("");
       setInviteRole("manager");
       invalidate();
-      if (res.email_sent) {
-        toast.success("Invite emailed", { description: sentTo });
-      } else if (res.action_link) {
+      if (res.action_link) {
         setLinkDialog({ open: true, link: res.action_link, email: sentTo });
+      }
+      if (res.email_sent) {
+        toast.success("Invite emailed", { description: "Use the live-app link shown here if the email link fails." });
       } else {
         toast.success("Invite processed", { description: sentTo });
       }
@@ -103,8 +106,11 @@ export function UsersPanel() {
     mutationFn: (v: { user_id: string; email: string; role: AppRole }) => resendFn({ data: v }),
     onSuccess: (res, v) => {
       invalidate();
+      if (res.action_link) {
+        setLinkDialog({ open: true, link: res.action_link, email: v.email });
+      }
       if (res.email_sent) {
-        toast.success("Fresh invite emailed", { description: v.email });
+        toast.success("Fresh invite emailed", { description: "Copy the live-app link shown here for WhatsApp." });
       } else {
         toast.success("Invite re-sent", { description: v.email });
       }
@@ -187,8 +193,9 @@ export function UsersPanel() {
         <Info className="h-4 w-4 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-medium text-foreground">How invites work</p>
-          <p>New users receive an email with a "Set your password" link. After setting a password they sign in at <span className="font-mono text-foreground">https://mego-produccion.lovable.app</span>.</p>
-          <p>Do <strong>not</strong> send them a Lovable editor or preview URL — those are for project editors only and will show "Access denied".</p>
+          <p>New users receive an email with a "Set your password" link that opens the live app: <span className="font-mono text-foreground">{PUBLIC_APP_URL}</span>.</p>
+          <p>Do <strong>not</strong> send them a Lovable editor, preview, or project URL — those are for project editors only and will show "Access denied".</p>
+          <p>If a user sees "Internal Lovable project" or "Access denied", delete that message and resend/copy a fresh invite from this Users tab.</p>
         </div>
       </div>
 
@@ -283,7 +290,7 @@ export function UsersPanel() {
           <DialogHeader>
             <DialogTitle>Link for {linkDialog.email}</DialogTitle>
           </DialogHeader>
-          <p className="text-xs text-muted-foreground">Single-use, expires in ~1 hour. Send this to the user.</p>
+          <p className="text-xs text-muted-foreground">Single-use, expires in ~1 hour. Send this live-app link by WhatsApp if the email link opens an access wall.</p>
           <div className="flex gap-2">
             <Input readOnly value={linkDialog.link} onFocus={(e) => e.currentTarget.select()} />
             <Button
