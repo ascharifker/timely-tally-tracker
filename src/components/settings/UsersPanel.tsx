@@ -219,6 +219,7 @@ export function UsersPanel() {
               users.map((u) => {
                 const currentRole = (u.roles[0] as AppRole) ?? "viewer";
                 const neverSignedIn = !u.last_sign_in_at;
+                const setupRequired = !u.email_confirmed || neverSignedIn;
                 return (
                   <tr key={u.id} className="border-t border-border">
                     <td className="px-3 py-2">{u.email ?? "—"}</td>
@@ -236,8 +237,11 @@ export function UsersPanel() {
                       </Select>
                     </td>
                     <td className="px-3 py-2">
-                      {neverSignedIn ? (
-                        <Badge variant="outline">Invited</Badge>
+                      {setupRequired ? (
+                        <div className="space-y-1">
+                          <Badge variant="outline">Setup needed</Badge>
+                          <p className="text-[11px] text-muted-foreground">Send or copy setup link before sign-in.</p>
+                        </div>
                       ) : (
                         <div className="space-y-1">
                           <Badge>Active</Badge>
@@ -250,7 +254,7 @@ export function UsersPanel() {
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
-                        {u.email && neverSignedIn ? (
+                        {u.email && setupRequired ? (
                           <>
                             <Button
                               size="sm"
@@ -259,11 +263,11 @@ export function UsersPanel() {
                               onClick={() => resendMut.mutate({ user_id: u.id, email: u.email!, role: currentRole })}
                             >
                               {resendMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-1" />}
-                              Resend invite
+                              Resend setup
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => handleCopyLink(u.email!, "invite")}>
                               <Copy className="h-3.5 w-3.5 mr-1" />
-                              Copy link
+                              Copy setup link
                             </Button>
                           </>
                         ) : u.email ? (
