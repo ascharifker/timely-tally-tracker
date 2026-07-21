@@ -495,7 +495,7 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
         <table className="w-full border-collapse text-[12px] font-mono">
           <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground font-sans">
-              <Th className="w-6"></Th>
+              <Th className="w-6">{" "}</Th>
               <Th className="w-32">Customer</Th>
               <Th className="w-28">PO #</Th>
               <Th className="w-32">PIR</Th>
@@ -582,7 +582,7 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                     <Td className="text-muted-foreground text-[11px]">
                       {g.earliestDate ?? "—"}
                     </Td>
-                    <Td colSpan={6}></Td>
+                    <td colSpan={6} className="border-r border-border px-2 py-1" />
                   </tr>
                   {open &&
                     g.lines.map((r, idx) => {
