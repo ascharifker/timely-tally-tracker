@@ -319,6 +319,7 @@ const EDITABLE_FIELDS = [
   "qty_ordered",
   "committed_date",
   "notes",
+  "hb_price",
 ] as const;
 
 export const updatePoLineField = createServerFn({ method: "POST" })

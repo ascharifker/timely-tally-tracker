@@ -142,6 +142,8 @@ export interface POLineItem {
   engineering_reviewed_by: string | null;
   eng_step: string | null;
   eng_step_started_at: string | null;
+  hb_price: number | null;
+  total_hb: number | null;
 }
 
 export type POLineStatus =

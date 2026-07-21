@@ -443,6 +443,7 @@ export type Database = {
           engineering_reviewed_by: string | null
           export_date: string | null
           flag_reason: string | null
+          hb_price: number | null
           id: string
           line_number: number
           notes: string | null
@@ -450,6 +451,7 @@ export type Database = {
           purchase_order_id: string
           qty_ordered: number
           status: Database["public"]["Enums"]["po_line_status"]
+          total_hb: number | null
           tube_spec: string | null
           unit_price: number | null
           updated_at: string
@@ -464,6 +466,7 @@ export type Database = {
           engineering_reviewed_by?: string | null
           export_date?: string | null
           flag_reason?: string | null
+          hb_price?: number | null
           id?: string
           line_number?: number
           notes?: string | null
@@ -471,6 +474,7 @@ export type Database = {
           purchase_order_id: string
           qty_ordered?: number
           status?: Database["public"]["Enums"]["po_line_status"]
+          total_hb?: number | null
           tube_spec?: string | null
           unit_price?: number | null
           updated_at?: string
@@ -485,6 +489,7 @@ export type Database = {
           engineering_reviewed_by?: string | null
           export_date?: string | null
           flag_reason?: string | null
+          hb_price?: number | null
           id?: string
           line_number?: number
           notes?: string | null
@@ -492,6 +497,7 @@ export type Database = {
           purchase_order_id?: string
           qty_ordered?: number
           status?: Database["public"]["Enums"]["po_line_status"]
+          total_hb?: number | null
           tube_spec?: string | null
           unit_price?: number | null
           updated_at?: string
