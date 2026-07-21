@@ -67,6 +67,8 @@ export interface AdminUserRow {
   id: string;
   email: string | null;
   created_at: string;
+  invited_at: string | null;
+  email_confirmed: boolean;
   last_sign_in_at: string | null;
   roles: string[];
 }
@@ -94,6 +96,8 @@ export const listUsers = createServerFn({ method: "GET" })
       id: u.id,
       email: u.email ?? null,
       created_at: u.created_at,
+      invited_at: (u as { invited_at?: string | null }).invited_at ?? null,
+      email_confirmed: Boolean(u.email_confirmed_at ?? u.confirmed_at),
       last_sign_in_at: u.last_sign_in_at ?? null,
       roles: byUser.get(u.id) ?? [],
     }));
