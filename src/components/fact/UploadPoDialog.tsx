@@ -381,9 +381,22 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
       <div>
         <div className="flex items-center justify-between mb-2">
           <Label>Lines ({value.line_items.length})</Label>
-          <Button size="sm" variant="outline" onClick={addLine}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add line
-          </Button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              Total HB:{" "}
+              <span className="font-mono tabular-nums text-foreground">
+                {value.line_items
+                  .reduce((s, li) => s + (li.unit_price ?? 0) * li.qty_ordered, 0)
+                  .toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+              </span>
+            </span>
+            <Button size="sm" variant="outline" onClick={addLine}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add line
+            </Button>
+          </div>
         </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>
