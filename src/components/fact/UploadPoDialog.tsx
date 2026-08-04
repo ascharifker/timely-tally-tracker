@@ -448,6 +448,14 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                       }
                     />
                   </TableCell>
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
+                    {li.unit_price == null
+                      ? "—"
+                      : (li.unit_price * li.qty_ordered).toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                  </TableCell>
                   <TableCell>
                     <Input
                       value={li.currency ?? ""}
