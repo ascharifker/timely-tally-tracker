@@ -142,6 +142,7 @@ export function UploadPoDialog() {
             tube_spec: li.tube_spec?.trim() || null,
             currency: li.currency?.trim() || null,
             committed_date: li.committed_date || null,
+            hb_price: li.unit_price,
           })),
         },
       });
@@ -262,6 +263,7 @@ function emptyLine(n: number): ExtractedPoData["line_items"][number] {
     qty_ordered: 1,
     committed_date: null,
     unit_price: null,
+    line_total: null,
     currency: null,
   };
 }
@@ -379,9 +381,22 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
       <div>
         <div className="flex items-center justify-between mb-2">
           <Label>Lines ({value.line_items.length})</Label>
-          <Button size="sm" variant="outline" onClick={addLine}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add line
-          </Button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              Total HB:{" "}
+              <span className="font-mono tabular-nums text-foreground">
+                {value.line_items
+                  .reduce((s, li) => s + (li.unit_price ?? 0) * li.qty_ordered, 0)
+                  .toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+              </span>
+            </span>
+            <Button size="sm" variant="outline" onClick={addLine}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add line
+            </Button>
+          </div>
         </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>
@@ -392,7 +407,8 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                 <TableHead>Spec / Description</TableHead>
                 <TableHead className="w-24">Qty</TableHead>
                 <TableHead className="w-40">Customer date</TableHead>
-                <TableHead className="w-28">Price</TableHead>
+                <TableHead className="w-28">HB Price</TableHead>
+                <TableHead className="w-28 text-right">Total HB</TableHead>
                 <TableHead className="w-20">Currency</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
@@ -445,6 +461,14 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                         })
                       }
                     />
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs tabular-nums">
+                    {li.unit_price == null
+                      ? "—"
+                      : (li.unit_price * li.qty_ordered).toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                   </TableCell>
                   <TableCell>
                     <Input
