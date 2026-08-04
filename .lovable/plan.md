@@ -1,51 +1,26 @@
 ## Goal
 
-Add HB pricing to PO lines and restructure the Orders table so lines are grouped under their PO, with PO # sorting and expand/collapse.
+When a PO PDF is uploaded, the price extracted by the parser must land in the Orders table's **HB Price / Total HB** columns — today it is captured but stored in a different field the Orders table never reads.
 
-## 1. Schema — add HB Price columns
+## What's happening now
 
-Migration on `public.po_line_items`:
-- `hb_price numeric(12,2)` — unit price agreed with Halliburton (per piece).
-- `total_hb numeric(14,2)` generated as `hb_price * qty_ordered` (Postgres `GENERATED ALWAYS AS ... STORED`), so it stays in sync automatically as qty or unit price changes.
+- The AI extractor already pulls `unit_price` and `currency` per line, and the upload dialog shows them as editable fields.
+- On commit, those values are written to `po_line_items.unit_price` / `currency`.
+- The Orders table reads `hb_price` and the generated `total_hb`, which stay empty — so uploaded prices never appear.
 
-Update the fetch in `src/hooks/usePoLinesSpreadsheet.ts` to select the two new columns, and extend `POLineItem` in `src/lib/fact-types.ts`.
+## Changes
 
-Parser stays untouched for now — user confirmed manual entry, upgrade later.
+### 1. Carry the extracted price into HB Price
+- In `src/lib/po-intake.functions.ts`, when inserting line items in `commitPo`, also set `hb_price` from the line's price. `total_hb` is generated automatically from `hb_price * qty_ordered`.
+- Add `hb_price` to the commit input schema so the dialog can send an explicitly edited value that differs from `unit_price`.
 
-## 2. Allow editing HB Price
+### 2. Make the extraction stronger about prices
+- Extend the extractor prompt so it reads unit price, extended/line total, and currency, and normalizes formats (thousands separators, `USD`/`$`/`ARS`, values like `1.234,56`).
+- If only a line total is present, derive the unit price by dividing by quantity; if only a unit price is present, leave the total to the generated column.
 
-- Add `hb_price` to `EDITABLE_FIELDS` in `src/lib/po-workflow.functions.ts` (numeric coercion; null clears). `total_hb` is generated, never edited.
-- Extend `EditableField` type in `PoLinesSpreadsheet.tsx`.
-
-## 3. Group rows by PO # with expand/collapse
-
-Rework `src/components/fact/PoLinesSpreadsheet.tsx`:
-- After filtering, group `filtered` rows by `po.id` (rows without a PO fall into a synthetic "No PO" group at the bottom).
-- Render a **PO header row** per group with:
-  - expand/collapse chevron (default collapsed; state kept in a `Set<string>` in component state, persisted to `localStorage` so it survives navigation)
-  - Customer, PO # (clickable link, as today), line count, earliest committed date, group totals (Qty, Pending, **Total HB** = sum of line `total_hb`), and an aggregate status pill (e.g. "3 pending eng · 2 in prod").
-- Line rows render only when the group is expanded, indented under the header, keeping all existing editable cells (PIR, Description, Qty, Customer date, Notes) plus two new cells: **HB Price** (editable) and **Total HB** (read-only, right-aligned currency).
-- Search / preset filters continue to operate on lines; a group is shown only if at least one line matches, and auto-expands when the search query is non-empty so matches are visible.
-
-Column header row updates: add "HB Price" and "Total HB" columns; keep the existing 13 columns.
-
-## 4. Sort by PO #
-
-- Change the current "active first / committed_date asc" sort to sort **groups**, not lines, so the whole table is ordered by PO.
-- Default group sort: PO # ascending (natural sort so `PO-10` comes after `PO-2`).
-- Add a small sort control above the table with three options: **PO # ↑**, **PO # ↓**, **Earliest date**. Persist choice to `localStorage`.
-- Inside each group, lines keep their line_number order.
-
-## 5. Currency formatting
-
-Small helper in `src/lib/utils.ts` (or local to the component) to format HB values as USD with thousands separator; null → "—".
+### 3. Show it in the review step before commit
+- In `src/components/fact/UploadPoDialog.tsx`, relabel the price field as **HB Price** and add a read-only **Total HB** preview (price × qty) per line, plus a PO-level total, so the user can confirm or correct what the parser found before saving.
 
 ## Out of scope
-
-- Parser auto-extraction of price (explicit user request to defer).
-- Changes to `/purchase-orders/$id` detail page or `PoDetailDialog` — only mention if the user later asks; HB fields naturally show up there once selected, but not required now.
-
-## Technical notes
-
-- `total_hb` as a `GENERATED` column avoids drift and keeps the totals correct when Peter edits qty inline.
-- Grouping is a pure client-side render change over the already-fetched `rows`; no new server function needed beyond adding `hb_price` to the editable-field enum.
+- Changing how `unit_price` is used elsewhere; it stays as-is for backward compatibility (HB Price is populated alongside it).
+- Any schema change — `hb_price` and `total_hb` already exist.
