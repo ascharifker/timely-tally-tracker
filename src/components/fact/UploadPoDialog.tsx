@@ -393,7 +393,8 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                 <TableHead>Spec / Description</TableHead>
                 <TableHead className="w-24">Qty</TableHead>
                 <TableHead className="w-40">Customer date</TableHead>
-                <TableHead className="w-28">Price</TableHead>
+                <TableHead className="w-28">HB Price</TableHead>
+                <TableHead className="w-28 text-right">Total HB</TableHead>
                 <TableHead className="w-20">Currency</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
