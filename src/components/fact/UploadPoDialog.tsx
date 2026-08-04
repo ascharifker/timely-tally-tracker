@@ -142,6 +142,7 @@ export function UploadPoDialog() {
             tube_spec: li.tube_spec?.trim() || null,
             currency: li.currency?.trim() || null,
             committed_date: li.committed_date || null,
+            hb_price: li.unit_price,
           })),
         },
       });
