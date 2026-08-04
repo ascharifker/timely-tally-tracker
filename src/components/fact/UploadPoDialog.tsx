@@ -262,6 +262,7 @@ function emptyLine(n: number): ExtractedPoData["line_items"][number] {
     qty_ordered: 1,
     committed_date: null,
     unit_price: null,
+    line_total: null,
     currency: null,
   };
 }
