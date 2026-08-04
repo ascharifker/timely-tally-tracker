@@ -28,6 +28,7 @@ const ExtractedLineItem = z.object({
   qty_ordered: z.number().int().positive(),
   committed_date: z.string().nullable(),
   unit_price: z.number().nullable(),
+  line_total: z.number().nullable().optional().default(null),
   currency: z.string().nullable(),
 });
 
@@ -83,12 +84,18 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       '      "tube_spec": string | null,     // descripción / spec del tubo',
       '      "qty_ordered": number,',
       '      "committed_date": "YYYY-MM-DD" | null,',
-      '      "unit_price": number | null,',
+      '      "unit_price": number | null,      // precio unitario por pieza',
+      '      "line_total": number | null,      // precio total / extendido de la línea',
       '      "currency": string | null',
       "    }",
       "  ]",
       "}",
       "Si un campo no aparece en el PDF, usá null. Las fechas SIEMPRE en formato YYYY-MM-DD.",
+      "PRECIOS: buscá activamente columnas tipo 'Unit Price', 'Precio unitario', 'Price', 'Amount', 'Extended', 'Total', 'Importe'.",
+      "Normalizá los números: quitá separadores de miles y símbolos de moneda; '1.234,56' => 1234.56; '$ 1,234.56' => 1234.56.",
+      "Devolvé los precios como números puros (sin comas, sin símbolos).",
+      "Si solo hay un total de línea, dejá unit_price en null y poné el valor en line_total.",
+      "currency: usá el código ISO cuando puedas ('USD', 'ARS', 'EUR').",
       "No agregues texto fuera del JSON. No uses markdown ni ```.",
     ].join("\n");
 
@@ -134,7 +141,19 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
         `La extracción no cumple el formato esperado: ${result.error.message}`,
       );
     }
-    return result.data;
+    // Derive unit price from the line total when only the total was found.
+    return {
+      ...result.data,
+      line_items: result.data.line_items.map((li) => {
+        if (li.unit_price == null && li.line_total != null && li.qty_ordered > 0) {
+          return {
+            ...li,
+            unit_price: Math.round((li.line_total / li.qty_ordered) * 100) / 100,
+          };
+        }
+        return li;
+      }),
+    };
   });
 
 // ---------------------------------------------------------------
@@ -160,6 +179,7 @@ const CommitPoInput = z.object({
         qty_ordered: z.number().int().positive(),
         committed_date: z.string().nullable(),
         unit_price: z.number().nullable(),
+        hb_price: z.number().nullable().optional().default(null),
         currency: z.string().nullable(),
       }),
     )
@@ -244,6 +264,7 @@ export const commitPo = createServerFn({ method: "POST" })
       qty_ordered: li.qty_ordered,
       committed_date: li.committed_date,
       unit_price: li.unit_price,
+      hb_price: li.hb_price ?? li.unit_price,
       currency: li.currency,
     }));
     if (rows.length > 0) {
