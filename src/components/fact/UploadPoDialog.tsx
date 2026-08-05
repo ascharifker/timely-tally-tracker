@@ -142,11 +142,14 @@ export function UploadPoDialog() {
             tube_spec: li.tube_spec?.trim() || null,
             currency: li.currency?.trim() || null,
             committed_date: li.committed_date || null,
-            hb_price: li.unit_price,
+            unit_price: li.unit_price ?? li.hb_price,
+            hb_price: li.hb_price ?? li.unit_price,
           })),
         },
       });
       qc.invalidateQueries({ queryKey: ["purchase_orders"] });
+      qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });
+      qc.invalidateQueries({ queryKey: ["purchase_order", result.id] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Purchase Order created");
       setOpen(false);
@@ -263,6 +266,7 @@ function emptyLine(n: number): ExtractedPoData["line_items"][number] {
     qty_ordered: 1,
     committed_date: null,
     unit_price: null,
+    hb_price: null,
     line_total: null,
     currency: null,
   };
@@ -386,7 +390,7 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
               Total HB:{" "}
               <span className="font-mono tabular-nums text-foreground">
                 {value.line_items
-                  .reduce((s, li) => s + (li.unit_price ?? 0) * li.qty_ordered, 0)
+                  .reduce((s, li) => s + (li.hb_price ?? li.unit_price ?? 0) * li.qty_ordered, 0)
                   .toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -454,18 +458,18 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                     <Input
                       type="number"
                       step="0.01"
-                      value={li.unit_price ?? ""}
+                      value={li.hb_price ?? li.unit_price ?? ""}
                       onChange={(e) =>
                         updateLine(idx, {
-                          unit_price: e.target.value === "" ? null : Number(e.target.value),
+                          hb_price: e.target.value === "" ? null : Number(e.target.value),
                         })
                       }
                     />
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs tabular-nums">
-                    {li.unit_price == null
+                    {(li.hb_price ?? li.unit_price) == null
                       ? "—"
-                      : (li.unit_price * li.qty_ordered).toLocaleString("en-US", {
+                      : ((li.hb_price ?? li.unit_price ?? 0) * li.qty_ordered).toLocaleString("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}

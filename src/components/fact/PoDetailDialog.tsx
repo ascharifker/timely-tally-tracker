@@ -17,6 +17,15 @@ import { usePoDetail } from "@/hooks/usePoDetail";
 import { ExternalLink } from "lucide-react";
 import { PO_LINE_STATUS_LABEL_EN, type POLineStatus } from "@/lib/fact-types";
 
+function formatPrice(value: number | null, currency: string | null) {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency || "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function PoDetailDialog({
   poId,
   onClose,
@@ -94,6 +103,8 @@ export function PoDetailDialog({
                       <TableHead>PIR</TableHead>
                       <TableHead>Spec</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">HB Price</TableHead>
+                      <TableHead className="text-right">Total HB</TableHead>
                       <TableHead>Customer date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Notes</TableHead>
@@ -106,6 +117,12 @@ export function PoDetailDialog({
                         <TableCell className="font-mono text-xs">{l.pir ?? "—"}</TableCell>
                         <TableCell>{l.tube_spec ?? "—"}</TableCell>
                         <TableCell className="text-right font-mono">{l.qty_ordered}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatPrice(l.hb_price, l.currency)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatPrice(l.total_hb, l.currency)}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{l.committed_date ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
