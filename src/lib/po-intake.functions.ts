@@ -28,6 +28,7 @@ const ExtractedLineItem = z.object({
   qty_ordered: z.number().int().positive(),
   committed_date: z.string().nullable(),
   unit_price: z.number().nullable(),
+  hb_price: z.number().nullable().optional().default(null),
   line_total: z.number().nullable().optional().default(null),
   currency: z.string().nullable(),
 });
@@ -146,12 +147,14 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       ...result.data,
       line_items: result.data.line_items.map((li) => {
         if (li.unit_price == null && li.line_total != null && li.qty_ordered > 0) {
+          const derivedPrice = Math.round((li.line_total / li.qty_ordered) * 100) / 100;
           return {
             ...li,
-            unit_price: Math.round((li.line_total / li.qty_ordered) * 100) / 100,
+            unit_price: derivedPrice,
+            hb_price: derivedPrice,
           };
         }
-        return li;
+        return { ...li, hb_price: li.hb_price ?? li.unit_price };
       }),
     };
   });
@@ -263,8 +266,8 @@ export const commitPo = createServerFn({ method: "POST" })
       tube_spec: li.tube_spec,
       qty_ordered: li.qty_ordered,
       committed_date: li.committed_date,
-      unit_price: li.unit_price,
-      hb_price: li.hb_price ?? li.unit_price,
+       unit_price: li.unit_price ?? li.hb_price,
+       hb_price: li.hb_price ?? li.unit_price,
       currency: li.currency,
     }));
     if (rows.length > 0) {

@@ -42,6 +42,15 @@ function daysBetween(a: Date, b: Date) {
   return Math.round((a.getTime() - b.getTime()) / 86_400_000);
 }
 
+function formatPrice(value: number | null, currency: string | null) {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency || "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function PurchaseOrderDetailPage() {
   const { id } = Route.useParams();
   const { data: po, isLoading } = usePurchaseOrder(id);
@@ -215,6 +224,8 @@ function PurchaseOrderDetailPage() {
                       <TableHead>PIR</TableHead>
                       <TableHead>Spec</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
+                       <TableHead className="text-right">HB Price</TableHead>
+                       <TableHead className="text-right">Total HB</TableHead>
                       <TableHead>Customer date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>ODF #</TableHead>
@@ -223,7 +234,7 @@ function PurchaseOrderDetailPage() {
                   <TableBody>
                     {po.line_items.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                         <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
                           No lines.
                         </TableCell>
                       </TableRow>
@@ -236,6 +247,12 @@ function PurchaseOrderDetailPage() {
                           <TableCell className="font-mono text-xs">{li.pir ?? "—"}</TableCell>
                           <TableCell className="text-sm">{li.tube_spec ?? "—"}</TableCell>
                           <TableCell className="text-right font-mono">{li.qty_ordered}</TableCell>
+                           <TableCell className="text-right font-mono text-xs">
+                             {formatPrice(li.hb_price, li.currency)}
+                           </TableCell>
+                           <TableCell className="text-right font-mono text-xs">
+                             {formatPrice(li.total_hb, li.currency)}
+                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {li.committed_date ?? "—"}
                           </TableCell>

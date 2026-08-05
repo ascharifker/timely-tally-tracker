@@ -11,6 +11,8 @@ export interface PoDetailLine {
   status: string;
   notes: string | null;
   unit_price: number | null;
+  hb_price: number | null;
+  total_hb: number | null;
   currency: string | null;
 }
 
@@ -46,7 +48,7 @@ export function usePoDetail(poId: string | null) {
       const { data: po, error } = await supabase
         .from("purchase_orders" as never)
         .select(
-          "*, customer:customers(id, name, code), lines:po_line_items(id, line_number, pir, tube_spec, qty_ordered, committed_date, status, notes, unit_price, currency)",
+          "*, customer:customers(id, name, code), lines:po_line_items(id, line_number, pir, tube_spec, qty_ordered, committed_date, status, notes, unit_price, hb_price, total_hb, currency)",
         )
         .eq("id", poId!)
         .single();
