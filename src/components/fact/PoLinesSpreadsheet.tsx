@@ -45,6 +45,7 @@ import { ExportLinesDialog } from "@/components/fact/ExportLinesDialog";
 type Mode = "intake" | "pending";
 type EditableField =
   | "pir"
+  | "pir_rev"
   | "tube_spec"
   | "qty_ordered"
   | "committed_date"
@@ -499,6 +500,7 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
               <Th className="w-32">Customer</Th>
               <Th className="w-28">PO #</Th>
               <Th className="w-32">PIR</Th>
+              <Th className="w-20">Rev</Th>
               <Th className="min-w-[260px]">Description</Th>
               <Th className="w-16 text-right">Qty</Th>
               <Th className="w-16 text-right">Pend</Th>
@@ -516,14 +518,14 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={16} className="text-center text-muted-foreground py-8">
+                <td colSpan={17} className="text-center text-muted-foreground py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={16} className="text-center text-muted-foreground py-8">
+                <td colSpan={17} className="text-center text-muted-foreground py-8">
                   No lines match.
                 </td>
               </tr>
@@ -570,6 +572,7 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                     <Td className="text-muted-foreground font-sans text-[11px]">
                       {g.lines.length} line{g.lines.length === 1 ? "" : "s"}
                     </Td>
+                    <Td className="text-muted-foreground">—</Td>
                     <Td className="text-muted-foreground font-sans text-[11px] truncate">
                       {statusPill}
                     </Td>
@@ -619,6 +622,14 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                             value={r.line.pir ?? ""}
                             onCommit={(v) => handleEdit(r.line.id, "pir", v || null)}
                             change={getChange(changes, r.line.id, "pir")}
+                            readOnly={!canEdit}
+                          />
+                          <EditableCell
+                            value={r.line.pir_rev ?? ""}
+                            onCommit={(v) =>
+                              handleEdit(r.line.id, "pir_rev", v || null)
+                            }
+                            change={getChange(changes, r.line.id, "pir_rev")}
                             readOnly={!canEdit}
                           />
                           <EditableCell
