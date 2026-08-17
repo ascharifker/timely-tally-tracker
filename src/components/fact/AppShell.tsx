@@ -72,6 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showPendingReview =
     isAdmin(roles) ||
     hasRole(roles, "po_editor") ||
+    hasRole(roles, "engineer") ||
     hasRole(roles, "coe_reviewer") ||
     hasRole(roles, "third_party_reviewer");
 

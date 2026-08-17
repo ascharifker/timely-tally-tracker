@@ -25,7 +25,7 @@ export function canCreatePo(roles: AppRole[]): boolean {
 
 /** Can this user edit a specific PO given its review track? */
 export function canEditPo(roles: AppRole[], track: ReviewTrack | null | undefined): boolean {
-  if (isAdmin(roles) || hasRole(roles, "po_editor")) return true;
+  if (isAdmin(roles) || hasRole(roles, "po_editor") || hasRole(roles, "engineer")) return true;
   if (track === "coe" && hasRole(roles, "coe_reviewer")) return true;
   if (track === "third_party" && hasRole(roles, "third_party_reviewer")) return true;
   return false;
@@ -33,7 +33,7 @@ export function canEditPo(roles: AppRole[], track: ReviewTrack | null | undefine
 
 /** Loose check — used to show/hide spreadsheet edit affordances when the PO track isn't known yet. */
 export function canEditAnyPo(roles: AppRole[]): boolean {
-  return canCreatePo(roles);
+  return canCreatePo(roles) || hasRole(roles, "engineer");
 }
 
 export function canEditProduction(roles: AppRole[]): boolean {
@@ -44,10 +44,16 @@ export function canEditProduction(roles: AppRole[]): boolean {
   );
 }
 
+/** Can this user act on the engineering verification queue? */
+export function canReviewEngineering(roles: AppRole[]): boolean {
+  return isAdmin(roles) || hasRole(roles, "manager") || hasRole(roles, "engineer");
+}
+
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
   manager: "Manager",
   po_editor: "PO Editor",
+  engineer: "Engineering",
   coe_reviewer: "COE Reviewer",
   third_party_reviewer: "Third-party Reviewer",
   production_editor: "Production",
@@ -60,6 +66,7 @@ export function primaryRoleLabel(roles: AppRole[]): string {
     "admin",
     "manager",
     "po_editor",
+    "engineer",
     "coe_reviewer",
     "third_party_reviewer",
     "production_editor",

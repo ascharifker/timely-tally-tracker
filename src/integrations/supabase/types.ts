@@ -906,6 +906,7 @@ export type Database = {
         | "third_party_reviewer"
         | "production_editor"
         | "viewer"
+        | "engineer"
       event_kind:
         | "delay"
         | "priority_shift"
@@ -1075,6 +1076,7 @@ export const Constants = {
         "third_party_reviewer",
         "production_editor",
         "viewer",
+        "engineer",
       ],
       event_kind: [
         "delay",

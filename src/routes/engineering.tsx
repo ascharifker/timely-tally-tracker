@@ -45,6 +45,8 @@ import { ArrowLeft, ArrowRight, ChevronDown, Flag, RotateCcw } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { EngStepDrawer } from "@/components/fact/EngStepDrawer";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
+import { useAuth } from "@/hooks/useUserRole";
+import { canReviewEngineering } from "@/lib/rbac";
 
 export const Route = createFileRoute("/engineering")({
   ssr: false,
@@ -98,6 +100,8 @@ function StepDots({ currentKey }: { currentKey: string | null }) {
 }
 
 function EngineeringPage() {
+  const { roles } = useAuth();
+  const canReview = canReviewEngineering(roles);
   const { data: lines = [], isLoading } = usePoLinesByStatus([
     "pending_engineering",
     "engineering_flagged",
@@ -233,6 +237,11 @@ function EngineeringPage() {
         <p className="text-sm text-muted-foreground">
           4-step verification funnel: PO Info → PIR → Components → Matrix.
         </p>
+        {!canReview && (
+          <p className="mt-1 text-xs text-amber-400/90">
+            Read-only — the Engineering role is required to advance or flag lines.
+          </p>
+        )}
       </div>
 
       <div className="rounded-md border bg-card">
@@ -321,7 +330,7 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={busy === l.id || stepIndex(currentStep) <= 0}
+                      disabled={!canReview || busy === l.id || stepIndex(currentStep) <= 0}
                       onClick={() => goBack(l.id)}
                       title="Back one step"
                     >
@@ -330,14 +339,14 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="default"
-                      disabled={busy === l.id}
+                      disabled={!canReview || busy === l.id}
                       onClick={() => advance(l.id)}
                     >
                       Complete step <ArrowRight className="h-3.5 w-3.5 ml-1" />
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost" disabled={busy === l.id}>
+                        <Button size="sm" variant="ghost" disabled={!canReview || busy === l.id}>
                           <ChevronDown className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -358,7 +367,7 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={busy === l.id}
+                      disabled={!canReview || busy === l.id}
                       onClick={() => {
                         setFlagOpen(l.id);
                         setFlagReason(l.flag_reason ?? "");
@@ -413,7 +422,7 @@ function EngineeringPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={busy === l.id}
+                        disabled={!canReview || busy === l.id}
                         onClick={() => reopen(l.id)}
                       >
                         <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Reopen in
