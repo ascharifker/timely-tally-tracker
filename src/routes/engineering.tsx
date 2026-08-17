@@ -318,6 +318,15 @@ function EngineeringPage() {
                     </Button>
                     <Button
                       size="sm"
+                      variant="outline"
+                      disabled={busy === l.id || stepIndex(currentStep) <= 0}
+                      onClick={() => goBack(l.id)}
+                      title="Back one step"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="default"
                       disabled={busy === l.id}
                       onClick={() => advance(l.id)}
@@ -339,6 +348,9 @@ function EngineeringPage() {
                             Jump to {s.label}
                           </DropdownMenuItem>
                         ))}
+                        <DropdownMenuItem onClick={() => restart(l.id)}>
+                          <RotateCcw className="h-3.5 w-3.5 mr-2" /> Start over
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Button
@@ -360,6 +372,59 @@ function EngineeringPage() {
           </TableBody>
         </Table>
       </div>
+
+      {doneLines.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold mb-2">
+            Ready for production ({doneLines.length})
+          </h3>
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer / PO</TableHead>
+                  <TableHead>Line</TableHead>
+                  <TableHead>PIR</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="w-56" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {doneLines.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-sm">
+                      {l.purchase_order?.customer?.name ?? "—"}
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {l.purchase_order?.po_number}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      L{l.line_number}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {l.pir ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {l.qty_ordered}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === l.id}
+                        onClick={() => reopen(l.id)}
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Reopen in
+                        engineering
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!flagOpen} onOpenChange={(o) => !o && setFlagOpen(null)}>
         <DialogContent className="bg-card">
