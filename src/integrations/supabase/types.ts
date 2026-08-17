@@ -434,6 +434,13 @@ export type Database = {
       }
       po_line_items: {
         Row: {
+          body_grade: string | null
+          body_heat_treat: string | null
+          body_length: string | null
+          body_notes: string | null
+          body_od: string | null
+          body_thread: string | null
+          body_wall: string | null
           committed_date: string | null
           created_at: string
           currency: string | null
@@ -448,6 +455,7 @@ export type Database = {
           line_number: number
           notes: string | null
           pir: string | null
+          pir_rev: string | null
           purchase_order_id: string
           qty_ordered: number
           status: Database["public"]["Enums"]["po_line_status"]
@@ -457,6 +465,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          body_grade?: string | null
+          body_heat_treat?: string | null
+          body_length?: string | null
+          body_notes?: string | null
+          body_od?: string | null
+          body_thread?: string | null
+          body_wall?: string | null
           committed_date?: string | null
           created_at?: string
           currency?: string | null
@@ -471,6 +486,7 @@ export type Database = {
           line_number?: number
           notes?: string | null
           pir?: string | null
+          pir_rev?: string | null
           purchase_order_id: string
           qty_ordered?: number
           status?: Database["public"]["Enums"]["po_line_status"]
@@ -480,6 +496,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          body_grade?: string | null
+          body_heat_treat?: string | null
+          body_length?: string | null
+          body_notes?: string | null
+          body_od?: string | null
+          body_thread?: string | null
+          body_wall?: string | null
           committed_date?: string | null
           created_at?: string
           currency?: string | null
@@ -494,6 +517,7 @@ export type Database = {
           line_number?: number
           notes?: string | null
           pir?: string | null
+          pir_rev?: string | null
           purchase_order_id?: string
           qty_ordered?: number
           status?: Database["public"]["Enums"]["po_line_status"]
