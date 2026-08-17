@@ -130,6 +130,7 @@ function EngineeringPage() {
   const [flagOpen, setFlagOpen] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
   const [drawerLineId, setDrawerLineId] = useState<string | null>(null);
+  const [drawerStep, setDrawerStep] = useState<EngStepKey | null>(null);
   const drawerLine: PoLineWithContext | null =
     lines.find((l) => l.id === drawerLineId) ?? null;
 
@@ -308,7 +309,13 @@ function EngineeringPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <StepDots currentKey={currentStep} />
+                    <StepDots
+                      currentKey={currentStep}
+                      onSelect={(k) => {
+                        setDrawerStep(k);
+                        setDrawerLineId(l.id);
+                      }}
+                    />
                     <div className="text-xs text-muted-foreground">
                       {step?.label ?? "—"}
                     </div>
@@ -332,7 +339,10 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setDrawerLineId(l.id)}
+                      onClick={() => {
+                        setDrawerStep(null);
+                        setDrawerLineId(l.id);
+                      }}
                     >
                       Open
                     </Button>
@@ -471,6 +481,7 @@ function EngineeringPage() {
       <EngStepDrawer
         line={drawerLine}
         open={!!drawerLine}
+        initialStep={drawerStep}
         onOpenChange={(o) => !o && setDrawerLineId(null)}
       />
     </AppShell>
