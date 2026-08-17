@@ -116,7 +116,9 @@ function EngineeringPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [flagOpen, setFlagOpen] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
-  const [drawerLine, setDrawerLine] = useState<PoLineWithContext | null>(null);
+  const [drawerLineId, setDrawerLineId] = useState<string | null>(null);
+  const drawerLine: PoLineWithContext | null =
+    lines.find((l) => l.id === drawerLineId) ?? null;
 
   const refresh = () =>
     qc.invalidateQueries({ queryKey: ["po_lines_by_status"] });
@@ -312,7 +314,7 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setDrawerLine(l)}
+                      onClick={() => setDrawerLineId(l.id)}
                     >
                       Open
                     </Button>
@@ -451,7 +453,7 @@ function EngineeringPage() {
       <EngStepDrawer
         line={drawerLine}
         open={!!drawerLine}
-        onOpenChange={(o) => !o && setDrawerLine(null)}
+        onOpenChange={(o) => !o && setDrawerLineId(null)}
       />
     </AppShell>
   );
