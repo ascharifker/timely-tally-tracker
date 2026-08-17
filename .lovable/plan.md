@@ -1,8 +1,10 @@
-# What we still need from Engineering (Alexis / Lendris)
+# What we still need from Engineering (Alexis / Lendris) — PARKED
 
 Cross-referenced against Alexis's process as captured earlier in this project (Peter uploads PO -> Engineering validates PIR + specs against the Master PIR list in E-Dash -> Production creates the ODT and assigns machine/operator -> date changes flow back to Peter with an audit trail) and against the 4-step Engineering funnel we built (PO Info -> PIR Verification -> Part Component List -> Quality Matrix Check).
 
 Steps 1-3 are functional today. Step 4 is still a placeholder, and two inputs are missing that only Engineering can supply.
+
+Status: **Waiting for the transcript from today's Engineering demo call before adjusting this plan.**
 
 ## Ask list (what to request in the meeting)
 
