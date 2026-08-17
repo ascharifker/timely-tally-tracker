@@ -15,14 +15,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, Download, ExternalLink, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, ExternalLink, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ENGINEERING_STEPS,
   getStep,
+  stepIndex,
   type EngStepKey,
 } from "@/lib/engineering-steps";
-import { advanceEngStep } from "@/lib/po-workflow.functions";
+import { advanceEngStep, revertEngStep } from "@/lib/po-workflow.functions";
 import { updatePoLineField } from "@/lib/po-workflow.functions";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
 
@@ -36,6 +37,7 @@ interface Props {
 
 export function EngStepDrawer({ line, open, onOpenChange }: Props) {
   const advanceFn = useServerFn(advanceEngStep);
+  const revertFn = useServerFn(revertEngStep);
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
 
@@ -50,9 +52,36 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
     setBusy(true);
     try {
       const res = await advanceFn({ data: { id: line.id } });
-      toast.success(res.completed ? "Ready for production" : "Step completed");
+      toast.success(res.completed ? "Ready for production" : "Step completed", {
+        duration: 10000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await revertFn({ data: { id: line.id, kind: "undo" } });
+              toast.success("Step restored");
+              await refresh();
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Error");
+            }
+          },
+        },
+      });
       await refresh();
       if (res.completed) onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBack = async () => {
+    setBusy(true);
+    try {
+      await revertFn({ data: { id: line.id, kind: "back" } });
+      toast.success("Moved back one step");
+      await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
     } finally {
@@ -89,7 +118,15 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
           {currentKey === "matrix_check" && <MatrixPanel />}
         </div>
 
-        <SheetFooter className="mt-6">
+        <SheetFooter className="mt-6 flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            className="sm:w-auto w-full"
+            disabled={busy || stepIndex(currentKey) <= 0}
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
           <Button
             className="w-full"
             disabled={busy}
