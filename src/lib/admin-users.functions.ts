@@ -33,6 +33,7 @@ const APP_ROLES = [
   "admin",
   "manager",
   "po_editor",
+  "engineer",
   "coe_reviewer",
   "third_party_reviewer",
   "production_editor",
