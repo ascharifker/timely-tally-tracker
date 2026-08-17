@@ -57,7 +57,8 @@ export function QualityMatrixPanel({ line, canReview, onSaved }: Props) {
   });
 
   const checksByItemId = useMemo(() => {
-    const map: Record<string, (typeof checksData?.checks)[number]> = {};
+    type CheckRow = NonNullable<typeof checksData>["checks"][number];
+    const map: Record<string, CheckRow> = {};
     for (const c of checksData?.checks ?? []) {
       map[c.item_id] = c;
     }
