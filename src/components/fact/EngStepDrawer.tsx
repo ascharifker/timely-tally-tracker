@@ -42,6 +42,8 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
   const revertFn = useServerFn(revertEngStep);
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const { roles } = useAuth();
+  const canReview = canReviewEngineering(roles);
 
   if (!line) return null;
   const currentKey = (line.eng_step ?? ENGINEERING_STEPS[0].key) as EngStepKey;
@@ -129,14 +131,14 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
           <Button
             variant="outline"
             className="sm:w-auto w-full"
-            disabled={busy || stepIndex(currentKey) <= 0}
+            disabled={!canReview || busy || stepIndex(currentKey) <= 0}
             onClick={handleBack}
           >
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Button
             className="w-full"
-            disabled={busy}
+            disabled={!canReview || busy}
             onClick={handleAdvance}
           >
             {currentKey === "matrix_check"
