@@ -9,6 +9,8 @@ import {
   advanceEngStep,
   setEngStep,
   flagPoLine,
+  revertEngStep,
+  restartEngStep,
 } from "@/lib/po-workflow.functions";
 import {
   ENGINEERING_STEPS,
@@ -39,7 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowRight, ChevronDown, Flag } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Flag, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EngStepDrawer } from "@/components/fact/EngStepDrawer";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
@@ -103,7 +105,13 @@ function EngineeringPage() {
   const advanceFn = useServerFn(advanceEngStep);
   const jumpFn = useServerFn(setEngStep);
   const flagFn = useServerFn(flagPoLine);
+  const revertFn = useServerFn(revertEngStep);
+  const restartFn = useServerFn(restartEngStep);
   const qc = useQueryClient();
+  const { data: doneLines = [] } = usePoLinesByStatus([
+    "ready_for_production",
+    "engineering_approved",
+  ]);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [flagOpen, setFlagOpen] = useState<string | null>(null);
@@ -117,9 +125,61 @@ function EngineeringPage() {
     setBusy(id);
     try {
       const res = await advanceFn({ data: { id } });
-      toast.success(
-        res.completed ? "Ready for production" : "Step completed",
-      );
+      toast.success(res.completed ? "Ready for production" : "Step completed", {
+        duration: 10000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await revertFn({ data: { id, kind: "undo" } });
+              toast.success("Step restored");
+              await refresh();
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Error");
+            }
+          },
+        },
+      });
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const goBack = async (id: string) => {
+    setBusy(id);
+    try {
+      await revertFn({ data: { id, kind: "back" } });
+      toast.success("Moved back one step");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restart = async (id: string) => {
+    if (!window.confirm("Start this line over from step 1?")) return;
+    setBusy(id);
+    try {
+      await restartFn({ data: { id } });
+      toast.success("Restarted from step 1");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reopen = async (id: string) => {
+    setBusy(id);
+    try {
+      await revertFn({ data: { id, kind: "back" } });
+      toast.success("Reopened in engineering");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
