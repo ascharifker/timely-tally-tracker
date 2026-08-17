@@ -44,10 +44,16 @@ export function canEditProduction(roles: AppRole[]): boolean {
   );
 }
 
+/** Can this user act on the engineering verification queue? */
+export function canReviewEngineering(roles: AppRole[]): boolean {
+  return isAdmin(roles) || hasRole(roles, "manager") || hasRole(roles, "engineer");
+}
+
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
   manager: "Manager",
   po_editor: "PO Editor",
+  engineer: "Engineering",
   coe_reviewer: "COE Reviewer",
   third_party_reviewer: "Third-party Reviewer",
   production_editor: "Production",
@@ -60,6 +66,7 @@ export function primaryRoleLabel(roles: AppRole[]): string {
     "admin",
     "manager",
     "po_editor",
+    "engineer",
     "coe_reviewer",
     "third_party_reviewer",
     "production_editor",
