@@ -17,6 +17,7 @@ import {
   getStep,
   stepIndex,
 } from "@/lib/engineering-steps";
+import type { EngStepKey } from "@/lib/engineering-steps";
 import {
   Table,
   TableBody,
@@ -66,7 +67,13 @@ function formatElapsed(startedAt: string | null | undefined): string {
   return `${days}d ${hrs % 24}h`;
 }
 
-function StepDots({ currentKey }: { currentKey: string | null }) {
+function StepDots({
+  currentKey,
+  onSelect,
+}: {
+  currentKey: string | null;
+  onSelect?: (key: EngStepKey) => void;
+}) {
   const idx = stepIndex(currentKey);
   return (
     <div className="flex items-center gap-1">
@@ -75,10 +82,12 @@ function StepDots({ currentKey }: { currentKey: string | null }) {
         const active = idx === i;
         return (
           <div key={s.key} className="flex items-center gap-1">
-            <div
-              title={s.label}
+            <button
+              type="button"
+              title={`View ${s.label}`}
+              onClick={() => onSelect?.(s.key)}
               className={cn(
-                "h-2 w-2 rounded-full transition-colors",
+                "h-2.5 w-2.5 rounded-full transition-colors hover:ring-2 hover:ring-primary/40",
                 done && "bg-emerald-500",
                 active && "bg-primary ring-2 ring-primary/30",
                 !done && !active && "bg-muted",
