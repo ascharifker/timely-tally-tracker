@@ -37,6 +37,8 @@ function buildCsv(rows: SpreadsheetRow[]): string {
     "Description",
     "Qty",
     "Pending",
+    "HB Price",
+    "Total HB",
     "Customer date",
     "Export date",
     "Shipped",
@@ -45,8 +47,16 @@ function buildCsv(rows: SpreadsheetRow[]): string {
     "Notes",
   ];
   const lines = [headers.join(",")];
+  let grandTotal = 0;
   for (const r of rows) {
     const odfs = r.jobs.map((j) => j.odf).join(" / ");
+    const totalHb =
+      r.line.total_hb != null
+        ? Number(r.line.total_hb)
+        : r.line.hb_price != null
+          ? Number(r.line.hb_price) * (r.line.qty_ordered ?? 0)
+          : null;
+    if (totalHb != null) grandTotal += totalHb;
     lines.push(
       [
         r.customer?.name ?? "",
@@ -56,6 +66,8 @@ function buildCsv(rows: SpreadsheetRow[]): string {
         r.line.tube_spec ?? "",
         r.line.qty_ordered,
         Math.max(0, r.line.qty_ordered - r.total_pieces_completed),
+        r.line.hb_price ?? "",
+        totalHb ?? "",
         r.line.committed_date ?? "",
         r.line.export_date ?? "",
         r.shipped_at?.slice(0, 10) ?? "",
@@ -67,6 +79,12 @@ function buildCsv(rows: SpreadsheetRow[]): string {
         .join(","),
     );
   }
+  if (grandTotal > 0) {
+    const row = new Array(headers.length).fill("");
+    row[0] = "TOTAL";
+    row[8] = grandTotal.toFixed(2);
+    lines.push(row.map(csvCell).join(","));
+  }
   return lines.join("\r\n");
 }
 
@@ -75,18 +93,31 @@ function buildPlainTextTable(rows: SpreadsheetRow[]): string {
   const out: string[] = [];
   out.push(`PO lines export — ${rows.length} row(s)`);
   out.push("");
+  let grandTotal = 0;
   for (const r of rows) {
+    const totalHb =
+      r.line.total_hb != null
+        ? Number(r.line.total_hb)
+        : r.line.hb_price != null
+          ? Number(r.line.hb_price) * (r.line.qty_ordered ?? 0)
+          : null;
+    if (totalHb != null) grandTotal += totalHb;
     out.push(
       [
         r.customer?.name ?? "—",
         r.po?.po_number ?? "—",
         r.line.pir ? `${r.line.pir}${r.line.pir_rev ? ` r${r.line.pir_rev}` : ""}` : "—",
         `qty ${r.line.qty_ordered}`,
+        totalHb != null ? `$${totalHb.toFixed(2)}` : "no price",
         r.line.committed_date ? `due ${r.line.committed_date}` : "no date",
         PO_LINE_STATUS_LABEL_EN[r.line.status] ?? r.line.status,
       ].join(" · "),
     );
     if (r.line.tube_spec) out.push(`   ${r.line.tube_spec}`);
+  }
+  if (grandTotal > 0) {
+    out.push("");
+    out.push(`TOTAL HB: $${grandTotal.toFixed(2)}`);
   }
   return out.join("\n");
 }
