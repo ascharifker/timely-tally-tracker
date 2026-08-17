@@ -360,6 +360,90 @@ function PirVerifyPanel({
 }
 
 function ComponentsPanel() {
+  return <ComponentsPanelInner />;
+}
+
+function BodySpecPanel({
+  line,
+  onSaved,
+}: {
+  line: PoLineWithContext;
+  onSaved: () => void;
+}) {
+  const updateFn = useServerFn(updatePoLineField);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const f of BODY_SPEC_FIELDS) {
+      next[f.key] = (line[f.key] as string | null) ?? "";
+    }
+    setValues(next);
+  }, [line]);
+
+  const save = async (key: BodySpecKey) => {
+    setSaving(key);
+    try {
+      await updateFn({
+        data: { id: line.id, field: key, value: values[key]?.trim() || null },
+      });
+      toast.success("Saved");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold">Body / Tube Spec Review</h3>
+      <p className="text-xs text-muted-foreground">
+        Steel tubing that becomes the part body — separate from the component
+        specs.
+      </p>
+      <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+        <div className="text-muted-foreground">Raw spec from the PO</div>
+        <div className="font-mono">{line.tube_spec ?? "—"}</div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {BODY_SPEC_FIELDS.map((f) => (
+          <div
+            key={f.key}
+            className={`space-y-2 ${f.wide ? "sm:col-span-2" : ""}`}
+          >
+            <Label htmlFor={f.key}>{f.label}</Label>
+            <div className="flex gap-2">
+              <Input
+                id={f.key}
+                value={values[f.key] ?? ""}
+                placeholder={f.placeholder}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, [f.key]: e.target.value }))
+                }
+              />
+              <Button
+                variant="secondary"
+                disabled={
+                  saving !== null ||
+                  (values[f.key] ?? "") ===
+                    (((line[f.key] as string | null) ?? "") as string)
+                }
+                onClick={() => save(f.key)}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComponentsPanelInner() {
   const [uploading, setUploading] = useState(false);
   const [lastModified, setLastModified] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
