@@ -6,6 +6,7 @@
 export type EngStepKey =
   | "po_info"
   | "pir_verify"
+  | "body_spec"
   | "components"
   | "matrix_check";
 
@@ -30,6 +31,14 @@ export const ENGINEERING_STEPS: EngStep[] = [
     label: "PIR Verification",
     shortLabel: "PIR",
     description: "Verify PIR number and tube spec for the line.",
+    optional: false,
+  },
+  {
+    key: "body_spec",
+    label: "Body Spec Review",
+    shortLabel: "Body",
+    description:
+      "Review the tube / body steel specs (OD, wall, grade, thread, heat treat).",
     optional: false,
   },
   {
