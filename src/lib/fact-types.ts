@@ -152,6 +152,10 @@ export interface POLineItem {
   body_thread: string | null;
   body_heat_treat: string | null;
   body_notes: string | null;
+  quality_matrix_document_url: string | null;
+  quality_matrix_signed_off_by: string | null;
+  quality_matrix_signed_off_at: string | null;
+  quality_matrix_notes: string | null;
 }
 
 export type POLineStatus =
