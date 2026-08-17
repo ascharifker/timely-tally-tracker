@@ -60,6 +60,7 @@ export const advanceEngStep = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { data: row, error: rErr } = await supabaseAdmin
       .from("po_line_items" as never)
       .select("eng_step, eng_step_started_at, status")
@@ -137,6 +138,7 @@ export const revertEngStep = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { data: row, error: rErr } = await supabaseAdmin
       .from("po_line_items" as never)
       .select("eng_step, eng_step_started_at, status")
@@ -224,6 +226,7 @@ export const restartEngStep = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { data: row, error: rErr } = await supabaseAdmin
       .from("po_line_items" as never)
       .select("eng_step, eng_step_started_at, status")
@@ -276,6 +279,7 @@ export const setEngStep = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const target = getStep(data.step);
     if (!target) throw new Error(`Unknown engineering step: ${data.step}`);
     const { data: row, error: rErr } = await supabaseAdmin
@@ -313,6 +317,7 @@ export const setEngStep = createServerFn({ method: "POST" })
 
 // Approve a PO line (engineering OK). Moves directly to ready_for_production.
 export const approvePoLine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -323,7 +328,8 @@ export const approvePoLine = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const patch: Record<string, unknown> = {
       status: "ready_for_production",
       flag_reason: null,
@@ -341,6 +347,7 @@ export const approvePoLine = createServerFn({ method: "POST" })
   });
 
 export const flagPoLine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -350,7 +357,8 @@ export const flagPoLine = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { error } = await supabaseAdmin
       .from("po_line_items" as never)
       .update({
