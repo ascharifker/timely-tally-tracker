@@ -263,6 +263,8 @@ function emptyLine(n: number): ExtractedPoData["line_items"][number] {
     line_number: n,
     pir: "",
     pir_rev: null,
+    customer_part_number: null,
+    low_confidence: false,
     tube_spec: "",
     qty_ordered: 1,
     committed_date: null,
@@ -425,8 +427,16 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                   <TableCell>
                     <Input
                       value={li.pir ?? ""}
-                      onChange={(e) => updateLine(idx, { pir: e.target.value })}
+                      className={li.low_confidence ? "border-amber-500" : undefined}
+                      onChange={(e) =>
+                        updateLine(idx, { pir: e.target.value, low_confidence: false })
+                      }
                     />
+                    {li.low_confidence && (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        Check part # — verify against the PO
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Input

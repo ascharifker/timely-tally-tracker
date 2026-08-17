@@ -25,6 +25,8 @@ const ExtractedLineItem = z.object({
   line_number: z.number().int().positive(),
   pir: z.string().nullable(),
   pir_rev: z.string().nullable().optional().default(null),
+  customer_part_number: z.string().nullable().optional().default(null),
+  low_confidence: z.boolean().optional().default(false),
   tube_spec: z.string().nullable(),
   qty_ordered: z.number().int().positive(),
   committed_date: z.string().nullable(),
@@ -83,6 +85,7 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       "    {",
       '      "line_number": number,',
       '      "pir": string | null,           // código PIR del item',
+      '      "customer_part_number": string | null, // el mismo número tal cual figura en la columna Customer Part #',
       '      "pir_rev": string | null,       // revisión / versión del PIR o plano (ej "A", "02", "Rev C")',
       '      "tube_spec": string | null,     // descripción / spec del tubo',
       '      "qty_ordered": number,',
@@ -94,6 +97,12 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       "  ]",
       "}",
       "Si un campo no aparece en el PDF, usá null. Las fechas SIEMPRE en formato YYYY-MM-DD.",
+      "NÚMERO DE PARTE (CRÍTICO): el 'pir' de cada línea SIEMPRE sale de la columna 'Customer Part #' / 'Part #' / 'Material' de la tabla 'Line Items'.",
+      "NUNCA tomes el número de parte del bloque de Comments / 'TECHNICAL DATA' que aparece debajo de cada línea: ese bloque es la lista de materiales (BOM) e incluye decenas de filas 'COM', 'PIR', 'MDW', 'SPC', 'DRW' de componentes hijos.",
+      "Ignorá por completo las filas COM, MDW, SPC y DRW. Solo podés usar una fila 'PIR' o 'MAT' del bloque técnico si su nivel (LVL) es '00' Y su número coincide exactamente con el Customer Part # de esa línea.",
+      "pir_rev: la letra REV de esa fila PIR/MAT de nivel 00 con el mismo número de parte (ej 'C'). Si no existe, null.",
+      "tube_spec: la descripción de la línea que está en la columna 'Part # / Description' (ej 'SH,FL,7-5/8BLK TSH523 33.7,PQ,DV,RPT,EDJ'). Nunca uses la descripción de un componente del BOM.",
+      "customer_part_number: copiá el valor de la columna Customer Part # tal cual, sin modificar.",
       "PRECIOS: buscá activamente columnas tipo 'Unit Price', 'Precio unitario', 'Price', 'Amount', 'Extended', 'Total', 'Importe'.",
       "Normalizá los números: quitá separadores de miles y símbolos de moneda; '1.234,56' => 1234.56; '$ 1,234.56' => 1234.56.",
       "Devolvé los precios como números puros (sin comas, sin símbolos).",
@@ -144,10 +153,21 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
         `La extracción no cumple el formato esperado: ${result.error.message}`,
       );
     }
-    // Derive unit price from the line total when only the total was found.
+    // Sanity-check part numbers, then derive unit price when only the total was found.
     return {
       ...result.data,
       line_items: result.data.line_items.map((li) => {
+        const cpn = li.customer_part_number?.trim() || null;
+        const pir = li.pir?.trim() || null;
+        // The customer part number column is authoritative; the BOM block in the
+        // Comments section confuses the model into picking a child component.
+        const mismatch = !!cpn && !!pir && cpn !== pir;
+        const resolvedPir = cpn ?? pir;
+        li = {
+          ...li,
+          pir: resolvedPir,
+          low_confidence: mismatch || !cpn,
+        };
         if (li.unit_price == null && li.line_total != null && li.qty_ordered > 0) {
           const derivedPrice = Math.round((li.line_total / li.qty_ordered) * 100) / 100;
           return {
