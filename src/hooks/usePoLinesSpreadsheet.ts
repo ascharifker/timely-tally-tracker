@@ -140,6 +140,14 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
             eng_step_started_at: l.eng_step_started_at ?? null,
             hb_price: l.hb_price ?? null,
             total_hb: l.total_hb ?? null,
+            pir_rev: l.pir_rev ?? null,
+            body_od: l.body_od ?? null,
+            body_wall: l.body_wall ?? null,
+            body_grade: l.body_grade ?? null,
+            body_length: l.body_length ?? null,
+            body_thread: l.body_thread ?? null,
+            body_heat_treat: l.body_heat_treat ?? null,
+            body_notes: l.body_notes ?? null,
           },
           po: l.purchase_order
             ? {

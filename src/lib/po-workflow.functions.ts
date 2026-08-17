@@ -458,11 +458,19 @@ export const acknowledgeAllDateChanges = createServerFn({ method: "POST" }).hand
 // date_change_log too — `field` is free text, so we reuse the same table.
 const EDITABLE_FIELDS = [
   "pir",
+  "pir_rev",
   "tube_spec",
   "qty_ordered",
   "committed_date",
   "notes",
   "hb_price",
+  "body_od",
+  "body_wall",
+  "body_grade",
+  "body_length",
+  "body_thread",
+  "body_heat_treat",
+  "body_notes",
 ] as const;
 
 export const updatePoLineField = createServerFn({ method: "POST" })

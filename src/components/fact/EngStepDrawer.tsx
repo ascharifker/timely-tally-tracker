@@ -25,6 +25,8 @@ import {
 } from "@/lib/engineering-steps";
 import { advanceEngStep, revertEngStep } from "@/lib/po-workflow.functions";
 import { updatePoLineField } from "@/lib/po-workflow.functions";
+import { attachPoDocument, getPoDocumentUrl } from "@/lib/po-intake.functions";
+import { BODY_SPEC_FIELDS, type BodySpecKey } from "@/lib/body-spec";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
 
 const MASTER_PIR_PATH = "master-pir/current.xlsx";
@@ -110,9 +112,14 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
         </div>
 
         <div className="py-2">
-          {currentKey === "po_info" && <PoInfoPanel line={line} />}
+          {currentKey === "po_info" && (
+            <PoInfoPanel line={line} onSaved={refresh} />
+          )}
           {currentKey === "pir_verify" && (
             <PirVerifyPanel line={line} onSaved={refresh} />
+          )}
+          {currentKey === "body_spec" && (
+            <BodySpecPanel line={line} onSaved={refresh} />
           )}
           {currentKey === "components" && <ComponentsPanel />}
           {currentKey === "matrix_check" && <MatrixPanel />}
@@ -152,8 +159,52 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function PoInfoPanel({ line }: { line: PoLineWithContext }) {
+function PoInfoPanel({
+  line,
+  onSaved,
+}: {
+  line: PoLineWithContext;
+  onSaved: () => void;
+}) {
   const po = line.purchase_order;
+  const signFn = useServerFn(getPoDocumentUrl);
+  const attachFn = useServerFn(attachPoDocument);
+  const [working, setWorking] = useState(false);
+
+  const openPdf = async () => {
+    if (!po?.source_document_url) return;
+    setWorking(true);
+    try {
+      const { url } = await signFn({
+        data: { storagePath: po.source_document_url },
+      });
+      window.open(url, "_blank", "noopener");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo abrir el PDF");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const attach = async (file: File) => {
+    if (!po?.id) return;
+    setWorking(true);
+    try {
+      const path = `po/${po.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+      const { error } = await supabase.storage
+        .from("po-documents")
+        .upload(path, file, { contentType: file.type || "application/pdf" });
+      if (error) throw error;
+      await attachFn({ data: { purchaseOrderId: po.id, storagePath: path } });
+      toast.success("PO PDF attached");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setWorking(false);
+    }
+  };
+
   return (
     <div className="space-y-1">
       <h3 className="text-sm font-semibold mb-2">PO Info (read-only)</h3>
@@ -161,22 +212,48 @@ function PoInfoPanel({ line }: { line: PoLineWithContext }) {
       <Field label="PO #" value={po?.po_number} />
       <Field label="Line #" value={`L${line.line_number}`} />
       <Field label="PIR" value={line.pir} />
+      <Field label="PIR rev" value={line.pir_rev} />
       <Field label="Tube spec" value={line.tube_spec} />
       <Field label="Qty ordered" value={line.qty_ordered} />
       <Field label="Committed date" value={line.committed_date} />
       <Field label="Issued date" value={po?.issued_date} />
-      {po?.source_document_url && (
-        <div className="pt-3">
-          <a
-            href={po.source_document_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+      <div className="pt-3">
+        {po?.source_document_url ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={working}
+            onClick={openPdf}
           >
-            Open source PDF <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </div>
-      )}
+            Open source PDF <ExternalLink className="h-3.5 w-3.5 ml-1" />
+          </Button>
+        ) : (
+          <div className="rounded-md border border-dashed p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              No PDF attached to this PO.
+            </p>
+            <label className="inline-flex">
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                disabled={working}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) attach(f);
+                  e.currentTarget.value = "";
+                }}
+              />
+              <Button size="sm" disabled={working} asChild>
+                <span>
+                  <Upload className="h-3.5 w-3.5 mr-1" />
+                  {working ? "Uploading…" : "Attach PO PDF"}
+                </span>
+              </Button>
+            </label>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -190,15 +267,20 @@ function PirVerifyPanel({
 }) {
   const updateFn = useServerFn(updatePoLineField);
   const [pir, setPir] = useState(line.pir ?? "");
+  const [rev, setRev] = useState(line.pir_rev ?? "");
   const [spec, setSpec] = useState(line.tube_spec ?? "");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setPir(line.pir ?? "");
+    setRev(line.pir_rev ?? "");
     setSpec(line.tube_spec ?? "");
-  }, [line.id, line.pir, line.tube_spec]);
+  }, [line.id, line.pir, line.pir_rev, line.tube_spec]);
 
-  const save = async (field: "pir" | "tube_spec", value: string) => {
+  const save = async (
+    field: "pir" | "pir_rev" | "tube_spec",
+    value: string,
+  ) => {
     setSaving(true);
     try {
       await updateFn({
@@ -238,6 +320,24 @@ function PirVerifyPanel({
         </div>
       </div>
       <div className="space-y-2">
+        <Label htmlFor="pir_rev">PIR revision</Label>
+        <div className="flex gap-2">
+          <Input
+            id="pir_rev"
+            value={rev}
+            onChange={(e) => setRev(e.target.value)}
+            placeholder="e.g. Rev C"
+          />
+          <Button
+            variant="secondary"
+            disabled={saving || rev === (line.pir_rev ?? "")}
+            onClick={() => save("pir_rev", rev)}
+          >
+            Save
+          </Button>
+        </div>
+      </div>
+      <div className="space-y-2">
         <Label htmlFor="spec">Tube spec</Label>
         <div className="flex gap-2">
           <Input
@@ -260,6 +360,90 @@ function PirVerifyPanel({
 }
 
 function ComponentsPanel() {
+  return <ComponentsPanelInner />;
+}
+
+function BodySpecPanel({
+  line,
+  onSaved,
+}: {
+  line: PoLineWithContext;
+  onSaved: () => void;
+}) {
+  const updateFn = useServerFn(updatePoLineField);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const f of BODY_SPEC_FIELDS) {
+      next[f.key] = (line[f.key] as string | null) ?? "";
+    }
+    setValues(next);
+  }, [line]);
+
+  const save = async (key: BodySpecKey) => {
+    setSaving(key);
+    try {
+      await updateFn({
+        data: { id: line.id, field: key, value: values[key]?.trim() || null },
+      });
+      toast.success("Saved");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold">Body / Tube Spec Review</h3>
+      <p className="text-xs text-muted-foreground">
+        Steel tubing that becomes the part body — separate from the component
+        specs.
+      </p>
+      <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+        <div className="text-muted-foreground">Raw spec from the PO</div>
+        <div className="font-mono">{line.tube_spec ?? "—"}</div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {BODY_SPEC_FIELDS.map((f) => (
+          <div
+            key={f.key}
+            className={`space-y-2 ${f.wide ? "sm:col-span-2" : ""}`}
+          >
+            <Label htmlFor={f.key}>{f.label}</Label>
+            <div className="flex gap-2">
+              <Input
+                id={f.key}
+                value={values[f.key] ?? ""}
+                placeholder={f.placeholder}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, [f.key]: e.target.value }))
+                }
+              />
+              <Button
+                variant="secondary"
+                disabled={
+                  saving !== null ||
+                  (values[f.key] ?? "") ===
+                    (((line[f.key] as string | null) ?? "") as string)
+                }
+                onClick={() => save(f.key)}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComponentsPanelInner() {
   const [uploading, setUploading] = useState(false);
   const [lastModified, setLastModified] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

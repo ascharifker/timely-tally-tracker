@@ -262,6 +262,7 @@ function emptyLine(n: number): ExtractedPoData["line_items"][number] {
   return {
     line_number: n,
     pir: "",
+    pir_rev: null,
     tube_spec: "",
     qty_ordered: 1,
     committed_date: null,

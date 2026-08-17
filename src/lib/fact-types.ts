@@ -144,6 +144,14 @@ export interface POLineItem {
   eng_step_started_at: string | null;
   hb_price: number | null;
   total_hb: number | null;
+  pir_rev: string | null;
+  body_od: string | null;
+  body_wall: string | null;
+  body_grade: string | null;
+  body_length: string | null;
+  body_thread: string | null;
+  body_heat_treat: string | null;
+  body_notes: string | null;
 }
 
 export type POLineStatus =

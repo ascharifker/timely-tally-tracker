@@ -24,6 +24,7 @@ async function assertCanEditPo(userId: string) {
 const ExtractedLineItem = z.object({
   line_number: z.number().int().positive(),
   pir: z.string().nullable(),
+  pir_rev: z.string().nullable().optional().default(null),
   tube_spec: z.string().nullable(),
   qty_ordered: z.number().int().positive(),
   committed_date: z.string().nullable(),
@@ -82,6 +83,7 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       "    {",
       '      "line_number": number,',
       '      "pir": string | null,           // código PIR del item',
+      '      "pir_rev": string | null,       // revisión / versión del PIR o plano (ej "A", "02", "Rev C")',
       '      "tube_spec": string | null,     // descripción / spec del tubo',
       '      "qty_ordered": number,',
       '      "committed_date": "YYYY-MM-DD" | null,',
@@ -178,6 +180,7 @@ const CommitPoInput = z.object({
       z.object({
         line_number: z.number().int().positive(),
         pir: z.string().nullable(),
+        pir_rev: z.string().nullable().optional().default(null),
         tube_spec: z.string().nullable(),
         qty_ordered: z.number().int().positive(),
         committed_date: z.string().nullable(),
@@ -263,6 +266,7 @@ export const commitPo = createServerFn({ method: "POST" })
       purchase_order_id: poId,
       line_number: li.line_number,
       pir: li.pir,
+      pir_rev: li.pir_rev ?? null,
       tube_spec: li.tube_spec,
       qty_ordered: li.qty_ordered,
       committed_date: li.committed_date,
@@ -298,4 +302,28 @@ export const getPoDocumentUrl = createServerFn({ method: "POST" })
       .createSignedUrl(data.storagePath, 60 * 60);
     if (error || !signed) throw new Error(error?.message ?? "No se pudo firmar URL");
     return { url: signed.signedUrl };
+  });
+
+// ---------------------------------------------------------------
+// attachPoDocument — link an uploaded PDF to an existing PO
+// ---------------------------------------------------------------
+
+export const attachPoDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        purchaseOrderId: z.string().uuid(),
+        storagePath: z.string().min(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertCanEditPo(context.userId);
+    const { error } = await supabaseAdmin
+      .from("purchase_orders" as never)
+      .update({ source_document_url: data.storagePath } as never)
+      .eq("id", data.purchaseOrderId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
