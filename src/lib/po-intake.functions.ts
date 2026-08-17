@@ -24,6 +24,7 @@ async function assertCanEditPo(userId: string) {
 const ExtractedLineItem = z.object({
   line_number: z.number().int().positive(),
   pir: z.string().nullable(),
+  pir_rev: z.string().nullable().optional().default(null),
   tube_spec: z.string().nullable(),
   qty_ordered: z.number().int().positive(),
   committed_date: z.string().nullable(),
@@ -82,6 +83,7 @@ export const extractPoFromPdf = createServerFn({ method: "POST" })
       "    {",
       '      "line_number": number,',
       '      "pir": string | null,           // código PIR del item',
+      '      "pir_rev": string | null,       // revisión / versión del PIR o plano (ej "A", "02", "Rev C")',
       '      "tube_spec": string | null,     // descripción / spec del tubo',
       '      "qty_ordered": number,',
       '      "committed_date": "YYYY-MM-DD" | null,',
@@ -178,6 +180,7 @@ const CommitPoInput = z.object({
       z.object({
         line_number: z.number().int().positive(),
         pir: z.string().nullable(),
+        pir_rev: z.string().nullable().optional().default(null),
         tube_spec: z.string().nullable(),
         qty_ordered: z.number().int().positive(),
         committed_date: z.string().nullable(),
@@ -263,6 +266,7 @@ export const commitPo = createServerFn({ method: "POST" })
       purchase_order_id: poId,
       line_number: li.line_number,
       pir: li.pir,
+      pir_rev: li.pir_rev ?? null,
       tube_spec: li.tube_spec,
       qty_ordered: li.qty_ordered,
       committed_date: li.committed_date,
