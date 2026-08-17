@@ -30,6 +30,7 @@ import { updatePoLineField } from "@/lib/po-workflow.functions";
 import { attachPoDocument, getPoDocumentUrl } from "@/lib/po-intake.functions";
 import { BODY_SPEC_FIELDS, type BodySpecKey } from "@/lib/body-spec";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
+import { QualityMatrixPanel } from "./QualityMatrixPanel";
 
 const MASTER_PIR_PATH = "master-pir/current.xlsx";
 
@@ -563,21 +564,6 @@ function ComponentsPanelInner() {
             </Button>
           </label>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function MatrixPanel() {
-  return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold">Quality Matrix Check</h3>
-      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-        <p className="mb-2">Matrix workflow TBD.</p>
-        <p className="text-xs">
-          Final UI lands once the team defines the matrix source. Use the
-          button below to mark the check complete. No auto-email is sent.
-        </p>
       </div>
     </div>
   );
