@@ -148,6 +148,10 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
             body_thread: l.body_thread ?? null,
             body_heat_treat: l.body_heat_treat ?? null,
             body_notes: l.body_notes ?? null,
+            quality_matrix_document_url: l.quality_matrix_document_url ?? null,
+            quality_matrix_signed_off_by: l.quality_matrix_signed_off_by ?? null,
+            quality_matrix_signed_off_at: l.quality_matrix_signed_off_at ?? null,
+            quality_matrix_notes: l.quality_matrix_notes ?? null,
           },
           po: l.purchase_order
             ? {
