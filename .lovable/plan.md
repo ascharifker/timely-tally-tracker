@@ -1,43 +1,44 @@
-# Digital Twin tab for machines
+# What we still need from Engineering (Alexis / Lendris)
 
-Short answer: yes — but as a **data-driven twin**, not a physics simulator. You already capture everything a useful first version needs (`machine_runs`, `jobs`, `part_times`, `status_events` with breakdown/maintenance kinds, machine specs and hourly cost). A twin built on that gives Fernando real value on day one and gets more accurate as runs accumulate. A CNC physics/G-code simulation would need machine telemetry you don't have yet, so that stays out of scope.
+Cross-referenced against Alexis's process as captured earlier in this project (Peter uploads PO -> Engineering validates PIR + specs against the Master PIR list in E-Dash -> Production creates the ODT and assigns machine/operator -> date changes flow back to Peter with an audit trail) and against the 4-step Engineering funnel we built (PO Info -> PIR Verification -> Part Component List -> Quality Matrix Check).
 
-## What gets added
+Steps 1-3 are functional today. Step 4 is still a placeholder, and two inputs are missing that only Engineering can supply.
 
-A new **Gemelo Digital** tab on the machine page (`/maquina/:id`), next to Resumen / Especificaciones / Producción / Tiempos / Eventos.
+## Ask list (what to request in the meeting)
 
-### 1. Health score
-A single 0-100 score per machine with the drivers shown underneath:
-- Speed drift: real h/pieza vs catalog (already computed in `catalogDeviation`)
-- Variability: run-to-run standard deviation trend (rising σ = the machine or setup is degrading)
-- Breakdown load: unplanned `breakdown` / `maintenance_corrective` hours in the last 90 days
-- Utilization vs available shift hours
+1. **Master PIR file (Excel)** — the current revision of the master parts/PIR list.
+   - Needed to load into the Part Component List step so lines can be cross-checked in-app instead of in E-Dash.
+   - Ask: who owns it, how often it is re-issued, and who should be allowed to replace it.
 
-### 2. Maintenance prediction
-- Cumulative run hours since the last preventive maintenance event, versus a per-machine service interval
-- Projected date the interval is hit, based on the machine's recent hours/week
-- Alert states: OK / Due soon / Overdue
-- A "drift alarm" when the last N runs of a PIR are consistently slower than that PIR's own baseline — the earliest honest signal of tool or spindle wear
+2. **Quality Matrix definition** — the open item flagged earlier ("the Matrix is not a static checklist, will clarify with the team").
+   - Needed: what the matrix actually checks, where the source data lives (Excel? E-Dash? per-customer?), what a pass/fail looks like, and whether it is per PO line or per part number.
+   - Without this, Step 4 stays a "Done" button with no verification value.
 
-### 3. Performance simulator
-"What if" panel with sliders, no data written:
-- Shifts per day and hours per shift
-- Speed factor (e.g. -10% if degrading, +5% after service)
-- Queue of pending ODTs for this machine
-Outputs projected completion date for the queue, throughput in pieces/week, projected monthly cost, and the delta vs the current baseline. It reuses the existing `scheduleJob` engine so results match the real calendar.
+3. **Flag / rejection reasons** — the standard list of reasons Engineering sends a line back to Peter (wrong PIR, missing revision, spec mismatch, missing drawing, etc.).
+   - Turns the free-text flag into a consistent, reportable dropdown.
 
-### 4. Run history chart
-h/pieza per run over time per PIR, with the catalog line and a trend line, so degradation is visible instead of inferred.
+4. **Spec fields that matter** — which fields inside tube spec they actually verify (OD, ID, wall, thread, material, length, heat treat...).
+   - This unblocks the decomposition of `tube_spec` into real columns and makes engineering review checkable rather than eyeballed.
 
-Empty states everywhere: with zero closed runs the tab explains what to record instead of showing fake numbers.
+5. **Queue ownership rules** — confirm the COE vs Third-Party split (Alexis vs Lendris), who covers vacations, and whether a line can be reassigned mid-review.
 
-## Technical notes
+6. **Target review SLA** — how long a line should sit in each step before it is late.
+   - The funnel already timestamps every step; an SLA turns that into an alert instead of just a clock.
 
-- New pure module `src/lib/digital-twin.ts` alongside `machine-metrics.ts`: health score, maintenance projection, drift detection, simulation. No new dependencies; charts use the recharts setup already in the project.
-- New component `src/components/fact/DigitalTwinTab.tsx`, wired into the existing tab switch in `src/routes/maquina.$id.tsx`.
-- One small migration: add `service_interval_hours` (default 500) and `last_service_at` to `public.machines`, editable from the specs form. Everything else is derived from existing tables — no new tables, no new writes.
-- Simulation is read-only; it never touches `jobs.planned_start/planned_end`.
+7. **Sample completed line** — one real PO line walked end to end with the correct PIR, correct spec, and matrix outcome, to use as the validation reference.
 
-## Out of scope for now
+## What we build once each item lands
 
-Live CNC telemetry / MTConnect ingestion, G-code cycle simulation, and ML-based failure prediction. Those need machine-side connectivity and a much larger run history; the tab is structured so telemetry can feed the same score later.
+| Input received | Change in the app |
+| --- | --- |
+| Master PIR Excel | Load into Step 3, auto-match PIR from the file, show mismatch warning |
+| Matrix definition | Replace the Step 4 placeholder with a real check + pass/fail record |
+| Flag reasons | Reason dropdown on flag, reason breakdown in Pending Review |
+| Spec fields | Split `tube_spec` into columns; per-field verify checkboxes in Step 2 |
+| Queue rules | Role-scoped defaults and delegation coverage confirmed in Settings |
+| SLA targets | Overdue badges in Engineering and Pending Review |
+| Sample line | End-to-end acceptance test before wider rollout |
+
+## Not blocking
+
+Orders intake, PO grouping/pricing, ODT creation, Gantt scheduling, undo, and Kanban execution are all live and do not depend on Engineering input.
