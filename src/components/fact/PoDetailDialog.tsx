@@ -15,6 +15,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { usePoDetail } from "@/hooks/usePoDetail";
 import { ExternalLink } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { getPoDocumentUrl } from "@/lib/po-intake.functions";
 import { PO_LINE_STATUS_LABEL_EN, type POLineStatus } from "@/lib/fact-types";
 
 function formatPrice(value: number | null, currency: string | null) {
@@ -36,6 +39,16 @@ export function PoDetailDialog({
   const { data, isLoading } = usePoDetail(poId);
   const po = data?.po;
   const changes = data?.changes ?? [];
+  const signFn = useServerFn(getPoDocumentUrl);
+
+  const openPdf = async (storagePath: string) => {
+    try {
+      const { url } = await signFn({ data: { storagePath } });
+      window.open(url, "_blank", "noopener");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo abrir el PDF");
+    }
+  };
 
   return (
     <Dialog open={!!poId} onOpenChange={(o) => !o && onClose()}>
@@ -72,14 +85,13 @@ export function PoDetailDialog({
               </div>
               {po.source_document_url && (
                 <div className="col-span-2">
-                  <a
-                    href={po.source_document_url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openPdf(po.source_document_url!)}
                     className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
                   >
                     <ExternalLink className="h-3 w-3" /> Original document
-                  </a>
+                  </button>
                 </div>
               )}
               {po.notes && (
