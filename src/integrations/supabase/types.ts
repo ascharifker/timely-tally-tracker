@@ -458,6 +458,10 @@ export type Database = {
           pir_rev: string | null
           purchase_order_id: string
           qty_ordered: number
+          quality_matrix_document_url: string | null
+          quality_matrix_notes: string | null
+          quality_matrix_signed_off_at: string | null
+          quality_matrix_signed_off_by: string | null
           status: Database["public"]["Enums"]["po_line_status"]
           total_hb: number | null
           tube_spec: string | null
@@ -489,6 +493,10 @@ export type Database = {
           pir_rev?: string | null
           purchase_order_id: string
           qty_ordered?: number
+          quality_matrix_document_url?: string | null
+          quality_matrix_notes?: string | null
+          quality_matrix_signed_off_at?: string | null
+          quality_matrix_signed_off_by?: string | null
           status?: Database["public"]["Enums"]["po_line_status"]
           total_hb?: number | null
           tube_spec?: string | null
@@ -520,6 +528,10 @@ export type Database = {
           pir_rev?: string | null
           purchase_order_id?: string
           qty_ordered?: number
+          quality_matrix_document_url?: string | null
+          quality_matrix_notes?: string | null
+          quality_matrix_signed_off_at?: string | null
+          quality_matrix_signed_off_by?: string | null
           status?: Database["public"]["Enums"]["po_line_status"]
           total_hb?: number | null
           tube_spec?: string | null
@@ -532,6 +544,51 @@ export type Database = {
             columns: ["purchase_order_id"]
             isOneToOne: false
             referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_line_quality_checks: {
+        Row: {
+          checked_at: string
+          checked_by: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          po_line_item_id: string
+          status: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_by?: string | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          po_line_item_id: string
+          status: string
+        }
+        Update: {
+          checked_at?: string
+          checked_by?: string | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          po_line_item_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_line_quality_checks_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "quality_matrix_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_line_quality_checks_po_line_item_id_fkey"
+            columns: ["po_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_items"
             referencedColumns: ["id"]
           },
         ]
@@ -629,6 +686,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      quality_matrix_items: {
+        Row: {
+          category: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          category?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+          template_id: string
+        }
+        Update: {
+          category?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_matrix_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "quality_matrix_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_matrix_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          version: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          version?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          version?: string | null
+        }
+        Relationships: []
       }
       review_delegations: {
         Row: {
