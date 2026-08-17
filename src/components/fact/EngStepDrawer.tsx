@@ -127,7 +127,9 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
             <BodySpecPanel line={line} onSaved={refresh} />
           )}
           {currentKey === "components" && <ComponentsPanel />}
-          {currentKey === "matrix_check" && <MatrixPanel />}
+          {currentKey === "matrix_check" && (
+            <QualityMatrixPanel line={line} canReview={canReview} onSaved={refresh} />
+          )}
         </div>
 
         <SheetFooter className="mt-6 flex-col gap-2 sm:flex-row">
