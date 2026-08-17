@@ -17,6 +17,7 @@ import {
   getStep,
   stepIndex,
 } from "@/lib/engineering-steps";
+import type { EngStepKey } from "@/lib/engineering-steps";
 import {
   Table,
   TableBody,
@@ -66,7 +67,13 @@ function formatElapsed(startedAt: string | null | undefined): string {
   return `${days}d ${hrs % 24}h`;
 }
 
-function StepDots({ currentKey }: { currentKey: string | null }) {
+function StepDots({
+  currentKey,
+  onSelect,
+}: {
+  currentKey: string | null;
+  onSelect?: (key: EngStepKey) => void;
+}) {
   const idx = stepIndex(currentKey);
   return (
     <div className="flex items-center gap-1">
@@ -75,10 +82,12 @@ function StepDots({ currentKey }: { currentKey: string | null }) {
         const active = idx === i;
         return (
           <div key={s.key} className="flex items-center gap-1">
-            <div
-              title={s.label}
+            <button
+              type="button"
+              title={`View ${s.label}`}
+              onClick={() => onSelect?.(s.key)}
               className={cn(
-                "h-2 w-2 rounded-full transition-colors",
+                "h-2.5 w-2.5 rounded-full transition-colors hover:ring-2 hover:ring-primary/40",
                 done && "bg-emerald-500",
                 active && "bg-primary ring-2 ring-primary/30",
                 !done && !active && "bg-muted",
@@ -121,6 +130,7 @@ function EngineeringPage() {
   const [flagOpen, setFlagOpen] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
   const [drawerLineId, setDrawerLineId] = useState<string | null>(null);
+  const [drawerStep, setDrawerStep] = useState<EngStepKey | null>(null);
   const drawerLine: PoLineWithContext | null =
     lines.find((l) => l.id === drawerLineId) ?? null;
 
@@ -299,7 +309,13 @@ function EngineeringPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <StepDots currentKey={currentStep} />
+                    <StepDots
+                      currentKey={currentStep}
+                      onSelect={(k) => {
+                        setDrawerStep(k);
+                        setDrawerLineId(l.id);
+                      }}
+                    />
                     <div className="text-xs text-muted-foreground">
                       {step?.label ?? "—"}
                     </div>
@@ -323,7 +339,10 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setDrawerLineId(l.id)}
+                      onClick={() => {
+                        setDrawerStep(null);
+                        setDrawerLineId(l.id);
+                      }}
                     >
                       Open
                     </Button>
@@ -462,6 +481,7 @@ function EngineeringPage() {
       <EngStepDrawer
         line={drawerLine}
         open={!!drawerLine}
+        initialStep={drawerStep}
         onOpenChange={(o) => !o && setDrawerLineId(null)}
       />
     </AppShell>

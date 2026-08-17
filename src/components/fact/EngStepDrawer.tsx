@@ -19,13 +19,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, ArrowRight, Download, ExternalLink, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import {
   ENGINEERING_STEPS,
   getStep,
   stepIndex,
   type EngStepKey,
 } from "@/lib/engineering-steps";
-import { advanceEngStep, revertEngStep } from "@/lib/po-workflow.functions";
+import {
+  advanceEngStep,
+  revertEngStep,
+  setEngStep,
+} from "@/lib/po-workflow.functions";
 import { updatePoLineField } from "@/lib/po-workflow.functions";
 import { attachPoDocument, getPoDocumentUrl } from "@/lib/po-intake.functions";
 import { BODY_SPEC_FIELDS, type BodySpecKey } from "@/lib/body-spec";
@@ -38,19 +43,31 @@ interface Props {
   line: PoLineWithContext | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialStep?: EngStepKey | null;
 }
 
-export function EngStepDrawer({ line, open, onOpenChange }: Props) {
+export function EngStepDrawer({ line, open, onOpenChange, initialStep }: Props) {
   const advanceFn = useServerFn(advanceEngStep);
   const revertFn = useServerFn(revertEngStep);
+  const jumpFn = useServerFn(setEngStep);
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const { roles } = useAuth();
   const canReview = canReviewEngineering(roles);
+  const realKey = (line?.eng_step ?? ENGINEERING_STEPS[0].key) as EngStepKey;
+  const [viewStep, setViewStep] = useState<EngStepKey>(realKey);
+
+  useEffect(() => {
+    if (!open) return;
+    setViewStep((initialStep ?? realKey) as EngStepKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, line?.id, initialStep]);
 
   if (!line) return null;
-  const currentKey = (line.eng_step ?? ENGINEERING_STEPS[0].key) as EngStepKey;
-  const step = getStep(currentKey);
+  const currentKey = realKey;
+  const step = getStep(viewStep);
+  const isPreview = viewStep !== currentKey;
+  const viewIdx = stepIndex(viewStep);
 
   const refresh = () =>
     qc.invalidateQueries({ queryKey: ["po_lines_by_status"] });
@@ -96,16 +113,78 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
     }
   };
 
+  const handleSetCurrent = async () => {
+    setBusy(true);
+    try {
+      await jumpFn({ data: { id: line.id, step: viewStep } });
+      toast.success(`Current step set to ${getStep(viewStep)?.label}`);
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="bg-card w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            Step {ENGINEERING_STEPS.findIndex((s) => s.key === currentKey) + 1}
-            /{ENGINEERING_STEPS.length}: {step?.label ?? "—"}
+            Step {viewIdx + 1}/{ENGINEERING_STEPS.length}: {step?.label ?? "—"}
           </SheetTitle>
           <SheetDescription>{step?.description}</SheetDescription>
         </SheetHeader>
+
+        <div className="mt-3 flex flex-wrap gap-1">
+          {ENGINEERING_STEPS.map((s, i) => {
+            const active = s.key === viewStep;
+            const isCurrent = s.key === currentKey;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setViewStep(s.key)}
+                title={s.label}
+                className={cn(
+                  "rounded-md border px-2 py-1 text-xs transition-colors",
+                  active
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted/50",
+                  !active && isCurrent && "border-emerald-500/60 text-emerald-300",
+                )}
+              >
+                {i + 1}. {s.shortLabel}
+              </button>
+            );
+          })}
+        </div>
+
+        {isPreview && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            <span className="text-amber-200/90">
+              Viewing {getStep(viewStep)?.label} — current step is{" "}
+              {getStep(currentKey)?.label}
+            </span>
+            <div className="ml-auto flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setViewStep(currentKey)}
+              >
+                Back to current
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!canReview || busy}
+                onClick={handleSetCurrent}
+              >
+                Set as current step
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="my-4 rounded-md border bg-muted/30 p-3 text-sm space-y-1">
           <div className="font-medium">
@@ -117,19 +196,41 @@ export function EngStepDrawer({ line, open, onOpenChange }: Props) {
         </div>
 
         <div className="py-2">
-          {currentKey === "po_info" && (
+          {viewStep === "po_info" && (
             <PoInfoPanel line={line} onSaved={refresh} />
           )}
-          {currentKey === "pir_verify" && (
+          {viewStep === "pir_verify" && (
             <PirVerifyPanel line={line} onSaved={refresh} />
           )}
-          {currentKey === "body_spec" && (
+          {viewStep === "body_spec" && (
             <BodySpecPanel line={line} onSaved={refresh} />
           )}
-          {currentKey === "components" && <ComponentsPanel />}
-          {currentKey === "matrix_check" && (
+          {viewStep === "components" && <ComponentsPanel />}
+          {viewStep === "matrix_check" && (
             <QualityMatrixPanel line={line} canReview={canReview} onSaved={refresh} />
           )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-2 border-t pt-3">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={viewIdx <= 0}
+            onClick={() => setViewStep(ENGINEERING_STEPS[viewIdx - 1].key)}
+          >
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Previous step
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            Browsing only — nothing is recorded
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={viewIdx >= ENGINEERING_STEPS.length - 1}
+            onClick={() => setViewStep(ENGINEERING_STEPS[viewIdx + 1].key)}
+          >
+            Next step <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          </Button>
         </div>
 
         <SheetFooter className="mt-6 flex-col gap-2 sm:flex-row">
