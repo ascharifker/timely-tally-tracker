@@ -82,7 +82,8 @@ export function QualityMatrixPanel({ line, canReview, onSaved }: Props) {
   }, [line.id, line.quality_matrix_notes]);
 
   const groupedItems = useMemo(() => {
-    const groups: Record<string, typeof templateData.items> = {};
+    type Item = NonNullable<typeof templateData>["items"][number];
+    const groups: Record<string, Item[]> = {};
     for (const item of templateData?.items ?? []) {
       const cat = item.category ?? "General";
       groups[cat] = groups[cat] ?? [];
