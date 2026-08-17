@@ -69,3 +69,14 @@ export function stepIndex(key: string | null | undefined): number {
   if (!key) return -1;
   return ENGINEERING_STEPS.findIndex((s) => s.key === key);
 }
+
+export function lastStep(): EngStep {
+  return ENGINEERING_STEPS[ENGINEERING_STEPS.length - 1];
+}
+
+/** Previous step, or null when already on the first step. */
+export function prevStep(current: string | null | undefined): EngStep | null {
+  const idx = ENGINEERING_STEPS.findIndex((s) => s.key === current);
+  if (idx <= 0) return null;
+  return ENGINEERING_STEPS[idx - 1];
+}

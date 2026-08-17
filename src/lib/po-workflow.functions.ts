@@ -6,6 +6,8 @@ import {
   ENGINEERING_STEPS,
   nextStep,
   getStep,
+  prevStep,
+  lastStep,
 } from "@/lib/engineering-steps";
 
 async function logStepEvent(opts: {
@@ -103,7 +105,148 @@ export const advanceEngStep = createServerFn({ method: "POST" })
       actor,
       elapsed_ms: elapsed,
     });
-    return { ok: true, completed: false, to_step: next.key };
+    return { ok: true, completed: false, from_step: current, to_step: next.key };
+  });
+
+/**
+ * Move a PO line one engineering step BACK. If the line already completed the
+ * funnel (`ready_for_production`), it is reopened on the last step — unless an
+ * ODT (job) already exists for it.
+ */
+export const revertEngStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        kind: z.enum(["back", "undo"]).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error: rErr } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .select("eng_step, eng_step_started_at, status")
+      .eq("id", data.id)
+      .single();
+    if (rErr || !row) throw new Error(rErr?.message ?? "Line not found");
+    const line = row as {
+      eng_step: string | null;
+      eng_step_started_at: string | null;
+      status: string;
+    };
+    const now = new Date().toISOString();
+    const actor = context.userId ?? null;
+    const elapsed = elapsedMs(line.eng_step_started_at);
+
+    // Completed line → reopen at the last step if nothing is scheduled yet.
+    if (line.eng_step === null) {
+      if (
+        line.status !== "ready_for_production" &&
+        line.status !== "engineering_approved"
+      ) {
+        throw new Error(
+          "This line is already scheduled in production and cannot be reopened.",
+        );
+      }
+      const { data: jobs, error: jErr } = await supabaseAdmin
+        .from("jobs" as never)
+        .select("id")
+        .eq("po_line_item_id", data.id)
+        .limit(1);
+      if (jErr) throw new Error(jErr.message);
+      if (jobs && jobs.length > 0) {
+        throw new Error(
+          "This line already has an ODT in production. Cancel the ODT first.",
+        );
+      }
+      const target = lastStep();
+      const { error } = await supabaseAdmin
+        .from("po_line_items" as never)
+        .update({
+          status: "pending_engineering",
+          eng_step: target.key,
+          eng_step_started_at: now,
+          engineering_reviewed_at: null,
+          engineering_reviewed_by: null,
+        } as never)
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+      await logStepEvent({
+        po_line_item_id: data.id,
+        from_step: null,
+        to_step: target.key,
+        kind: (data.kind === "undo" ? "undo" : "reopen") as never,
+        actor,
+        elapsed_ms: elapsed,
+      });
+      return { ok: true, reopened: true, to_step: target.key };
+    }
+
+    const prev = prevStep(line.eng_step);
+    if (!prev) throw new Error("Already on the first step.");
+    const { error } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .update({
+        eng_step: prev.key,
+        eng_step_started_at: now,
+      } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await logStepEvent({
+      po_line_item_id: data.id,
+      from_step: line.eng_step,
+      to_step: prev.key,
+      kind: (data.kind === "undo" ? "undo" : "back") as never,
+      actor,
+      elapsed_ms: elapsed,
+    });
+    return { ok: true, reopened: false, to_step: prev.key };
+  });
+
+/** Reset a PO line back to the first engineering step. */
+export const restartEngStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error: rErr } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .select("eng_step, eng_step_started_at, status")
+      .eq("id", data.id)
+      .single();
+    if (rErr || !row) throw new Error(rErr?.message ?? "Line not found");
+    const line = row as {
+      eng_step: string | null;
+      eng_step_started_at: string | null;
+      status: string;
+    };
+    if (line.status === "scheduled" || line.status === "in_progress") {
+      throw new Error("This line is already scheduled in production.");
+    }
+    const now = new Date().toISOString();
+    const first = ENGINEERING_STEPS[0];
+    const { error } = await supabaseAdmin
+      .from("po_line_items" as never)
+      .update({
+        status: "pending_engineering",
+        eng_step: first.key,
+        eng_step_started_at: now,
+        engineering_reviewed_at: null,
+        engineering_reviewed_by: null,
+      } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await logStepEvent({
+      po_line_item_id: data.id,
+      from_step: line.eng_step,
+      to_step: first.key,
+      kind: "restart" as never,
+      actor: context.userId ?? null,
+      elapsed_ms: elapsedMs(line.eng_step_started_at),
+    });
+    return { ok: true, to_step: first.key };
   });
 
 /**

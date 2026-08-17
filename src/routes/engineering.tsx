@@ -9,6 +9,8 @@ import {
   advanceEngStep,
   setEngStep,
   flagPoLine,
+  revertEngStep,
+  restartEngStep,
 } from "@/lib/po-workflow.functions";
 import {
   ENGINEERING_STEPS,
@@ -39,7 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowRight, ChevronDown, Flag } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Flag, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EngStepDrawer } from "@/components/fact/EngStepDrawer";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
@@ -103,12 +105,20 @@ function EngineeringPage() {
   const advanceFn = useServerFn(advanceEngStep);
   const jumpFn = useServerFn(setEngStep);
   const flagFn = useServerFn(flagPoLine);
+  const revertFn = useServerFn(revertEngStep);
+  const restartFn = useServerFn(restartEngStep);
   const qc = useQueryClient();
+  const { data: doneLines = [] } = usePoLinesByStatus([
+    "ready_for_production",
+    "engineering_approved",
+  ]);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [flagOpen, setFlagOpen] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
-  const [drawerLine, setDrawerLine] = useState<PoLineWithContext | null>(null);
+  const [drawerLineId, setDrawerLineId] = useState<string | null>(null);
+  const drawerLine: PoLineWithContext | null =
+    lines.find((l) => l.id === drawerLineId) ?? null;
 
   const refresh = () =>
     qc.invalidateQueries({ queryKey: ["po_lines_by_status"] });
@@ -117,9 +127,61 @@ function EngineeringPage() {
     setBusy(id);
     try {
       const res = await advanceFn({ data: { id } });
-      toast.success(
-        res.completed ? "Ready for production" : "Step completed",
-      );
+      toast.success(res.completed ? "Ready for production" : "Step completed", {
+        duration: 10000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await revertFn({ data: { id, kind: "undo" } });
+              toast.success("Step restored");
+              await refresh();
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Error");
+            }
+          },
+        },
+      });
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const goBack = async (id: string) => {
+    setBusy(id);
+    try {
+      await revertFn({ data: { id, kind: "back" } });
+      toast.success("Moved back one step");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restart = async (id: string) => {
+    if (!window.confirm("Start this line over from step 1?")) return;
+    setBusy(id);
+    try {
+      await restartFn({ data: { id } });
+      toast.success("Restarted from step 1");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reopen = async (id: string) => {
+    setBusy(id);
+    try {
+      await revertFn({ data: { id, kind: "back" } });
+      toast.success("Reopened in engineering");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -252,9 +314,18 @@ function EngineeringPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setDrawerLine(l)}
+                      onClick={() => setDrawerLineId(l.id)}
                     >
                       Open
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy === l.id || stepIndex(currentStep) <= 0}
+                      onClick={() => goBack(l.id)}
+                      title="Back one step"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       size="sm"
@@ -279,6 +350,9 @@ function EngineeringPage() {
                             Jump to {s.label}
                           </DropdownMenuItem>
                         ))}
+                        <DropdownMenuItem onClick={() => restart(l.id)}>
+                          <RotateCcw className="h-3.5 w-3.5 mr-2" /> Start over
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Button
@@ -300,6 +374,59 @@ function EngineeringPage() {
           </TableBody>
         </Table>
       </div>
+
+      {doneLines.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold mb-2">
+            Ready for production ({doneLines.length})
+          </h3>
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer / PO</TableHead>
+                  <TableHead>Line</TableHead>
+                  <TableHead>PIR</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="w-56" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {doneLines.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-sm">
+                      {l.purchase_order?.customer?.name ?? "—"}
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {l.purchase_order?.po_number}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      L{l.line_number}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {l.pir ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {l.qty_ordered}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === l.id}
+                        onClick={() => reopen(l.id)}
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Reopen in
+                        engineering
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!flagOpen} onOpenChange={(o) => !o && setFlagOpen(null)}>
         <DialogContent className="bg-card">
@@ -326,7 +453,7 @@ function EngineeringPage() {
       <EngStepDrawer
         line={drawerLine}
         open={!!drawerLine}
-        onOpenChange={(o) => !o && setDrawerLine(null)}
+        onOpenChange={(o) => !o && setDrawerLineId(null)}
       />
     </AppShell>
   );
