@@ -299,3 +299,27 @@ export const getPoDocumentUrl = createServerFn({ method: "POST" })
     if (error || !signed) throw new Error(error?.message ?? "No se pudo firmar URL");
     return { url: signed.signedUrl };
   });
+
+// ---------------------------------------------------------------
+// attachPoDocument — link an uploaded PDF to an existing PO
+// ---------------------------------------------------------------
+
+export const attachPoDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        purchaseOrderId: z.string().uuid(),
+        storagePath: z.string().min(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertCanEditPo(context.userId);
+    const { error } = await supabaseAdmin
+      .from("purchase_orders" as never)
+      .update({ source_document_url: data.storagePath } as never)
+      .eq("id", data.purchaseOrderId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
