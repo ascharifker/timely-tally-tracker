@@ -37,6 +37,19 @@ function elapsedMs(startedAt: string | null): number | null {
   return Date.now() - t;
 }
 
+/** Only admins, managers and the Engineering role may mutate the engineering funnel. */
+async function assertEngineeringReviewer(userId: string | null | undefined) {
+  if (!userId) throw new Error("Not authenticated");
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  const roles = (data ?? []).map((r) => r.role as string);
+  const allowed = roles.some((r) => r === "admin" || r === "manager" || r === "engineer");
+  if (!allowed) throw new Error("Forbidden — Engineering role required");
+}
+
 /**
  * Advance a PO line to the next engineering step.
  * If already on the last step, the line transitions to `ready_for_production`.
