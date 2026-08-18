@@ -36,6 +36,7 @@ import { attachPoDocument, getPoDocumentUrl } from "@/lib/po-intake.functions";
 import { BODY_SPEC_FIELDS, type BodySpecKey } from "@/lib/body-spec";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
 import { QualityMatrixPanel } from "./QualityMatrixPanel";
+import { DesignPlansPanel } from "./DesignPlansPanel";
 
 const MASTER_PIR_PATH = "master-pir/current.xlsx";
 
@@ -200,7 +201,16 @@ export function EngStepDrawer({ line, open, onOpenChange, initialStep }: Props) 
             <PoInfoPanel line={line} onSaved={refresh} />
           )}
           {viewStep === "pir_verify" && (
-            <PirVerifyPanel line={line} onSaved={refresh} />
+            <div className="space-y-6">
+              <PirVerifyPanel line={line} onSaved={refresh} />
+              <div className="border-t pt-4">
+                <DesignPlansPanel
+                  line={line}
+                  canReview={canReview}
+                  onSaved={refresh}
+                />
+              </div>
+            </div>
           )}
           {viewStep === "body_spec" && (
             <BodySpecPanel line={line} onSaved={refresh} />

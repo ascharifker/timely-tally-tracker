@@ -135,6 +135,39 @@ export type Database = {
           },
         ]
       }
+      dropbox_config: {
+        Row: {
+          account_email: string | null
+          account_name: string | null
+          connected_at: string | null
+          connected_by: string | null
+          id: boolean
+          refresh_token: string | null
+          root_folder: string
+          updated_at: string
+        }
+        Insert: {
+          account_email?: string | null
+          account_name?: string | null
+          connected_at?: string | null
+          connected_by?: string | null
+          id?: boolean
+          refresh_token?: string | null
+          root_folder?: string
+          updated_at?: string
+        }
+        Update: {
+          account_email?: string | null
+          account_name?: string | null
+          connected_at?: string | null
+          connected_by?: string | null
+          id?: boolean
+          refresh_token?: string | null
+          root_folder?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       job_steps: {
         Row: {
           completed_at: string | null
@@ -456,6 +489,9 @@ export type Database = {
           notes: string | null
           pir: string | null
           pir_rev: string | null
+          plan_dropbox_name: string | null
+          plan_dropbox_path: string | null
+          plan_dropbox_rev: string | null
           purchase_order_id: string
           qty_ordered: number
           quality_matrix_document_url: string | null
@@ -491,6 +527,9 @@ export type Database = {
           notes?: string | null
           pir?: string | null
           pir_rev?: string | null
+          plan_dropbox_name?: string | null
+          plan_dropbox_path?: string | null
+          plan_dropbox_rev?: string | null
           purchase_order_id: string
           qty_ordered?: number
           quality_matrix_document_url?: string | null
@@ -526,6 +565,9 @@ export type Database = {
           notes?: string | null
           pir?: string | null
           pir_rev?: string | null
+          plan_dropbox_name?: string | null
+          plan_dropbox_path?: string | null
+          plan_dropbox_rev?: string | null
           purchase_order_id?: string
           qty_ordered?: number
           quality_matrix_document_url?: string | null
