@@ -156,6 +156,9 @@ export interface POLineItem {
   quality_matrix_signed_off_by: string | null;
   quality_matrix_signed_off_at: string | null;
   quality_matrix_notes: string | null;
+  plan_dropbox_path: string | null;
+  plan_dropbox_name: string | null;
+  plan_dropbox_rev: string | null;
 }
 
 export type POLineStatus =

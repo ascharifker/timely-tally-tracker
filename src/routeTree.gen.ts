@@ -26,6 +26,7 @@ import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminImportMaquinadosRouteImport } from './routes/admin.import-maquinados'
 import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
+import { Route as ApiPublicDropboxCallbackRouteImport } from './routes/api/public/dropbox-callback'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -112,6 +113,12 @@ const AdminDelegationsRoute = AdminDelegationsRouteImport.update({
   path: '/admin/delegations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDropboxCallbackRoute =
+  ApiPublicDropboxCallbackRouteImport.update({
+    id: '/api/public/dropbox-callback',
+    path: '/api/public/dropbox-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
+  '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -149,6 +157,7 @@ export interface FileRoutesByTo {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders': typeof PurchaseOrdersIndexRoute
+  '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -169,6 +178,7 @@ export interface FileRoutesById {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
+  '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
+    | '/api/public/dropbox-callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders'
+    | '/api/public/dropbox-callback'
   id:
     | '__root__'
     | '/'
@@ -227,6 +239,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
+    | '/api/public/dropbox-callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -245,6 +258,7 @@ export interface RootRouteChildren {
   AdminImportMaquinadosRoute: typeof AdminImportMaquinadosRoute
   AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
+  ApiPublicDropboxCallbackRoute: typeof ApiPublicDropboxCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -368,6 +382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDelegationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/dropbox-callback': {
+      id: '/api/public/dropbox-callback'
+      path: '/api/public/dropbox-callback'
+      fullPath: '/api/public/dropbox-callback'
+      preLoaderRoute: typeof ApiPublicDropboxCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -401,6 +422,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminImportMaquinadosRoute: AdminImportMaquinadosRoute,
   AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
+  ApiPublicDropboxCallbackRoute: ApiPublicDropboxCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

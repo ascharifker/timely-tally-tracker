@@ -152,6 +152,9 @@ export function usePoLinesSpreadsheet(opts: { statuses?: POLineStatus[] } = {}) 
             quality_matrix_signed_off_by: l.quality_matrix_signed_off_by ?? null,
             quality_matrix_signed_off_at: l.quality_matrix_signed_off_at ?? null,
             quality_matrix_notes: l.quality_matrix_notes ?? null,
+            plan_dropbox_path: l.plan_dropbox_path ?? null,
+            plan_dropbox_name: l.plan_dropbox_name ?? null,
+            plan_dropbox_rev: l.plan_dropbox_rev ?? null,
           },
           po: l.purchase_order
             ? {
