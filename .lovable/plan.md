@@ -1,47 +1,77 @@
-# Call prep — Catalina (QC / Quality Matrix), 30 min
+# Quality Matrix — rebuilt from the Catalina call
 
-Goal of the call: understand how QC actually inspects, in her words, so the module mirrors her process instead of the two sample checklists. Come out with enough to freeze a data model.
+## What the call changed
 
-## What we have today (so you can speak to it)
+The single biggest correction: **"matriz de calidad" is not an inspection checklist.** It is Catalina's **document / revision control matrix** — the list of part numbers (PIR) and the drawing revision she has documented in the system at Reynosa. What Alexis actually does in Step 4 is:
 
-- Engineering funnel has 4 steps: PO Info -> PIR Verification -> Part Component List -> Quality Matrix Check.
-- Step 4 today: a generic checklist (Pass / Fail / N/A per item + notes), one attached reference document, and a single sign-off with timestamp and user. Editable only by the Engineering role.
-- The two files she sent are dimensional inspection sheets: rows = characteristics (dimension + tolerance), columns = pieces inspected, one sheet filled by Calidad and one by Producción. Our current model cannot hold per-piece measurements — that's the main gap.
+1. Take the part number off the PO.
+2. Check it against Catalina's matrix — is this document on file, and at which revision?
+3. If the PO brings a newer revision, he tells Catalina and she updates the record immediately.
+4. If the document is not on file at Reynosa, Alexis supplies it from Dropbox; if he doesn't have it either, he requests it from the customer, and it gets catalogued once received.
 
-## The 8 questions to get answered
+Real QC inspection is a **separate world**, and Catalina explicitly asked to phase it:
 
-1. **Product or process?** She asked this directly. Confirm: we want product inspection (per part / per PO line) first, and process/production self-check second. Ask if both must live in the same record.
-2. **Who fills what, and when.** Producción self-check at first piece? Calidad at final? In-process every N pieces? Who signs, and can production submit without QC?
-3. **Where the criteria come from.** For a given part number / PIR / revision, where do the characteristics and tolerances live today — the drawing, the PIR, a controlled Excel? Who updates them when a revision changes?
-4. **Sampling rule.** How many pieces get measured out of a lot — fixed N, %, AQL table, first/middle/last? Does it change by customer or part?
-5. **Pass / fail / rework outcomes.** What happens on an out-of-tolerance reading: scrap, rework, concession, stop the lot? Is there a nonconformance (NC) number or report today?
-6. **Instruments and traceability.** Do they record gauge/instrument ID, calibration, inspector name, date/time per sheet? Anything the customer audits?
-7. **The physical/legal artifact.** Does the signed sheet have to be printed/PDF'd for the customer or ISO records? Do they need a specific layout back out of the system?
-8. **Volume + friction.** How many sheets per day, filled on paper then typed in? Tablet on the floor? This decides whether we build fast keyboard entry or a simple form.
+- **Process inspection** — filled by *production* after a setup / at start-up, verifying run conditions. More generic across parts.
+- **Product inspection** — filled by a *Mego QC inspector* (not Catalina, not a third party), 100% of pieces, at several points in the flow, using a **per-part form** she prints today and fills by hand.
+- Her ask, verbatim in spirit: a digital form the inspector fills on a computer or iPad that attaches itself to the product record.
+- She is sending a **flujograma** (receive PO -> inspection points -> which document at each point). Deep product-inspection design waits for that and for the October site visit.
+- Her order of attack: **process first, then product** — tie down one stage before jumping to the next.
 
-## Things to show her live (5 min max)
+Also noted: she is worried about losing documents in Dropbox and has no Drive capacity. A backup/mirror of controlled documents is a real need for audits, not a nice-to-have.
 
-- Engineering drawer -> Step 4 as it stands, so she reacts to something concrete.
-- The PO line context (customer, part number, PIR + rev, quantity) that we can auto-fill onto her sheet — that's the immediate time saver to sell.
+## Phase 1 — Document Control Matrix (build now)
 
-## Ask her to leave with
+Replace the current generic pass/fail checklist in Step 4 with what Alexis actually does.
 
-- One blank master template of each form type they use (not just the two already sent).
-- One completed real example, so we see the real handwriting/values and edge cases.
-- The list of characteristic types they record (dimension, visual, functional, material cert, torque...).
-- Who besides her needs a login and at what permission level (inspector = enter readings, QC lead = sign off).
+- New **Matriz de Documentos**: one row per part number (PIR) holding the controlled revision, document status, where the file lives, and who last updated it and when.
+- Step 4 in the Engineering drawer becomes **Verificación de documento**. It looks up the line's PIR in the matrix and shows one of four states:
+  - `Documentado` — on file and the revision matches the PO.
+  - `Revisión nueva` — the PO revision is newer than the matrix; one click sends a request to Catalina to update.
+  - `No documentado` — not on file. Alexis can attach the Dropbox plan he found (the Dropbox panel already exists) to close it.
+  - `Solicitado al cliente` — nobody has it; one click records the request and its date.
+- Every state change is logged with actor and timestamp, so the matrix carries its own audit trail.
+- Catalina gets a **Calidad** view listing everything pending her action (new revisions to document, documents received to catalogue) and can mark a part as documented at revision X.
+- Reuse the Dropbox integration: when the drawer finds a plan, its filename revision is compared against both the PO revision and the matrix revision, and any mismatch is shown explicitly.
+- **Import**: load the matrix in bulk from the Excel she already maintains, so nothing gets retyped.
 
-## What we build after (do not commit dates on the call)
+## Phase 2 — Process inspection forms (after Phase 1 lands)
 
-Generic model, driven by her answers:
-- `qm_forms` (templates) -> `qm_characteristics` (rows: description, nominal, tol +/-, unit, type, instrument)
-- `qm_part_specs` (which template + values apply to a part number / PIR revision)
-- `qm_inspections` (a filled sheet: line, lot, sample size, inspector, stage: production self-check vs QC final)
-- `qm_measurements` (one reading per characteristic per piece, auto-flagged out of tolerance)
-- `quality` role separate from `engineer`; QC sign-off distinct from engineering sign-off
-- Excel importer so a template can be loaded from her existing sheets rather than retyped
-- PDF export of the completed sheet for customer/ISO records
+Digital version of the production start-up / setup check, since it is the more generic of the two.
 
-## Technical notes
+- A **form catalog**: reusable templates with sections and items (yes/no, value + tolerance, text, signature).
+- A production user opens the ODT, fills the start-up check on a tablet, and it attaches to the job.
+- Sign-off records who filled it and when; PDF export for the paper record and audits.
 
-Current tables: `quality_matrix_templates`, `quality_matrix_items`, `po_line_quality_checks`, plus `quality_matrix_*` columns on `po_line_items`. The v2 model above is additive — the existing checklist can stay as a lightweight per-line gate while the measurement grid becomes the real QC record, or we migrate it out once her forms are loaded. Decide after the call.
+## Phase 3 — Product inspection (after the flujograma and the October visit)
+
+Per-part inspection forms with characteristics, tolerances and per-piece readings, plus inspection points mapped onto the production flow. Deliberately not designed yet — waiting on the flujograma so the model mirrors her real inspection points instead of guessing from two sample sheets.
+
+## Technical section
+
+New tables for Phase 1:
+
+```text
+qc_document_matrix
+  id, pir (unique), part_description,
+  documented_rev,
+  status: documented | new_rev_pending | not_documented | requested_from_customer,
+  dropbox_path, dropbox_name, source: dropbox | customer | internal,
+  requested_at, documented_at, documented_by, notes, created_at, updated_at
+
+qc_document_events
+  id, matrix_id, po_line_item_id (nullable), kind,
+  from_status, to_status, from_rev, to_rev, actor, note, occurred_at
+```
+
+Both get GRANTs to `authenticated` and `service_role`, RLS enabled, read for authenticated users, writes restricted to `admin | manager | engineer | quality`.
+
+New role: add `quality` to the `app_role` enum, label "Calidad", selectable in Settings > Users. Engineering can flag and attach; Calidad can mark documented and set the controlled revision.
+
+Server functions in a new `src/lib/qc-matrix.functions.ts`: `getMatrixEntryForPir`, `upsertMatrixEntry`, `requestRevisionUpdate`, `markDocumented`, `markRequestedFromCustomer`, `listPendingQualityActions`, `importMatrixRows`.
+
+UI:
+- Rewrite `src/components/fact/QualityMatrixPanel.tsx` as the document-verification panel (status card, revision comparison, actions, event history).
+- New `src/routes/calidad.tsx` — Catalina's pending-actions queue plus the full matrix table with PIR search and an Excel importer (SheetJS, same pattern as the maquinados import).
+- Sidebar entry for Calidad, visible to the new role plus admin/manager.
+
+Existing objects: `quality_matrix_templates`, `quality_matrix_items` and `po_line_quality_checks` stay in place, unused for now — they become the backbone of the Phase 2 form catalog rather than being dropped. The `quality_matrix_signed_off_*` columns on `po_line_items` are reused to record that Step 4 document verification passed.
