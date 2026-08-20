@@ -1071,6 +1071,7 @@ export type Database = {
         | "production_editor"
         | "viewer"
         | "engineer"
+        | "quality"
       event_kind:
         | "delay"
         | "priority_shift"
@@ -1241,6 +1242,7 @@ export const Constants = {
         "production_editor",
         "viewer",
         "engineer",
+        "quality",
       ],
       event_kind: [
         "delay",
