@@ -10,6 +10,7 @@ export type AppRole =
   | "coe_reviewer"
   | "third_party_reviewer"
   | "production_editor"
+  | "quality"
   | "viewer";
 
 export interface AuthState {
