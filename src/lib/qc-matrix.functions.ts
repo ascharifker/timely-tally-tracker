@@ -293,7 +293,15 @@ export const importMatrixRows = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const now = new Date().toISOString();
     const seen = new Set<string>();
-    const payload = [] as Array<Record<string, unknown>>;
+    const payload: Array<{
+      pir: string;
+      part_description: string | null;
+      documented_rev: string | null;
+      status: string;
+      documented_at: string | null;
+      documented_by: string | null;
+      source: string;
+    }> = [];
     for (const r of data.rows) {
       const pir = r.pir.trim();
       if (!pir || seen.has(pir)) continue;
