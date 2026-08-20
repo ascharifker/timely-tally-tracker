@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
+  ShieldCheck,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -75,6 +76,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     hasRole(roles, "engineer") ||
     hasRole(roles, "coe_reviewer") ||
     hasRole(roles, "third_party_reviewer");
+  const showCalidad =
+    isAdmin(roles) ||
+    hasRole(roles, "manager") ||
+    hasRole(roles, "quality") ||
+    hasRole(roles, "engineer");
 
   const navItems: Array<{ to: string; label: string; icon: typeof Inbox; exact?: boolean; show: boolean }> = [
     { to: "/", label: t("nav.calendar"), icon: CalendarDays, exact: true, show: true },
@@ -82,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/pending-review", label: t("nav.pending"), icon: ClipboardList, show: showPendingReview },
     { to: "/engineering", label: t("nav.engineering"), icon: Wrench, show: true },
     { to: "/production", label: t("nav.production"), icon: Factory, show: true },
+    { to: "/calidad", label: "Calidad", icon: ShieldCheck, show: showCalidad },
     { to: "/admin/import-maquinados", label: "Importar MAQ.", icon: Upload, show: showAdmin },
     { to: "/settings", label: showAdmin ? t("nav.settings") : t("nav.config"), icon: Settings, show: true },
   ];

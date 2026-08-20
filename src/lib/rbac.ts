@@ -49,11 +49,22 @@ export function canReviewEngineering(roles: AppRole[]): boolean {
   return isAdmin(roles) || hasRole(roles, "manager") || hasRole(roles, "engineer");
 }
 
+/** Can this user act on the document control matrix (flag / attach / request)? */
+export function canFlagQcDocuments(roles: AppRole[]): boolean {
+  return canReviewEngineering(roles) || hasRole(roles, "quality");
+}
+
+/** Can this user set the controlled revision (Calidad)? */
+export function canDocumentQc(roles: AppRole[]): boolean {
+  return isAdmin(roles) || hasRole(roles, "manager") || hasRole(roles, "quality");
+}
+
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
   manager: "Manager",
   po_editor: "PO Editor",
   engineer: "Engineering",
+  quality: "Calidad",
   coe_reviewer: "COE Reviewer",
   third_party_reviewer: "Third-party Reviewer",
   production_editor: "Production",
@@ -67,6 +78,7 @@ export function primaryRoleLabel(roles: AppRole[]): string {
     "manager",
     "po_editor",
     "engineer",
+    "quality",
     "coe_reviewer",
     "third_party_reviewer",
     "production_editor",

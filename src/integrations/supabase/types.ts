@@ -729,6 +729,114 @@ export type Database = {
           },
         ]
       }
+      qc_document_events: {
+        Row: {
+          actor: string | null
+          from_rev: string | null
+          from_status: string | null
+          id: string
+          kind: string
+          matrix_id: string
+          note: string | null
+          occurred_at: string
+          po_line_item_id: string | null
+          to_rev: string | null
+          to_status: string | null
+        }
+        Insert: {
+          actor?: string | null
+          from_rev?: string | null
+          from_status?: string | null
+          id?: string
+          kind: string
+          matrix_id: string
+          note?: string | null
+          occurred_at?: string
+          po_line_item_id?: string | null
+          to_rev?: string | null
+          to_status?: string | null
+        }
+        Update: {
+          actor?: string | null
+          from_rev?: string | null
+          from_status?: string | null
+          id?: string
+          kind?: string
+          matrix_id?: string
+          note?: string | null
+          occurred_at?: string
+          po_line_item_id?: string | null
+          to_rev?: string | null
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qc_document_events_matrix_id_fkey"
+            columns: ["matrix_id"]
+            isOneToOne: false
+            referencedRelation: "qc_document_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qc_document_events_po_line_item_id_fkey"
+            columns: ["po_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qc_document_matrix: {
+        Row: {
+          created_at: string
+          documented_at: string | null
+          documented_by: string | null
+          documented_rev: string | null
+          dropbox_name: string | null
+          dropbox_path: string | null
+          id: string
+          notes: string | null
+          part_description: string | null
+          pir: string
+          requested_at: string | null
+          source: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          documented_at?: string | null
+          documented_by?: string | null
+          documented_rev?: string | null
+          dropbox_name?: string | null
+          dropbox_path?: string | null
+          id?: string
+          notes?: string | null
+          part_description?: string | null
+          pir: string
+          requested_at?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          documented_at?: string | null
+          documented_by?: string | null
+          documented_rev?: string | null
+          dropbox_name?: string | null
+          dropbox_path?: string | null
+          id?: string
+          notes?: string | null
+          part_description?: string | null
+          pir?: string
+          requested_at?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       quality_matrix_items: {
         Row: {
           category: string | null
@@ -1045,6 +1153,7 @@ export type Database = {
       bulk_import_maquinados: { Args: { payload: Json }; Returns: Json }
       current_user_can_edit_po: { Args: { _po_id: string }; Returns: boolean }
       current_user_can_edit_production: { Args: never; Returns: boolean }
+      current_user_can_edit_qc: { Args: never; Returns: boolean }
       has_active_delegation: {
         Args: {
           _track: Database["public"]["Enums"]["review_track"]
@@ -1071,6 +1180,7 @@ export type Database = {
         | "production_editor"
         | "viewer"
         | "engineer"
+        | "quality"
       event_kind:
         | "delay"
         | "priority_shift"
@@ -1241,6 +1351,7 @@ export const Constants = {
         "production_editor",
         "viewer",
         "engineer",
+        "quality",
       ],
       event_kind: [
         "delay",

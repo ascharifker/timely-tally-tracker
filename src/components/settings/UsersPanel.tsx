@@ -49,6 +49,7 @@ const ROLE_OPTIONS: AppRole[] = [
   "manager",
   "po_editor",
   "engineer",
+  "quality",
   "coe_reviewer",
   "third_party_reviewer",
   "production_editor",

@@ -18,6 +18,7 @@ import { Route as PendingReviewRouteImport } from './routes/pending-review'
 import { Route as IntakeRouteImport } from './routes/intake'
 import { Route as EngineeringRouteImport } from './routes/engineering'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
+import { Route as CalidadRouteImport } from './routes/calidad'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PurchaseOrdersIndexRouteImport } from './routes/purchase-orders.index'
@@ -73,6 +74,11 @@ const ConfiguracionRoute = ConfiguracionRouteImport.update({
   path: '/configuracion',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CalidadRoute = CalidadRouteImport.update({
+  id: '/calidad',
+  path: '/calidad',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -123,6 +129,7 @@ const ApiPublicDropboxCallbackRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/calidad': typeof CalidadRoute
   '/configuracion': typeof ConfiguracionRoute
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/calidad': typeof CalidadRoute
   '/configuracion': typeof ConfiguracionRoute
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/calidad': typeof CalidadRoute
   '/configuracion': typeof ConfiguracionRoute
   '/engineering': typeof EngineeringRoute
   '/intake': typeof IntakeRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/calidad'
     | '/configuracion'
     | '/engineering'
     | '/intake'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/calidad'
     | '/configuracion'
     | '/engineering'
     | '/intake'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
+    | '/calidad'
     | '/configuracion'
     | '/engineering'
     | '/intake'
@@ -245,6 +257,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  CalidadRoute: typeof CalidadRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
   EngineeringRoute: typeof EngineeringRoute
   IntakeRoute: typeof IntakeRoute
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       path: '/configuracion'
       fullPath: '/configuracion'
       preLoaderRoute: typeof ConfiguracionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calidad': {
+      id: '/calidad'
+      path: '/calidad'
+      fullPath: '/calidad'
+      preLoaderRoute: typeof CalidadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -409,6 +429,7 @@ const PurchaseOrdersRouteWithChildren = PurchaseOrdersRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  CalidadRoute: CalidadRoute,
   ConfiguracionRoute: ConfiguracionRoute,
   EngineeringRoute: EngineeringRoute,
   IntakeRoute: IntakeRoute,

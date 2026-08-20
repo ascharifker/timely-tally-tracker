@@ -50,9 +50,10 @@ export const ENGINEERING_STEPS: EngStep[] = [
   },
   {
     key: "matrix_check",
-    label: "Quality Matrix Check",
-    shortLabel: "Matrix",
-    description: "Mark Quality Matrix check complete. No auto-email.",
+    label: "Verificación de documento",
+    shortLabel: "Documento",
+    description:
+      "Verifica el número de parte contra la matriz de documentos de Calidad y su revisión.",
     optional: false,
   },
 ];
