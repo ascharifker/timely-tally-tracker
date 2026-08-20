@@ -18,7 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, Clock, FileQuestion, RefreshCw, Upload } from "lucide-react";
+import { CheckCircle2, Clock, FileQuestion, RefreshCw, Trash2, Upload } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useUserRole";
 import { canDocumentQc } from "@/lib/rbac";
 import {
@@ -26,6 +36,7 @@ import {
   listPendingQualityActions,
   markDocumented,
   importMatrixRows,
+  deleteMatrixEntries,
 } from "@/lib/qc-matrix.functions";
 
 export const Route = createFileRoute("/calidad")({
@@ -103,10 +114,12 @@ function CalidadPage() {
   const listFn = useServerFn(listMatrix);
   const documentFn = useServerFn(markDocumented);
   const importFn = useServerFn(importMatrixRows);
+  const deleteFn = useServerFn(deleteMatrixEntries);
 
   const [search, setSearch] = useState("");
   const [revDrafts, setRevDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [toDelete, setToDelete] = useState<Row | null>(null);
 
   const pending = useQuery({
     queryKey: ["qc_matrix_pending"],
@@ -146,6 +159,21 @@ function CalidadPage() {
       refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    if (!toDelete) return;
+    setBusy(true);
+    try {
+      await deleteFn({ data: { ids: [toDelete.id] } });
+      toast.success(`${toDelete.pir} eliminado de la matriz`);
+      setToDelete(null);
+      refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
     } finally {
       setBusy(false);
     }
@@ -196,7 +224,7 @@ function CalidadPage() {
           <TableHead>Rev. documentada</TableHead>
           <TableHead>Estado</TableHead>
           <TableHead>Plano</TableHead>
-          {withActions && canDocument && <TableHead className="w-[260px]">Acción</TableHead>}
+          {withActions && canDocument && <TableHead className="w-[320px]">Acción</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -233,6 +261,16 @@ function CalidadPage() {
                   />
                   <Button size="sm" disabled={busy} onClick={() => doDocument(r)}>
                     Documentar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={busy}
+                    aria-label={`Eliminar ${r.pir}`}
+                    onClick={() => setToDelete(r)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </TableCell>
@@ -314,6 +352,24 @@ function CalidadPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar {toDelete?.pir}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borrará esta parte de la matriz junto con su historial. Esta acción no se puede
+              deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={doDelete}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }

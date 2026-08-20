@@ -324,3 +324,17 @@ export const importMatrixRows = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { imported: payload.length };
   });
+
+export const deleteMatrixEntries = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertCanDocument(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("qc_document_events").delete().in("matrix_id", data.ids);
+    const { error } = await supabaseAdmin.from("qc_document_matrix").delete().in("id", data.ids);
+    if (error) throw new Error(error.message);
+    return { deleted: data.ids.length };
+  });
