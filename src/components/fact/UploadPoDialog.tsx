@@ -386,7 +386,7 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
         />
       </div>
 
-      <div>
+      <div className="flex flex-1 min-h-0 flex-col">
         <div className="flex items-center justify-between mb-2">
           <Label>Lines ({value.line_items.length})</Label>
           <div className="flex items-center gap-3">
@@ -406,21 +406,22 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
             </Button>
           </div>
         </div>
-        <div className="rounded-md border overflow-x-auto">
+        <div className="flex-1 min-h-0 rounded-md border overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead className="w-10">#</TableHead>
-                <TableHead>PIR</TableHead>
-                <TableHead>Spec / Description</TableHead>
-                <TableHead className="w-24">Qty</TableHead>
-                <TableHead className="w-40">Customer date</TableHead>
-                <TableHead className="w-28">HB Price</TableHead>
-                <TableHead className="w-28 text-right">Total HB</TableHead>
-                <TableHead className="w-20">Currency</TableHead>
+                <TableHead className="min-w-[260px]">PIR / Part #</TableHead>
+                <TableHead className="min-w-[420px]">Spec / Description</TableHead>
+                <TableHead className="w-20">Qty</TableHead>
+                <TableHead className="w-36">Customer date</TableHead>
+                <TableHead className="w-24">HB Price</TableHead>
+                <TableHead className="w-24 text-right">Total HB</TableHead>
+                <TableHead className="w-16">Curr.</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {value.line_items.map((li, idx) => (
                 <TableRow key={idx}>
