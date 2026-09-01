@@ -596,16 +596,19 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                     className="border-t border-border bg-muted/40 hover:bg-muted/60 cursor-pointer"
                     onClick={() => toggleGroup(g.key)}
                   >
-                    <Td
-                      className="text-center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={selectedPos.has(g.key)}
-                        aria-label={`Select PO ${g.poNumber}`}
-                        onCheckedChange={() => toggleSelected(g.key)}
-                      />
+                    <Td className="text-center">
+                      <span
+                        className="inline-flex"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selectedPos.has(g.key)}
+                          aria-label={`Select PO ${g.poNumber}`}
+                          onCheckedChange={() => toggleSelected(g.key)}
+                        />
+                      </span>
                     </Td>
+
                     <Td className="text-center">
 
                       {open ? (
