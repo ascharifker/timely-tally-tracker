@@ -312,8 +312,9 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
     value.line_items.length > 0;
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="grid grid-cols-4 gap-4">
+
         <div className="space-y-1.5">
           <Label>Customer</Label>
           <Select
