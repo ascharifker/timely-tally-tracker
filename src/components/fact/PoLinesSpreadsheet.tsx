@@ -374,11 +374,23 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
     return arr;
   }, [filtered, sortMode]);
 
+  // Export scope: selected POs when any are checked, otherwise the whole view.
+  const exportRows = useMemo(() => {
+    if (selectedPos.size === 0) return filtered;
+    return groups.filter((g) => selectedPos.has(g.key)).flatMap((g) => g.lines);
+  }, [filtered, groups, selectedPos]);
+  const exportScope =
+    selectedPos.size > 0
+      ? `${selectedPos.size}-po${selectedPos.size === 1 ? "" : "s"}`
+      : `${track}-${preset}`;
+  const allSelected = groups.length > 0 && selectedPos.size === groups.length;
+
   const searchActive = query.trim().length > 0 || onlyChanges;
   const isGroupOpen = (key: string) => searchActive || expanded.has(key);
 
   const expandAll = () => setExpanded(new Set(groups.map((g) => g.key)));
   const collapseAll = () => setExpanded(new Set());
+
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });
