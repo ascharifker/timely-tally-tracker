@@ -174,7 +174,7 @@ export function UploadPoDialog() {
           <Upload className="mr-2 h-4 w-4" /> Upload PO
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[96vw] w-[96vw] h-[92vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Upload Purchase Order</DialogTitle>
           <DialogDescription>
@@ -312,8 +312,9 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
     value.line_items.length > 0;
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="grid grid-cols-4 gap-4">
+
         <div className="space-y-1.5">
           <Label>Customer</Label>
           <Select
@@ -385,7 +386,7 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
         />
       </div>
 
-      <div>
+      <div className="flex flex-1 min-h-0 flex-col">
         <div className="flex items-center justify-between mb-2">
           <Label>Lines ({value.line_items.length})</Label>
           <div className="flex items-center gap-3">
@@ -405,21 +406,22 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
             </Button>
           </div>
         </div>
-        <div className="rounded-md border overflow-x-auto">
+        <div className="flex-1 min-h-0 rounded-md border overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead className="w-10">#</TableHead>
-                <TableHead>PIR</TableHead>
-                <TableHead>Spec / Description</TableHead>
-                <TableHead className="w-24">Qty</TableHead>
-                <TableHead className="w-40">Customer date</TableHead>
-                <TableHead className="w-28">HB Price</TableHead>
-                <TableHead className="w-28 text-right">Total HB</TableHead>
-                <TableHead className="w-20">Currency</TableHead>
+                <TableHead className="min-w-[260px]">PIR / Part #</TableHead>
+                <TableHead className="min-w-[420px]">Spec / Description</TableHead>
+                <TableHead className="w-20">Qty</TableHead>
+                <TableHead className="w-36">Customer date</TableHead>
+                <TableHead className="w-24">HB Price</TableHead>
+                <TableHead className="w-24 text-right">Total HB</TableHead>
+                <TableHead className="w-16">Curr.</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {value.line_items.map((li, idx) => (
                 <TableRow key={idx}>
@@ -427,7 +429,10 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                   <TableCell>
                     <Input
                       value={li.pir ?? ""}
-                      className={li.low_confidence ? "border-amber-500" : undefined}
+                      className={
+                        li.low_confidence ? "font-mono border-amber-500" : "font-mono"
+                      }
+
                       onChange={(e) =>
                         updateLine(idx, { pir: e.target.value, low_confidence: false })
                       }

@@ -4,6 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -169,6 +171,23 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
       return new Set();
     }
   });
+  const [selectedPos, setSelectedPos] = useState<Set<string>>(new Set());
+
+  const toggleSelected = (key: string) => {
+    setSelectedPos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Clear selection whenever the visible set changes.
+  useEffect(() => {
+    setSelectedPos(new Set());
+  }, [query, customerFilter, statusFilter, preset, onlyChanges, track]);
+
+
 
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem(SORT_KEY, sortMode);
@@ -357,11 +376,23 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
     return arr;
   }, [filtered, sortMode]);
 
+  // Export scope: selected POs when any are checked, otherwise the whole view.
+  const exportRows = useMemo(() => {
+    if (selectedPos.size === 0) return filtered;
+    return groups.filter((g) => selectedPos.has(g.key)).flatMap((g) => g.lines);
+  }, [filtered, groups, selectedPos]);
+  const exportScope =
+    selectedPos.size > 0
+      ? `${selectedPos.size}-po${selectedPos.size === 1 ? "" : "s"}`
+      : `${track}-${preset}`;
+  const allSelected = groups.length > 0 && selectedPos.size === groups.length;
+
   const searchActive = query.trim().length > 0 || onlyChanges;
   const isGroupOpen = (key: string) => searchActive || expanded.has(key);
 
   const expandAll = () => setExpanded(new Set(groups.map((g) => g.key)));
   const collapseAll = () => setExpanded(new Set());
+
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["po_lines_spreadsheet"] });
@@ -459,12 +490,25 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
             <Check className="h-3.5 w-3.5 mr-1" /> Mark all seen
           </Button>
         )}
-        <div className="ml-auto">
-          <ExportLinesDialog
-            rows={filtered}
-            scope={`${track}-${preset}`}
-          />
+        <div className="ml-auto flex items-center gap-2">
+          {selectedPos.size > 0 && (
+            <>
+              <span className="text-xs text-muted-foreground">
+                {selectedPos.size} PO{selectedPos.size === 1 ? "" : "s"} selected
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs"
+                onClick={() => setSelectedPos(new Set())}
+              >
+                Clear
+              </Button>
+            </>
+          )}
+          <ExportLinesDialog rows={exportRows} scope={exportScope} />
         </div>
+
       </div>
 
       {/* Sort + expand controls */}
@@ -496,6 +540,15 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
         <table className="w-full border-collapse text-[12px] font-mono">
           <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground font-sans">
+              <Th className="w-8">
+                <Checkbox
+                  checked={allSelected}
+                  aria-label="Select all POs"
+                  onCheckedChange={(v) =>
+                    setSelectedPos(v === true ? new Set(groups.map((g) => g.key)) : new Set())
+                  }
+                />
+              </Th>
               <Th className="w-6">{" "}</Th>
               <Th className="w-32">Customer</Th>
               <Th className="w-28">PO #</Th>
@@ -518,18 +571,19 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={17} className="text-center text-muted-foreground py-8">
+                <td colSpan={18} className="text-center text-muted-foreground py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={17} className="text-center text-muted-foreground py-8">
+                <td colSpan={18} className="text-center text-muted-foreground py-8">
                   No lines match.
                 </td>
               </tr>
             )}
+
             {groups.map((g) => {
               const open = isGroupOpen(g.key);
               const statusPill = Object.entries(g.statusCounts)
@@ -543,6 +597,20 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                     onClick={() => toggleGroup(g.key)}
                   >
                     <Td className="text-center">
+                      <span
+                        className="inline-flex"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selectedPos.has(g.key)}
+                          aria-label={`Select PO ${g.poNumber}`}
+                          onCheckedChange={() => toggleSelected(g.key)}
+                        />
+                      </span>
+                    </Td>
+
+                    <Td className="text-center">
+
                       {open ? (
                         <ChevronDown className="h-3.5 w-3.5 inline" />
                       ) : (
@@ -609,9 +677,11 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                             isClosedRow && "text-muted-foreground",
                           )}
                         >
+                          <Td className="text-center">{""}</Td>
                           <Td className="text-center text-muted-foreground font-sans text-[10px]">
                             L{r.line.line_number}
                           </Td>
+
                           <Td>
                             <span className="pl-3 text-muted-foreground truncate block text-[11px]">
                               ↳
