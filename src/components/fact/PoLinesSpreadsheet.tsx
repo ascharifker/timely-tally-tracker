@@ -169,6 +169,23 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
       return new Set();
     }
   });
+  const [selectedPos, setSelectedPos] = useState<Set<string>>(new Set());
+
+  const toggleSelected = (key: string) => {
+    setSelectedPos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Clear selection whenever the visible set changes.
+  useEffect(() => {
+    setSelectedPos(new Set());
+  }, [query, customerFilter, statusFilter, preset, onlyChanges, track]);
+
+
 
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem(SORT_KEY, sortMode);
