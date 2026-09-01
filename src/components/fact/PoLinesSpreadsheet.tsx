@@ -677,9 +677,11 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
                             isClosedRow && "text-muted-foreground",
                           )}
                         >
+                          <Td className="text-center" />
                           <Td className="text-center text-muted-foreground font-sans text-[10px]">
                             L{r.line.line_number}
                           </Td>
+
                           <Td>
                             <span className="pl-3 text-muted-foreground truncate block text-[11px]">
                               ↳
