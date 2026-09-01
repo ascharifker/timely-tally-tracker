@@ -538,6 +538,15 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
         <table className="w-full border-collapse text-[12px] font-mono">
           <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground font-sans">
+              <Th className="w-8">
+                <Checkbox
+                  checked={allSelected}
+                  aria-label="Select all POs"
+                  onCheckedChange={(v) =>
+                    setSelectedPos(v === true ? new Set(groups.map((g) => g.key)) : new Set())
+                  }
+                />
+              </Th>
               <Th className="w-6">{" "}</Th>
               <Th className="w-32">Customer</Th>
               <Th className="w-28">PO #</Th>
@@ -560,18 +569,19 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={17} className="text-center text-muted-foreground py-8">
+                <td colSpan={18} className="text-center text-muted-foreground py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={17} className="text-center text-muted-foreground py-8">
+                <td colSpan={18} className="text-center text-muted-foreground py-8">
                   No lines match.
                 </td>
               </tr>
             )}
+
             {groups.map((g) => {
               const open = isGroupOpen(g.key);
               const statusPill = Object.entries(g.statusCounts)
