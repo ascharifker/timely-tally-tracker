@@ -488,12 +488,25 @@ export function PoLinesSpreadsheet({ mode, track = "all", defaultPreset = "all" 
             <Check className="h-3.5 w-3.5 mr-1" /> Mark all seen
           </Button>
         )}
-        <div className="ml-auto">
-          <ExportLinesDialog
-            rows={filtered}
-            scope={`${track}-${preset}`}
-          />
+        <div className="ml-auto flex items-center gap-2">
+          {selectedPos.size > 0 && (
+            <>
+              <span className="text-xs text-muted-foreground">
+                {selectedPos.size} PO{selectedPos.size === 1 ? "" : "s"} selected
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs"
+                onClick={() => setSelectedPos(new Set())}
+              >
+                Clear
+              </Button>
+            </>
+          )}
+          <ExportLinesDialog rows={exportRows} scope={exportScope} />
         </div>
+
       </div>
 
       {/* Sort + expand controls */}
