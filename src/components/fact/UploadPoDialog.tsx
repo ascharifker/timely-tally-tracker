@@ -174,7 +174,7 @@ export function UploadPoDialog() {
           <Upload className="mr-2 h-4 w-4" /> Upload PO
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[96vw] w-[96vw] h-[92vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Upload Purchase Order</DialogTitle>
           <DialogDescription>
