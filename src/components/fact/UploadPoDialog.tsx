@@ -429,7 +429,10 @@ function ReviewForm({ value, onChange, customers, onCommit, onCancel }: ReviewFo
                   <TableCell>
                     <Input
                       value={li.pir ?? ""}
-                      className={li.low_confidence ? "border-amber-500" : undefined}
+                      className={
+                        li.low_confidence ? "font-mono border-amber-500" : "font-mono"
+                      }
+
                       onChange={(e) =>
                         updateLine(idx, { pir: e.target.value, low_confidence: false })
                       }
