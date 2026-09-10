@@ -42,10 +42,20 @@ function userPromptFor(kind: Kind, snapshot: unknown): string {
 // Auth: Authorization: Bearer bm_...  Body: { model, messages }.
 // Returns null (so the Lovable fallback answers) on transport/upstream errors,
 // but throws on 401/403 so a bad key is visible instead of silently masked.
+// BrainMate Workspace's governed-proxy edge function (OpenAI-compatible).
+const BRAINMATE_DEFAULT_URL =
+  "https://nupykfunfdwjibrqxjgc.supabase.co/functions/v1/governed-proxy";
+
 async function callBrainmate(prompt: string): Promise<string | null> {
-  const url = Deno.env.get("BRAINMATE_URL");
+  const configured = Deno.env.get("BRAINMATE_URL")?.trim();
+  // Only honor an override that actually points at a governed-proxy endpoint;
+  // the marketing domain returns HTML and would silently degrade to fallback.
+  const url =
+    configured && /governed-proxy|\/v1\/(proxy|chat\/completions)$/.test(configured)
+      ? configured
+      : BRAINMATE_DEFAULT_URL;
   const key = Deno.env.get("BRAINMATE_API_KEY");
-  if (!url || !key) return null;
+  if (!key) return null;
 
   let r: Response;
   try {
