@@ -193,7 +193,14 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
-    const status = msg === "rate_limited" ? 429 : msg === "credits_exhausted" ? 402 : 500;
+    const status =
+      msg === "rate_limited"
+        ? 429
+        : msg === "credits_exhausted"
+          ? 402
+          : msg === "brainmate_auth_failed"
+            ? 401
+            : 500;
     return new Response(JSON.stringify({ error: msg }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
