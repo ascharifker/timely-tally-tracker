@@ -42,10 +42,20 @@ function userPromptFor(kind: Kind, snapshot: unknown): string {
 // Auth: Authorization: Bearer bm_...  Body: { model, messages }.
 // Returns null (so the Lovable fallback answers) on transport/upstream errors,
 // but throws on 401/403 so a bad key is visible instead of silently masked.
+// BrainMate Workspace's governed-proxy edge function (OpenAI-compatible).
+const BRAINMATE_DEFAULT_URL =
+  "https://nupykfunfdwjibrqxjgc.supabase.co/functions/v1/governed-proxy";
+
 async function callBrainmate(prompt: string): Promise<string | null> {
-  const url = Deno.env.get("BRAINMATE_URL");
+  const configured = Deno.env.get("BRAINMATE_URL")?.trim();
+  // Only honor an override that actually points at a governed-proxy endpoint;
+  // the marketing domain returns HTML and would silently degrade to fallback.
+  const url =
+    configured && configured.includes("governed-proxy")
+      ? configured
+      : BRAINMATE_DEFAULT_URL;
   const key = Deno.env.get("BRAINMATE_API_KEY");
-  if (!url || !key) return null;
+  if (!key) return null;
 
   let r: Response;
   try {
@@ -84,11 +94,31 @@ async function callBrainmate(prompt: string): Promise<string | null> {
     return null;
   }
 
-  const data = await r.json().catch(() => null);
+  const raw = await r.text().catch(() => "");
+  let data: any = null;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // Some governed-proxy deployments answer with SSE; take the last data frame.
+    const frames = raw
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim())
+      .filter((l) => l && l !== "[DONE]");
+    for (const f of frames) {
+      try {
+        data = JSON.parse(f);
+      } catch { /* ignore */ }
+    }
+  }
   const text =
-    data?.choices?.[0]?.message?.content ?? data?.text ?? data?.content ?? null;
+    data?.choices?.[0]?.message?.content ??
+    data?.choices?.[0]?.delta?.content ??
+    data?.text ??
+    data?.content ??
+    null;
   if (!text) {
-    console.error("[brainmate] empty completion:", JSON.stringify(data)?.slice(0, 300));
+    console.error(`[brainmate] empty completion (${r.status}): ${raw.slice(0, 500)}`);
     return null;
   }
   return text;
