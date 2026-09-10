@@ -39,7 +39,11 @@ export function BriefingPanel({ jobs, machines }: Props) {
       setText(res.text);
       setSource(res.source);
     } catch (e) {
-      toast.error("AI no disponible: " + (e instanceof Error ? e.message : "error"));
+      const raw = e instanceof Error ? e.message : "error";
+      const msg = raw.includes("brainmate_auth_failed")
+        ? "BrainMate rechazó la clave (401/403). Revisa BRAINMATE_API_KEY."
+        : raw;
+      toast.error("AI no disponible: " + msg);
     } finally {
       setLoading(false);
     }
