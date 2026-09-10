@@ -51,7 +51,7 @@ async function callBrainmate(prompt: string): Promise<string | null> {
   // Only honor an override that actually points at a governed-proxy endpoint;
   // the marketing domain returns HTML and would silently degrade to fallback.
   const url =
-    configured && /governed-proxy|\/v1\/(proxy|chat\/completions)$/.test(configured)
+    configured && configured.includes("governed-proxy")
       ? configured
       : BRAINMATE_DEFAULT_URL;
   const key = Deno.env.get("BRAINMATE_API_KEY");
