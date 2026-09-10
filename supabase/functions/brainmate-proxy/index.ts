@@ -84,11 +84,31 @@ async function callBrainmate(prompt: string): Promise<string | null> {
     return null;
   }
 
-  const data = await r.json().catch(() => null);
+  const raw = await r.text().catch(() => "");
+  let data: any = null;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // Some governed-proxy deployments answer with SSE; take the last data frame.
+    const frames = raw
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim())
+      .filter((l) => l && l !== "[DONE]");
+    for (const f of frames) {
+      try {
+        data = JSON.parse(f);
+      } catch { /* ignore */ }
+    }
+  }
   const text =
-    data?.choices?.[0]?.message?.content ?? data?.text ?? data?.content ?? null;
+    data?.choices?.[0]?.message?.content ??
+    data?.choices?.[0]?.delta?.content ??
+    data?.text ??
+    data?.content ??
+    null;
   if (!text) {
-    console.error("[brainmate] empty completion:", JSON.stringify(data)?.slice(0, 300));
+    console.error(`[brainmate] empty completion (${r.status}): ${raw.slice(0, 500)}`);
     return null;
   }
   return text;
