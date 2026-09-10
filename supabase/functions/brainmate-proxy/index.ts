@@ -38,27 +38,62 @@ function userPromptFor(kind: Kind, snapshot: unknown): string {
   }
 }
 
+// BrainMate governed proxy — OpenAI-compatible surface.
+// Auth: Authorization: Bearer bm_...  Body: { model, messages }.
+// Returns null (so the Lovable fallback answers) on transport/upstream errors,
+// but throws on 401/403 so a bad key is visible instead of silently masked.
 async function callBrainmate(prompt: string): Promise<string | null> {
   const url = Deno.env.get("BRAINMATE_URL");
   const key = Deno.env.get("BRAINMATE_API_KEY");
   if (!url || !key) return null;
+
+  let r: Response;
   try {
-    const r = await fetch(url, {
+    r = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
+        Accept: "application/json",
         Authorization: `Bearer ${key}`,
+        "x-agent-name": "mego-fact",
+        "x-bm-surface": "lovable_project",
+        "x-conversation-id": crypto.randomUUID(),
       },
-      body: JSON.stringify({ system: SYSTEM, prompt }),
+      body: JSON.stringify({
+        model: "google/gemini-2.5-pro",
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: prompt },
+        ],
+      }),
     });
-    if (!r.ok) return null;
-    const data = await r.json();
-    return data.text ?? data.content ?? data.message ?? null;
-  } catch {
+  } catch (e) {
+    console.error("[brainmate] transport error:", e instanceof Error ? e.message : e);
     return null;
   }
+
+  if (r.status === 401 || r.status === 403) {
+    const body = await r.text().catch(() => "");
+    console.error(`[brainmate] auth rejected ${r.status}: ${body.slice(0, 300)}`);
+    throw new Error("brainmate_auth_failed");
+  }
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    console.error(`[brainmate] upstream ${r.status}: ${body.slice(0, 300)}`);
+    return null;
+  }
+
+  const data = await r.json().catch(() => null);
+  const text =
+    data?.choices?.[0]?.message?.content ?? data?.text ?? data?.content ?? null;
+  if (!text) {
+    console.error("[brainmate] empty completion:", JSON.stringify(data)?.slice(0, 300));
+    return null;
+  }
+  return text;
 }
+
 
 async function callLovableAi(prompt: string): Promise<string> {
   const key = Deno.env.get("LOVABLE_API_KEY");
@@ -158,7 +193,14 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
-    const status = msg === "rate_limited" ? 429 : msg === "credits_exhausted" ? 402 : 500;
+    const status =
+      msg === "rate_limited"
+        ? 429
+        : msg === "credits_exhausted"
+          ? 402
+          : msg === "brainmate_auth_failed"
+            ? 401
+            : 500;
     return new Response(JSON.stringify({ error: msg }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
