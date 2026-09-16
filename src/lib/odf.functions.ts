@@ -1,6 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+/** Only admins, managers, production editors and engineers may mutate production. */
+async function assertProductionEditor(userId: string | null | undefined) {
+  if (!userId) throw new Error("Not authenticated");
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  const roles = (data ?? []).map((r) => r.role as string);
+  const allowed = roles.some(
+    (r) => r === "admin" || r === "manager" || r === "production_editor" || r === "engineer",
+  );
+  if (!allowed) throw new Error("Forbidden — production role required");
+}
 
 // ---------------------------------------------------------------
 // Helpers
