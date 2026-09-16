@@ -44,6 +44,7 @@ function startDatetimeFromShift(date: string, slot: keyof typeof SHIFT_HOURS): D
 // ---------------------------------------------------------------
 
 export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -61,7 +62,8 @@ export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertProductionEditor(context.userId);
     // 1. Load line + parent PO.
     const { data: line, error: lErr } = await supabaseAdmin
       .from("po_line_items" as never)
@@ -230,10 +232,12 @@ async function recomputeLineStatus(lineId: string): Promise<void> {
 }
 
 export const advanceJobStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ job_id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertProductionEditor(context.userId);
     const { data: steps, error } = await supabaseAdmin
       .from("job_steps" as never)
       .select("*")
@@ -273,10 +277,12 @@ export const advanceJobStep = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------
 
 export const holdJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ job_id: z.string().uuid(), reason: z.string().nullable() }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertProductionEditor(context.userId);
     const { error } = await supabaseAdmin
       .from("jobs" as never)
       .update({ status: "ON_HOLD", notes: data.reason ?? undefined } as never)
@@ -286,10 +292,12 @@ export const holdJob = createServerFn({ method: "POST" })
   });
 
 export const resumeJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ job_id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertProductionEditor(context.userId);
     const { data: steps, error } = await supabaseAdmin
       .from("job_steps" as never)
       .select("step_name, completed_at, step_order")
@@ -316,6 +324,7 @@ export const resumeJob = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------
 
 export const applyCascadingDelay = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -325,7 +334,8 @@ export const applyCascadingDelay = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertProductionEditor(context.userId);
     const { data: step, error } = await supabaseAdmin
       .from("job_steps" as never)
       .select("id, job_id, step_order, planned_start, planned_end")
