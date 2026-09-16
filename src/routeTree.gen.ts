@@ -28,6 +28,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminImportMaquinadosRouteImport } from './routes/admin.import-maquinados'
 import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
 import { Route as ApiPublicDropboxCallbackRouteImport } from './routes/api/public/dropbox-callback'
+import { Route as ApiPublicBrainmateStatusRouteImport } from './routes/api/public/brainmate-status'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -125,6 +126,12 @@ const ApiPublicDropboxCallbackRoute =
     path: '/api/public/dropbox-callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicBrainmateStatusRoute =
+  ApiPublicBrainmateStatusRouteImport.update({
+    id: '/api/public/brainmate-status',
+    path: '/api/public/brainmate-status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
+  '/api/public/brainmate-status': typeof ApiPublicBrainmateStatusRoute
   '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -165,6 +173,7 @@ export interface FileRoutesByTo {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders': typeof PurchaseOrdersIndexRoute
+  '/api/public/brainmate-status': typeof ApiPublicBrainmateStatusRoute
   '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
 export interface FileRoutesById {
@@ -187,6 +196,7 @@ export interface FileRoutesById {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
+  '/api/public/brainmate-status': typeof ApiPublicBrainmateStatusRoute
   '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
 export interface FileRouteTypes {
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
+    | '/api/public/brainmate-status'
     | '/api/public/dropbox-callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders'
+    | '/api/public/brainmate-status'
     | '/api/public/dropbox-callback'
   id:
     | '__root__'
@@ -251,6 +263,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
+    | '/api/public/brainmate-status'
     | '/api/public/dropbox-callback'
   fileRoutesById: FileRoutesById
 }
@@ -271,6 +284,7 @@ export interface RootRouteChildren {
   AdminImportMaquinadosRoute: typeof AdminImportMaquinadosRoute
   AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
+  ApiPublicBrainmateStatusRoute: typeof ApiPublicBrainmateStatusRoute
   ApiPublicDropboxCallbackRoute: typeof ApiPublicDropboxCallbackRoute
 }
 
@@ -409,6 +423,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDropboxCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/brainmate-status': {
+      id: '/api/public/brainmate-status'
+      path: '/api/public/brainmate-status'
+      fullPath: '/api/public/brainmate-status'
+      preLoaderRoute: typeof ApiPublicBrainmateStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -443,6 +464,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminImportMaquinadosRoute: AdminImportMaquinadosRoute,
   AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
+  ApiPublicBrainmateStatusRoute: ApiPublicBrainmateStatusRoute,
   ApiPublicDropboxCallbackRoute: ApiPublicDropboxCallbackRoute,
 }
 export const routeTree = rootRouteImport
