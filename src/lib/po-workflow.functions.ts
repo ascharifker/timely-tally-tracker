@@ -374,6 +374,7 @@ export const flagPoLine = createServerFn({ method: "POST" })
 
 // Create an ODF from a PO line (production planning step).
 export const createJobFromPoLine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -387,7 +388,8 @@ export const createJobFromPoLine = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     // Load line + parent PO to copy fields.
     const { data: line, error: lErr } = await supabaseAdmin
       .from("po_line_items" as never)
@@ -444,10 +446,12 @@ export const createJobFromPoLine = createServerFn({ method: "POST" })
   });
 
 export const acknowledgeDateChange = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { error } = await supabaseAdmin
       .from("date_change_log" as never)
       .update({
@@ -460,8 +464,11 @@ export const acknowledgeDateChange = createServerFn({ method: "POST" })
   });
 
 // Acknowledge ALL pending date changes (Peter clicks "Marcar todo visto").
-export const acknowledgeAllDateChanges = createServerFn({ method: "POST" }).handler(
-  async () => {
+export const acknowledgeAllDateChanges = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+  async ({ context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { error } = await supabaseAdmin
       .from("date_change_log" as never)
       .update({
@@ -495,6 +502,7 @@ const EDITABLE_FIELDS = [
 ] as const;
 
 export const updatePoLineField = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -505,7 +513,8 @@ export const updatePoLineField = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertEngineeringReviewer(context.userId);
     // Load the prior value so we can log the diff for non-date fields. The DB
     // trigger already logs committed_date changes, so we skip those here.
     const { data: prev, error: prevErr } = await supabaseAdmin
