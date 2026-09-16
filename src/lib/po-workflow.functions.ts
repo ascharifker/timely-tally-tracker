@@ -464,8 +464,11 @@ export const acknowledgeDateChange = createServerFn({ method: "POST" })
   });
 
 // Acknowledge ALL pending date changes (Peter clicks "Marcar todo visto").
-export const acknowledgeAllDateChanges = createServerFn({ method: "POST" }).handler(
-  async () => {
+export const acknowledgeAllDateChanges = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+  async ({ context }) => {
+    await assertEngineeringReviewer(context.userId);
     const { error } = await supabaseAdmin
       .from("date_change_log" as never)
       .update({
