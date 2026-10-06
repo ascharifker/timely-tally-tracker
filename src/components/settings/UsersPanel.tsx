@@ -96,9 +96,11 @@ export function UsersPanel() {
         setLinkDialog({ open: true, link: res.action_link, email: sentTo });
       }
       if (res.email_sent) {
-        toast.success("Invite emailed", { description: "Use the live-app link shown here if the email link fails." });
+        toast.success("Invite emailed", {
+          description: `${sentTo} can use the email link to set a password.`,
+        });
       } else {
-        toast.success("Invite processed", { description: sentTo });
+        toast.success("User already exists — setup link created", { description: sentTo });
       }
     },
     onError: (e: Error) => toast.error("Invite failed", { description: e.message }),
@@ -106,16 +108,11 @@ export function UsersPanel() {
 
   const resendMut = useMutation({
     mutationFn: (v: { user_id: string; email: string; role: AppRole }) => resendFn({ data: v }),
-    onSuccess: (res, v) => {
+    onSuccess: (_res, v) => {
       invalidate();
-      if (res.action_link) {
-        setLinkDialog({ open: true, link: res.action_link, email: v.email });
-      }
-      if (res.email_sent) {
-        toast.success("Fresh invite emailed", { description: "Copy the live-app link shown here for WhatsApp." });
-      } else {
-        toast.success("Invite re-sent", { description: v.email });
-      }
+      toast.success("Fresh invite emailed", {
+        description: `Any older invite for ${v.email} no longer works — use the newest email.`,
+      });
     },
     onError: (e: Error) => toast.error("Resend failed", { description: e.message }),
   });
@@ -140,6 +137,10 @@ export function UsersPanel() {
   });
 
   const handleCopyLink = async (email: string, type: "invite" | "recovery") => {
+    const ok = window.confirm(
+      `Create a direct link for ${email}?\n\nThis replaces any link already sent by email — the emailed link will stop working. Only do this if you'll send the new link yourself (WhatsApp, Slack, etc.).`,
+    );
+    if (!ok) return;
     try {
       const res = await linkFn({ data: { email, type } });
       setLinkDialog({ open: true, link: res.action_link, email });
@@ -296,7 +297,7 @@ export function UsersPanel() {
           <DialogHeader>
             <DialogTitle>Link for {linkDialog.email}</DialogTitle>
           </DialogHeader>
-          <p className="text-xs text-muted-foreground">Single-use, expires in ~1 hour. Send this live-app link by WhatsApp if the email link opens an access wall.</p>
+          <p className="text-xs text-muted-foreground">Single-use, expires in ~1 hour. Any earlier emailed link for this user no longer works — send them this one.</p>
           <div className="flex gap-2">
             <Input readOnly value={linkDialog.link} onFocus={(e) => e.currentTarget.select()} />
             <Button
