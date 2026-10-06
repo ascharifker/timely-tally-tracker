@@ -134,13 +134,14 @@ export const inviteUser = createServerFn({ method: "POST" })
     let actionLink: string | undefined;
 
     if (!existing) {
-      // New user — Supabase sends the invite email automatically.
+      // New user — the invite email is sent automatically.
+      // IMPORTANT: do NOT generate another link here. Each new link replaces the
+      // previous token, which would instantly invalidate the emailed invite.
       const { data: invited, error: iErr } =
         await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
       if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
       userId = invited.user.id;
       emailSent = true;
-      actionLink = await generatePublicPasswordLink(email, "invite");
     } else {
       // Existing user — generate a recovery link so they can set/reset a password.
       userId = existing.id;
@@ -162,7 +163,7 @@ export const resendInvite = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ user_id: z.string().uuid(), email: z.string().email(), role: AppRoleSchema }).parse(input),
   )
-  .handler(async ({ context, data }): Promise<{ user_id: string; email_sent: boolean; action_link: string }> => {
+  .handler(async ({ context, data }): Promise<{ user_id: string; email_sent: boolean }> => {
     await assertAdmin(context.userId);
     if (data.user_id === context.userId) {
       throw new Error("Refusing to resend invite for your own account.");
@@ -172,16 +173,16 @@ export const resendInvite = createServerFn({ method: "POST" })
     const email = data.email.trim().toLowerCase();
     assertAllowedDomain(email);
 
-    // Delete the stale auth account so Supabase will send a brand-new invite email.
+    // Delete the stale pending account so a brand-new invite email can be sent.
     const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
     if (delErr) throw new Error(delErr.message);
 
-    // Re-invite fresh. Supabase Auth sends the email automatically.
+    // Re-invite fresh. The email is sent automatically. Do NOT generate another
+    // link afterwards — that would invalidate the token inside the email.
     const redirectTo = PASSWORD_SETUP_URL;
     const { data: invited, error: iErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (iErr || !invited.user) throw new Error(iErr?.message ?? "invite failed");
     const newUserId = invited.user.id;
-    const actionLink = await generatePublicPasswordLink(email, "invite");
 
     // Restore the role assignment on the new user id.
     const { error: rErr } = await supabaseAdmin
@@ -195,7 +196,7 @@ export const resendInvite = createServerFn({ method: "POST" })
     await supabaseAdmin.from("review_delegations").update({ from_user_id: newUserId }).eq("from_user_id", oldId);
     await supabaseAdmin.from("review_delegations").update({ to_user_id: newUserId }).eq("to_user_id", oldId);
 
-    return { user_id: newUserId, email_sent: true, action_link: actionLink };
+    return { user_id: newUserId, email_sent: true };
   });
 
 export const copyLinkForUser = createServerFn({ method: "POST" })
