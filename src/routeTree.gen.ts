@@ -9,75 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as CalidadRouteImport } from './routes/calidad'
-import { Route as ConfiguracionRouteImport } from './routes/configuracion'
-import { Route as EngineeringRouteImport } from './routes/engineering'
-import { Route as IntakeRouteImport } from './routes/intake'
-import { Route as PendingReviewRouteImport } from './routes/pending-review'
-import { Route as ProductionRouteImport } from './routes/production'
-import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as RiesgoRouteImport } from './routes/riesgo'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
-import { Route as AdminImportMaquinadosRouteImport } from './routes/admin.import-maquinados'
-import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
+import { Route as RiesgoRouteImport } from './routes/riesgo'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PurchaseOrdersRouteImport } from './routes/purchase-orders'
+import { Route as ProductionRouteImport } from './routes/production'
+import { Route as PendingReviewRouteImport } from './routes/pending-review'
+import { Route as IntakeRouteImport } from './routes/intake'
+import { Route as EngineeringRouteImport } from './routes/engineering'
+import { Route as ConfiguracionRouteImport } from './routes/configuracion'
+import { Route as CalidadRouteImport } from './routes/calidad'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as PurchaseOrdersIndexRouteImport } from './routes/purchase-orders.index'
 import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
-import { Route as ApiPublicBrainmateStatusRouteImport } from './routes/api/public/brainmate-status'
+import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminImportMaquinadosRouteImport } from './routes/admin.import-maquinados'
+import { Route as AdminDelegationsRouteImport } from './routes/admin.delegations'
 import { Route as ApiPublicDropboxCallbackRouteImport } from './routes/api/public/dropbox-callback'
+import { Route as ApiPublicBrainmateStatusRouteImport } from './routes/api/public/brainmate-status'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CalidadRoute = CalidadRouteImport.update({
-  id: '/calidad',
-  path: '/calidad',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConfiguracionRoute = ConfiguracionRouteImport.update({
-  id: '/configuracion',
-  path: '/configuracion',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EngineeringRoute = EngineeringRouteImport.update({
-  id: '/engineering',
-  path: '/engineering',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IntakeRoute = IntakeRouteImport.update({
-  id: '/intake',
-  path: '/intake',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PendingReviewRoute = PendingReviewRouteImport.update({
-  id: '/pending-review',
-  path: '/pending-review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductionRoute = ProductionRouteImport.update({
-  id: '/production',
-  path: '/production',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
-  id: '/purchase-orders',
-  path: '/purchase-orders',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RiesgoRoute = RiesgoRouteImport.update({
@@ -85,29 +40,54 @@ const RiesgoRoute = RiesgoRouteImport.update({
   path: '/riesgo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminDelegationsRoute = AdminDelegationsRouteImport.update({
-  id: '/admin/delegations',
-  path: '/admin/delegations',
+const PurchaseOrdersRoute = PurchaseOrdersRouteImport.update({
+  id: '/purchase-orders',
+  path: '/purchase-orders',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminImportMaquinadosRoute = AdminImportMaquinadosRouteImport.update({
-  id: '/admin/import-maquinados',
-  path: '/admin/import-maquinados',
+const ProductionRoute = ProductionRouteImport.update({
+  id: '/production',
+  path: '/production',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
+const PendingReviewRoute = PendingReviewRouteImport.update({
+  id: '/pending-review',
+  path: '/pending-review',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MaquinaIdRoute = MaquinaIdRouteImport.update({
-  id: '/maquina/$id',
-  path: '/maquina/$id',
+const IntakeRoute = IntakeRouteImport.update({
+  id: '/intake',
+  path: '/intake',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EngineeringRoute = EngineeringRouteImport.update({
+  id: '/engineering',
+  path: '/engineering',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracionRoute = ConfiguracionRouteImport.update({
+  id: '/configuracion',
+  path: '/configuracion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalidadRoute = CalidadRouteImport.update({
+  id: '/calidad',
+  path: '/calidad',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PurchaseOrdersIndexRoute = PurchaseOrdersIndexRouteImport.update({
@@ -120,16 +100,36 @@ const PurchaseOrdersIdRoute = PurchaseOrdersIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PurchaseOrdersRoute,
 } as any)
-const ApiPublicBrainmateStatusRoute =
-  ApiPublicBrainmateStatusRouteImport.update({
-    id: '/api/public/brainmate-status',
-    path: '/api/public/brainmate-status',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const MaquinaIdRoute = MaquinaIdRouteImport.update({
+  id: '/maquina/$id',
+  path: '/maquina/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminImportMaquinadosRoute = AdminImportMaquinadosRouteImport.update({
+  id: '/admin/import-maquinados',
+  path: '/admin/import-maquinados',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDelegationsRoute = AdminDelegationsRouteImport.update({
+  id: '/admin/delegations',
+  path: '/admin/delegations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicDropboxCallbackRoute =
   ApiPublicDropboxCallbackRouteImport.update({
     id: '/api/public/dropbox-callback',
     path: '/api/public/dropbox-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBrainmateStatusRoute =
+  ApiPublicBrainmateStatusRouteImport.update({
+    id: '/api/public/brainmate-status',
+    path: '/api/public/brainmate-status',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -290,74 +290,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calidad': {
-      id: '/calidad'
-      path: '/calidad'
-      fullPath: '/calidad'
-      preLoaderRoute: typeof CalidadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/configuracion': {
-      id: '/configuracion'
-      path: '/configuracion'
-      fullPath: '/configuracion'
-      preLoaderRoute: typeof ConfiguracionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/engineering': {
-      id: '/engineering'
-      path: '/engineering'
-      fullPath: '/engineering'
-      preLoaderRoute: typeof EngineeringRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/intake': {
-      id: '/intake'
-      path: '/intake'
-      fullPath: '/intake'
-      preLoaderRoute: typeof IntakeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pending-review': {
-      id: '/pending-review'
-      path: '/pending-review'
-      fullPath: '/pending-review'
-      preLoaderRoute: typeof PendingReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/production': {
-      id: '/production'
-      path: '/production'
-      fullPath: '/production'
-      preLoaderRoute: typeof ProductionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/purchase-orders': {
-      id: '/purchase-orders'
-      path: '/purchase-orders'
-      fullPath: '/purchase-orders'
-      preLoaderRoute: typeof PurchaseOrdersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/riesgo': {
@@ -367,39 +304,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RiesgoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/delegations': {
-      id: '/admin/delegations'
-      path: '/admin/delegations'
-      fullPath: '/admin/delegations'
-      preLoaderRoute: typeof AdminDelegationsRouteImport
+    '/purchase-orders': {
+      id: '/purchase-orders'
+      path: '/purchase-orders'
+      fullPath: '/purchase-orders'
+      preLoaderRoute: typeof PurchaseOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/import-maquinados': {
-      id: '/admin/import-maquinados'
-      path: '/admin/import-maquinados'
-      fullPath: '/admin/import-maquinados'
-      preLoaderRoute: typeof AdminImportMaquinadosRouteImport
+    '/production': {
+      id: '/production'
+      path: '/production'
+      fullPath: '/production'
+      preLoaderRoute: typeof ProductionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
+    '/pending-review': {
+      id: '/pending-review'
+      path: '/pending-review'
+      fullPath: '/pending-review'
+      preLoaderRoute: typeof PendingReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/maquina/$id': {
-      id: '/maquina/$id'
-      path: '/maquina/$id'
-      fullPath: '/maquina/$id'
-      preLoaderRoute: typeof MaquinaIdRouteImport
+    '/intake': {
+      id: '/intake'
+      path: '/intake'
+      fullPath: '/intake'
+      preLoaderRoute: typeof IntakeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/engineering': {
+      id: '/engineering'
+      path: '/engineering'
+      fullPath: '/engineering'
+      preLoaderRoute: typeof EngineeringRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracion': {
+      id: '/configuracion'
+      path: '/configuracion'
+      fullPath: '/configuracion'
+      preLoaderRoute: typeof ConfiguracionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calidad': {
+      id: '/calidad'
+      path: '/calidad'
+      fullPath: '/calidad'
+      preLoaderRoute: typeof CalidadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/purchase-orders/': {
@@ -416,11 +388,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseOrdersIdRouteImport
       parentRoute: typeof PurchaseOrdersRoute
     }
-    '/api/public/brainmate-status': {
-      id: '/api/public/brainmate-status'
-      path: '/api/public/brainmate-status'
-      fullPath: '/api/public/brainmate-status'
-      preLoaderRoute: typeof ApiPublicBrainmateStatusRouteImport
+    '/maquina/$id': {
+      id: '/maquina/$id'
+      path: '/maquina/$id'
+      fullPath: '/maquina/$id'
+      preLoaderRoute: typeof MaquinaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/import-maquinados': {
+      id: '/admin/import-maquinados'
+      path: '/admin/import-maquinados'
+      fullPath: '/admin/import-maquinados'
+      preLoaderRoute: typeof AdminImportMaquinadosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/delegations': {
+      id: '/admin/delegations'
+      path: '/admin/delegations'
+      fullPath: '/admin/delegations'
+      preLoaderRoute: typeof AdminDelegationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/dropbox-callback': {
@@ -428,6 +421,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/dropbox-callback'
       fullPath: '/api/public/dropbox-callback'
       preLoaderRoute: typeof ApiPublicDropboxCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/brainmate-status': {
+      id: '/api/public/brainmate-status'
+      path: '/api/public/brainmate-status'
+      fullPath: '/api/public/brainmate-status'
+      preLoaderRoute: typeof ApiPublicBrainmateStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
