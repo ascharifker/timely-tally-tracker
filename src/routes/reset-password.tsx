@@ -20,13 +20,14 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState<"validating" | "ready" | "invalid">("validating");
+  const [status, setStatus] = useState<"validating" | "confirm" | "ready" | "invalid">("validating");
   const [message, setMessage] = useState("This link may already be used or expired.");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,19 +75,9 @@ function ResetPasswordPage() {
       const tokenHash = params.get("token_hash");
       const type = params.get("type") ?? "recovery";
       if (!tokenHash || (type !== "invite" && type !== "recovery")) return false;
-
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type,
-      });
-      if (error) {
-        if (!cancelled) {
-          setMessage(error.message);
-          setStatus("invalid");
-        }
-        return false;
-      }
-      if (!cancelled) setStatus("ready");
+      // Don't use the single-use token automatically: email security scanners
+      // open links before the person does. Wait for a real click instead.
+      if (!cancelled) setStatus("confirm");
       return true;
     };
 
@@ -117,6 +108,26 @@ function ResetPasswordPage() {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  const confirmLink = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get("token_hash");
+    const type = (params.get("type") ?? "recovery") as "invite" | "recovery";
+    if (!tokenHash) {
+      setStatus("invalid");
+      return;
+    }
+    setVerifying(true);
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    setVerifying(false);
+    if (error) {
+      setMessage(error.message);
+      setStatus("invalid");
+      return;
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+    setStatus("ready");
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +185,14 @@ function ResetPasswordPage() {
         </div>
         {status === "validating" ? (
           <p className="text-sm text-muted-foreground">Validating link…</p>
+        ) : status === "confirm" ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Click below to continue and choose your password.</p>
+            <Button type="button" className="w-full" disabled={verifying} onClick={confirmLink}>
+              {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Continue to set password
+            </Button>
+          </div>
         ) : status === "invalid" ? (
           <div className="space-y-4">
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-muted-foreground">
