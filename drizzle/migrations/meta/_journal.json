@@ -8,6 +8,13 @@
       "when": 1791394875889,
       "tag": "0000_anon_read_access_brainmate",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791394933956,
+      "tag": "0001_revoke_anon_read_access",
+      "breakpoints": true
     }
   ]
 }
