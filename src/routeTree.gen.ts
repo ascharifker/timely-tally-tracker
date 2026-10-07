@@ -27,6 +27,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as MaquinaIdRouteImport } from './routes/maquina.$id'
 import { Route as PurchaseOrdersIndexRouteImport } from './routes/purchase-orders.index'
 import { Route as PurchaseOrdersIdRouteImport } from './routes/purchase-orders.$id'
+import { Route as ApiPublicBrainmateDataRouteImport } from './routes/api/public/brainmate-data'
 import { Route as ApiPublicBrainmateStatusRouteImport } from './routes/api/public/brainmate-status'
 import { Route as ApiPublicDropboxCallbackRouteImport } from './routes/api/public/dropbox-callback'
 
@@ -120,6 +121,11 @@ const PurchaseOrdersIdRoute = PurchaseOrdersIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PurchaseOrdersRoute,
 } as any)
+const ApiPublicBrainmateDataRoute = ApiPublicBrainmateDataRouteImport.update({
+  id: '/api/public/brainmate-data',
+  path: '/api/public/brainmate-data',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicBrainmateStatusRoute =
   ApiPublicBrainmateStatusRouteImport.update({
     id: '/api/public/brainmate-status',
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
+  '/api/public/brainmate-data': typeof ApiPublicBrainmateDataRoute
   '/api/public/brainmate-status': typeof ApiPublicBrainmateStatusRoute
   '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders': typeof PurchaseOrdersIndexRoute
+  '/api/public/brainmate-data': typeof ApiPublicBrainmateDataRoute
   '/api/public/brainmate-status': typeof ApiPublicBrainmateStatusRoute
   '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
@@ -196,6 +204,7 @@ export interface FileRoutesById {
   '/maquina/$id': typeof MaquinaIdRoute
   '/purchase-orders/$id': typeof PurchaseOrdersIdRoute
   '/purchase-orders/': typeof PurchaseOrdersIndexRoute
+  '/api/public/brainmate-data': typeof ApiPublicBrainmateDataRoute
   '/api/public/brainmate-status': typeof ApiPublicBrainmateStatusRoute
   '/api/public/dropbox-callback': typeof ApiPublicDropboxCallbackRoute
 }
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
+    | '/api/public/brainmate-data'
     | '/api/public/brainmate-status'
     | '/api/public/dropbox-callback'
   fileRoutesByTo: FileRoutesByTo
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders'
+    | '/api/public/brainmate-data'
     | '/api/public/brainmate-status'
     | '/api/public/dropbox-callback'
   id:
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/maquina/$id'
     | '/purchase-orders/$id'
     | '/purchase-orders/'
+    | '/api/public/brainmate-data'
     | '/api/public/brainmate-status'
     | '/api/public/dropbox-callback'
   fileRoutesById: FileRoutesById
@@ -284,6 +296,7 @@ export interface RootRouteChildren {
   AdminImportMaquinadosRoute: typeof AdminImportMaquinadosRoute
   AdminUsersRoute: typeof AdminUsersRoute
   MaquinaIdRoute: typeof MaquinaIdRoute
+  ApiPublicBrainmateDataRoute: typeof ApiPublicBrainmateDataRoute
   ApiPublicBrainmateStatusRoute: typeof ApiPublicBrainmateStatusRoute
   ApiPublicDropboxCallbackRoute: typeof ApiPublicDropboxCallbackRoute
 }
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseOrdersIdRouteImport
       parentRoute: typeof PurchaseOrdersRoute
     }
+    '/api/public/brainmate-data': {
+      id: '/api/public/brainmate-data'
+      path: '/api/public/brainmate-data'
+      fullPath: '/api/public/brainmate-data'
+      preLoaderRoute: typeof ApiPublicBrainmateDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/brainmate-status': {
       id: '/api/public/brainmate-status'
       path: '/api/public/brainmate-status'
@@ -464,6 +484,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminImportMaquinadosRoute: AdminImportMaquinadosRoute,
   AdminUsersRoute: AdminUsersRoute,
   MaquinaIdRoute: MaquinaIdRoute,
+  ApiPublicBrainmateDataRoute: ApiPublicBrainmateDataRoute,
   ApiPublicBrainmateStatusRoute: ApiPublicBrainmateStatusRoute,
   ApiPublicDropboxCallbackRoute: ApiPublicDropboxCallbackRoute,
 }
