@@ -10,6 +10,8 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Shuffle } from "luci
 import { Link } from "@tanstack/react-router";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
 import { SHIFTS, shiftStartMs, shiftIndexFromDate, shiftSpan, snapToShift } from "@/lib/shifts";
+import { findOverlap } from "@/lib/scheduling/overlap";
+import { toast } from "sonner";
 
 interface Props {
   jobs: Job[];
@@ -278,6 +280,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       durMs = DEFAULT_DUR_MS;
     }
     const endMs = startMs + durMs;
+    const clash = findOverlap(effectiveJobs, machineId, startMs, endMs, dragJobId);
+    if (clash) {
+      toast.error(`Turno ocupado por ODT ${clash.odf} en esa máquina`);
+      setDragJobId(null);
+      setHoverCell(null);
+      return;
+    }
     const original = jobs.find((j) => j.id === dragJobId);
     setPending((prev) => {
       const next = new Map(prev);
@@ -355,6 +364,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     baseDay.setDate(baseDay.getDate() + dayDelta);
     const newStart = snapToShift(baseDay, targetShiftIdx);
     const newEnd = new Date(newStart.getTime() + durMs);
+    const clash = job.machine_id
+      ? findOverlap(effectiveJobs, job.machine_id, newStart.getTime(), newEnd.getTime(), jobId)
+      : null;
+    if (clash) {
+      toast.error(`Turno ocupado por ODT ${clash.odf} en esa máquina`);
+      return;
+    }
     const original = jobs.find((j) => j.id === jobId);
     setPending((prev) => {
       const next = new Map(prev);
