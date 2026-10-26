@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { odfProductionFields } from "@/lib/odf-fields";
 
 /** Only admins, managers, production editors and engineers may mutate production. */
 async function assertProductionEditor(userId: string | null | undefined) {
@@ -57,7 +58,8 @@ export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
         start_date: z.string().min(1),
         start_shift: z.enum(["manana", "tarde", "noche"]),
         hours_required: z.number().positive(),
-        tube_spec: z.string().trim().min(1),
+        tube_number: z.string().trim().min(1),
+        customer_date: z.string().nullable(),
         export_date: z.string().nullable(),
         notes: z.string().nullable(),
       })
@@ -126,11 +128,9 @@ export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
       .insert({
         odf: odfNumber,
         pir: row.pir,
-        tube_spec: data.tube_spec,
+        ...odfProductionFields(data),
         qty: data.qty_parcial,
         hours_override: data.hours_required,
-        customer_date: row.committed_date,
-        export_date: data.export_date ?? row.export_date,
         machine_id: data.machine_id,
         planned_start: startDt.toISOString(),
         planned_end: endDt.toISOString(),
