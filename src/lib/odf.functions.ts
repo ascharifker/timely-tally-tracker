@@ -53,10 +53,11 @@ export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
         qty_parcial: z.number().int().positive(),
         machine_id: z.string().uuid().nullable(),
         vendor_id: z.string().uuid().nullable(),
-        operator_name: z.string().nullable(),
+        operator_name: z.string().nullable().optional(),
         start_date: z.string().min(1),
         start_shift: z.enum(["manana", "tarde", "noche"]),
-        shifts_required: z.number().positive(),
+        hours_required: z.number().positive(),
+        tube_spec: z.string().trim().min(1),
         export_date: z.string().nullable(),
         notes: z.string().nullable(),
       })
@@ -112,7 +113,7 @@ export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
 
     // 4. Compute planned start/end from shift selection.
     const startDt = startDatetimeFromShift(data.start_date, data.start_shift);
-    const endDt = new Date(startDt.getTime() + data.shifts_required * 8 * 60 * 60 * 1000);
+    const endDt = new Date(startDt.getTime() + data.hours_required * 60 * 60 * 1000);
 
     const customerName = row.purchase_order?.customer?.name?.toLowerCase() ?? "";
     const poNumber = row.purchase_order?.po_number ?? null;
@@ -125,12 +126,12 @@ export const splitPoLineIntoOdf = createServerFn({ method: "POST" })
       .insert({
         odf: odfNumber,
         pir: row.pir,
-        tube_spec: row.tube_spec,
+        tube_spec: data.tube_spec,
         qty: data.qty_parcial,
+        hours_override: data.hours_required,
         customer_date: row.committed_date,
         export_date: data.export_date ?? row.export_date,
         machine_id: data.machine_id,
-        operator_name: data.operator_name,
         planned_start: startDt.toISOString(),
         planned_end: endDt.toISOString(),
         notes: data.notes,

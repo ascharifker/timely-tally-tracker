@@ -807,10 +807,10 @@ function CreateOdfDialog({
           qty_parcial: num("qty_parcial") || pending,
           machine_id: machineId ?? null,
           vendor_id: vendorId ?? null,
-          operator_name: v("operator_name"),
+          tube_spec: v("tube_spec") ?? "",
           start_date: v("start_date") ?? today,
           start_shift: shift,
-          shifts_required: Number(fd.get("shifts_required")) || 1,
+          hours_required: Number(fd.get("hours_required")) || 8,
           export_date: v("export_date"),
           notes: v("notes"),
         },
@@ -879,8 +879,8 @@ function CreateOdfDialog({
             </Select>
           </div>
           <div>
-            <Label>Operador</Label>
-            <Input name="operator_name" placeholder="Nombre" />
+            <Label>Número de Tubo *</Label>
+            <Input name="tube_spec" required defaultValue={line.tube_spec ?? ""} placeholder="Número de tubo" />
           </div>
           <div>
             <Label>Fecha inicio</Label>
@@ -900,13 +900,13 @@ function CreateOdfDialog({
             </Select>
           </div>
           <div>
-            <Label>Turnos requeridos</Label>
+            <Label>Horas de maquinado *</Label>
             <Input
-              name="shifts_required"
+              name="hours_required"
               type="number"
               min={0.5}
               step={0.5}
-              defaultValue={1}
+              defaultValue={8}
               required
             />
           </div>
