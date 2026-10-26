@@ -15,6 +15,13 @@
       "when": 1791394933956,
       "tag": "0001_revoke_anon_read_access",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793027185951,
+      "tag": "0002_jobs_pir_rev",
+      "breakpoints": true
     }
   ]
 }
