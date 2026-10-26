@@ -807,7 +807,8 @@ function CreateOdfDialog({
           qty_parcial: num("qty_parcial") || pending,
           machine_id: machineId ?? null,
           vendor_id: vendorId ?? null,
-          tube_spec: v("tube_spec") ?? "",
+          tube_number: v("tube_number") ?? "",
+          customer_date: v("customer_date"),
           start_date: v("start_date") ?? today,
           start_shift: shift,
           hours_required: Number(fd.get("hours_required")) || 8,
@@ -878,9 +879,13 @@ function CreateOdfDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="col-span-2">
+            <Label htmlFor="odf-po-spec">Especificación del PO</Label>
+            <Textarea id="odf-po-spec" value={line.tube_spec ?? ""} readOnly rows={2} />
+          </div>
           <div>
-            <Label>Número de Tubo *</Label>
-            <Input name="tube_spec" required defaultValue={line.tube_spec ?? ""} placeholder="Número de tubo" />
+            <Label htmlFor="odf-tube-number">Número de Tubo *</Label>
+            <Input id="odf-tube-number" name="tube_number" required placeholder="Número de tubo" />
           </div>
           <div>
             <Label>Fecha inicio</Label>
@@ -911,13 +916,12 @@ function CreateOdfDialog({
             />
           </div>
           <div>
-            <Label>Export MX→USA</Label>
-            <Input name="export_date" type="date" />
+            <Label htmlFor="odf-export-date">Fecha de exportación</Label>
+            <Input id="odf-export-date" name="export_date" type="date" defaultValue={line.export_date ?? ""} />
           </div>
-          <div className="col-span-2 text-xs text-muted-foreground">
-            Cliente: <span className="font-mono">{line.committed_date ?? "—"}</span> · Export PO:{" "}
-            <span className="font-mono">{line.export_date ?? "—"}</span>. Los pasos
-            CEMENTACION/EXPO se crean en automático.
+          <div>
+            <Label htmlFor="odf-customer-date">Fecha cliente</Label>
+            <Input id="odf-customer-date" name="customer_date" type="date" defaultValue={line.committed_date ?? ""} />
           </div>
           <div className="col-span-2">
             <Label>Notas</Label>
