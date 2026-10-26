@@ -4,7 +4,7 @@
 - [x] Test field mapping and verify the production form (authenticated; no operational ODT created).
 
 # Gantt overlap rescheduling
-- [ ] Compute collision-driven insertion cascades without changing unrelated machines.
-- [ ] Preview affected ODTs, stage together, and retain approval/discard/undo controls.
-- [ ] Save exactly the approved positions without a second hidden cascade.
-- [ ] Test scheduling rules and verify the authenticated calendar flow.
+- [x] Compute collision-driven insertion cascades without changing unrelated machines.
+- [x] Preview affected ODTs, stage together, and retain approval/discard/undo controls.
+- [x] Save exactly the approved positions without a second hidden cascade.
+- [x] Test scheduling rules and verify the authenticated calendar drag, cascade preview, approval dialog, and discard (no live production changes saved).

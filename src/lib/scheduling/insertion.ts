@@ -61,7 +61,7 @@ export function assertNoMoveOverlaps(jobs: ScheduledJob[], moves: InsertionMove[
   for (const move of moves) {
     const start = new Date(move.planned_start).getTime();
     const end = new Date(move.planned_end).getTime();
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("Horario de producción inválido");
+    if (!move.machine_id || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("Horario de producción inválido");
     const clash = effective.find((job) => job.id !== move.jobId && job.machine_id === move.machine_id &&
       job.planned_start && job.planned_end && new Date(job.planned_start).getTime() < end &&
       start < new Date(job.planned_end).getTime());
