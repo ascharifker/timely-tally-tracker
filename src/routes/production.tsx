@@ -77,7 +77,14 @@ function renderOtdBadge(j: ActiveJob) {
 
 export const Route = createFileRoute("/production")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Producción · MEGO Produccion" }] }),
+  head: () => ({ meta: [
+    { title: "Producción · MEGO Produccion" },
+    { name: "description", content: "Órdenes de trabajo, programación de máquinas y seguimiento de producción MEGO." },
+    { property: "og:title", content: "Producción · MEGO Produccion" },
+    { property: "og:description", content: "Órdenes de trabajo, programación de máquinas y seguimiento de producción MEGO." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: ProductionPage,
 });
 
