@@ -10,6 +10,7 @@ import { nextShiftBoundary } from "@/lib/shifts";
 import { jobDurationHours } from "@/lib/scheduling/duration";
 import { scheduleJob } from "@/lib/scheduling/schedule";
 import { showUndoToast, snapshotJobs } from "@/lib/undo-toast";
+import { assertNoMoveOverlaps } from "@/lib/scheduling/insertion";
 
 /**
  * Keep status ↔ machine in sync. MAZAK belongs to internal machines;
@@ -651,7 +652,7 @@ export function useLogDelay() {
 // ============================================================================
 // Batch apply: takes a list of pending moves (drag-staged in the Gantt) and
 // commits them in a single confirmation. Each move can have its own event kind
-// and the cascade is computed sequentially per move.
+// including every cascade move already shown in the Gantt preview.
 // ============================================================================
 
 export interface PendingMoveCommit {
@@ -675,6 +676,14 @@ export function useApplyReschedules() {
       const jobs = qc.getQueryData<Job[]>(["jobs"]) ?? [];
       const machines = qc.getQueryData<Machine[]>(["machines"]) ?? [];
       const byId = new Map(jobs.map((j) => [j.id, j]));
+
+      // Refresh occupancy before saving; never perform an unpreviewed second cascade.
+      const { data: currentJobs, error: readError } = await supabase
+        .from("jobs").select("id, odf, machine_id, planned_start, planned_end");
+      if (readError) throw readError;
+      assertNoMoveOverlaps(currentJobs ?? [], moves.map((move) => ({
+        ...move, machine_id: move.machine_id ?? "", odf: byId.get(move.jobId)?.odf ?? move.jobId,
+      })));
 
       for (const m of moves) {
         const original = byId.get(m.jobId);
@@ -701,25 +710,6 @@ export function useApplyReschedules() {
           .eq("id", m.jobId);
         if (updErr) throw updErr;
 
-        // 2. cascade downstream on the original machine using the delta.
-        //    cascade() takes the un-moved jobs + delayHours and computes
-        //    downstream shifts on the same machine; we skip the anchor itself
-        //    since we wrote it explicitly above.
-        if (shiftedHours !== 0 && original && original.machine_id && original.planned_end) {
-          const changes = cascade({
-            jobs,
-            delayedJobId: m.jobId,
-            delayHours: shiftedHours,
-          });
-          for (const c of changes) {
-            if (c.job_id === m.jobId) continue;
-            await supabase
-              .from("jobs")
-              .update({ planned_start: c.new_start, planned_end: c.new_end })
-              .eq("id", c.job_id);
-          }
-        }
-
         // 3. audit row
         const { error: evErr } = await supabase.from("status_events").insert({
           job_id: m.jobId,
@@ -736,19 +726,7 @@ export function useApplyReschedules() {
     },
     onMutate: async ({ moves }) => {
       const previous = qc.getQueryData<Job[]>(["jobs"]) ?? [];
-      // affected = each move + downstream cascade on the original schedule
-      const affected = new Set<string>();
-      for (const m of moves) {
-        affected.add(m.jobId);
-        const orig = previous.find((j) => j.id === m.jobId);
-        if (!orig?.planned_end) continue;
-        const shiftedHours =
-          (new Date(m.planned_end).getTime() - new Date(orig.planned_end).getTime()) /
-          (60 * 60 * 1000);
-        if (shiftedHours === 0) continue;
-        const changes = cascade({ jobs: previous, delayedJobId: m.jobId, delayHours: shiftedHours });
-        for (const c of changes) affected.add(c.job_id);
-      }
+      const affected = new Set(moves.map((move) => move.jobId));
       return { previous, affected: [...affected] };
     },
     onSuccess: ({ count }, _vars, ctx) => {

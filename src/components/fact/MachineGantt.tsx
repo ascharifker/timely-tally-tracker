@@ -10,7 +10,8 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Shuffle } from "luci
 import { Link } from "@tanstack/react-router";
 import { ApproveMovesDialog, type PendingMove } from "./ApproveMovesDialog";
 import { SHIFTS, shiftStartMs, shiftIndexFromDate, shiftSpan, snapToShift } from "@/lib/shifts";
-import { findOverlap } from "@/lib/scheduling/overlap";
+import { planInsertion, assertNoMoveOverlaps } from "@/lib/scheduling/insertion";
+import { CascadePreviewDialog } from "./CascadePreviewDialog";
 import { toast } from "sonner";
 
 interface Props {
@@ -57,6 +58,15 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
   // Drag staging: each drag updates pending moves; commit happens via dialog.
   const [pending, setPending] = useState<Map<string, PendingMove>>(new Map());
   const [approveOpen, setApproveOpen] = useState(false);
+  const [cascadeProposal, setCascadeProposal] = useState<PendingMove[] | null>(null);
+
+  const stageMoves = (moves: PendingMove[]) => {
+    setPending((prev) => {
+      const next = new Map(prev);
+      for (const move of moves) next.set(move.jobId, move);
+      return next;
+    });
+  };
 
   // Track previous planned_end per job to render a ghost bar that fades out
   // when a delay is applied — makes small schedule shifts visually obvious.
@@ -280,29 +290,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
       durMs = DEFAULT_DUR_MS;
     }
     const endMs = startMs + durMs;
-    const clash = findOverlap(effectiveJobs, machineId, startMs, endMs, dragJobId);
-    if (clash) {
-      toast.error(`Turno ocupado por ODT ${clash.odf} en esa máquina`);
-      setDragJobId(null);
-      setHoverCell(null);
-      return;
-    }
-    const original = jobs.find((j) => j.id === dragJobId);
-    setPending((prev) => {
-      const next = new Map(prev);
-      next.set(dragJobId, {
-        jobId: dragJobId,
-        odf: job.odf,
-        planned_start: new Date(startMs).toISOString(),
-        planned_end: new Date(endMs).toISOString(),
-        machine_id: machineId,
-        original_start: original?.planned_start ?? null,
-        original_end: original?.planned_end ?? null,
-        original_machine_id: original?.machine_id ?? null,
-        eventKind: "delay",
-      });
-      return next;
-    });
+    proposeMove(dragJobId, machineId, startMs, endMs);
     setDragJobId(null);
     setHoverCell(null);
   };
@@ -353,6 +341,34 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     });
   }, [jobs, pending]);
 
+  const proposeMove = (jobId: string, machineId: string, startMs: number, endMs: number) => {
+    try {
+      const moves: PendingMove[] = planInsertion(effectiveJobs, jobId, machineId, startMs, endMs).map((move) => {
+        const original = jobs.find((job) => job.id === move.jobId);
+        return {
+          ...move,
+          original_start: original?.planned_start ?? null,
+          original_end: original?.planned_end ?? null,
+          original_machine_id: original?.machine_id ?? null,
+          eventKind: pending.get(move.jobId)?.eventKind ?? "delay",
+        };
+      });
+      if (moves.length > 1) setCascadeProposal(moves);
+      else stageMoves(moves);
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
+  const openApproval = () => {
+    try {
+      assertNoMoveOverlaps(jobs, Array.from(pending.values()));
+      setApproveOpen(true);
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
   // Move/nudge a bar to a different shift without dragging.
   // Same machine, same calendar day, snap to shift start.
   const moveJobToShift = (jobId: string, targetShiftIdx: number, dayDelta = 0) => {
@@ -364,29 +380,8 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
     baseDay.setDate(baseDay.getDate() + dayDelta);
     const newStart = snapToShift(baseDay, targetShiftIdx);
     const newEnd = new Date(newStart.getTime() + durMs);
-    const clash = job.machine_id
-      ? findOverlap(effectiveJobs, job.machine_id, newStart.getTime(), newEnd.getTime(), jobId)
-      : null;
-    if (clash) {
-      toast.error(`Turno ocupado por ODT ${clash.odf} en esa máquina`);
-      return;
-    }
-    const original = jobs.find((j) => j.id === jobId);
-    setPending((prev) => {
-      const next = new Map(prev);
-      next.set(jobId, {
-        jobId,
-        odf: job.odf,
-        planned_start: newStart.toISOString(),
-        planned_end: newEnd.toISOString(),
-        machine_id: job.machine_id ?? original?.machine_id ?? "",
-        original_start: original?.planned_start ?? null,
-        original_end: original?.planned_end ?? null,
-        original_machine_id: original?.machine_id ?? null,
-        eventKind: "delay",
-      });
-      return next;
-    });
+    if (!job.machine_id) return;
+    proposeMove(jobId, job.machine_id, newStart.getTime(), newEnd.getTime());
   };
 
   // Shift load: how many bars currently touch each shift band in the visible window.
@@ -554,7 +549,7 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                 </div>
                 {(lanesByMachine.get(m.id)?.laneCount ?? 0) > 1 && (
                   <div className="text-[9px] text-amber-500/80 font-mono uppercase mt-0.5">
-                    {lanesByMachine.get(m.id)!.laneCount} lanes
+                    {lanesByMachine.get(m.id)?.laneCount} lanes
                   </div>
                 )}
               </Link>
@@ -962,12 +957,22 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
           <Button variant="ghost" size="sm" onClick={() => setPending(new Map())}>
             Descartar
           </Button>
-          <Button size="sm" onClick={() => setApproveOpen(true)}>
+          <Button size="sm" onClick={openApproval}>
             Aprobar movimientos
           </Button>
         </div>
       </div>
     )}
+    <CascadePreviewDialog
+      moves={cascadeProposal}
+      machineName={machines.find((machine) => machine.id === cascadeProposal?.[0]?.machine_id)?.name ?? "máquina"}
+      onClose={() => setCascadeProposal(null)}
+      onStage={() => {
+        if (!cascadeProposal) return;
+        stageMoves(cascadeProposal);
+        setCascadeProposal(null);
+      }}
+    />
     <ApproveMovesDialog
       open={approveOpen}
       onClose={() => setApproveOpen(false)}
