@@ -247,6 +247,7 @@ export type Database = {
           odf: string
           operator_name: string | null
           pir: string | null
+          pir_rev: string | null
           planned_end: string | null
           planned_start: string | null
           po_halliburton: string | null
@@ -269,6 +270,7 @@ export type Database = {
           odf: string
           operator_name?: string | null
           pir?: string | null
+          pir_rev?: string | null
           planned_end?: string | null
           planned_start?: string | null
           po_halliburton?: string | null
@@ -291,6 +293,7 @@ export type Database = {
           odf?: string
           operator_name?: string | null
           pir?: string | null
+          pir_rev?: string | null
           planned_end?: string | null
           planned_start?: string | null
           po_halliburton?: string | null
