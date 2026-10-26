@@ -45,6 +45,7 @@ export interface Job {
   po_halliburton: string | null;
   /** @deprecated Vive ahora en po_line_items.pir. */
   pir: string | null;
+  pir_rev?: string | null;
   /** @deprecated Vive ahora en po_line_items.tube_spec. */
   tube_spec: string | null;
   qty: number;
