@@ -70,6 +70,7 @@ export function ApproveMovesDialog({
     machines.find((m) => m.id === id)?.name ?? "—";
 
   const onConfirm = async () => {
+    try {
     await apply.mutateAsync({
       reason: reason.trim(),
       moves: moves.map((m) => ({
@@ -82,6 +83,9 @@ export function ApproveMovesDialog({
     });
     setReason("");
     onApplied();
+    } catch {
+      // The mutation shows the error; keep the preview available for correction.
+    }
   };
 
   return (
@@ -92,7 +96,7 @@ export function ApproveMovesDialog({
         </DialogHeader>
 
         <p className="text-xs text-muted-foreground">
-          Asigná una categoría a cada movimiento. La cascada empuja a las ODTs siguientes en la misma máquina.
+          {moves.length} movimiento{moves.length === 1 ? "" : "s"} para aplicar.
         </p>
 
         <div className="rounded border border-border divide-y divide-border max-h-[50vh] overflow-auto">

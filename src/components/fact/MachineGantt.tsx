@@ -653,6 +653,13 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
               return (
                 <div
                   key={m.id}
+                  onDragOver={onCellDragOver}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
+                    const segment = segments.find((seg) => x >= seg.leftPx && x < seg.leftPx + seg.widthPx);
+                    if (segment) onCellDrop(m.id, segment.dayIdx, segment.isFullDay ? null : segment.shiftIdx);
+                  }}
                   className={`relative border-b border-zinc-800/50 group ${
                     mIdx % 2 === 0 ? "bg-zinc-900/20" : ""
                   } ${m.type === "external_shop" ? "bg-[#18181b]" : ""}`}
@@ -672,7 +679,6 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                             onDragOver={onCellDragOver}
                             onDragEnter={() => dragJobId && setHoverCell(cellKey)}
                             onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
-                            onDrop={() => onCellDrop(m.id, seg.dayIdx)}
                             className={`absolute top-0 bottom-0 border-r border-zinc-800/40 transition-colors ${
                               isToday ? "bg-yellow-500/[0.025]" : ""
                             } ${isHover ? "bg-primary/20" : ""}`}
@@ -693,7 +699,6 @@ export function MachineGantt({ jobs, machines, onJobClick }: Props) {
                           onDragOver={onCellDragOver}
                           onDragEnter={() => dragJobId && setHoverCell(cellKey)}
                           onDragLeave={() => hoverCell === cellKey && setHoverCell(null)}
-                          onDrop={() => onCellDrop(m.id, seg.dayIdx, seg.shiftIdx)}
                           className={`absolute top-0 bottom-0 transition-all ${
                             isDayEdge ? "border-r border-zinc-700/60" : "border-r border-zinc-800/30"
                           }`}

@@ -7,6 +7,8 @@ export type ScheduleSnapshot = {
   id: string;
   planned_start: string | null;
   planned_end: string | null;
+  machine_id: string | null;
+  status: Job["status"];
 };
 
 export function snapshotJobs(jobs: Job[], ids: Iterable<string>): ScheduleSnapshot[] {
@@ -17,6 +19,8 @@ export function snapshotJobs(jobs: Job[], ids: Iterable<string>): ScheduleSnapsh
       id: j.id,
       planned_start: j.planned_start ?? null,
       planned_end: j.planned_end ?? null,
+      machine_id: j.machine_id,
+      status: j.status,
     }));
 }
 
@@ -42,7 +46,7 @@ export function showUndoToast(
           for (const s of snapshots) {
             const { error } = await supabase
               .from("jobs")
-              .update({ planned_start: s.planned_start, planned_end: s.planned_end })
+              .update({ planned_start: s.planned_start, planned_end: s.planned_end, machine_id: s.machine_id, status: s.status })
               .eq("id", s.id);
             if (error) throw error;
           }
