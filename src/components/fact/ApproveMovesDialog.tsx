@@ -70,6 +70,7 @@ export function ApproveMovesDialog({
     machines.find((m) => m.id === id)?.name ?? "—";
 
   const onConfirm = async () => {
+    try {
     await apply.mutateAsync({
       reason: reason.trim(),
       moves: moves.map((m) => ({
@@ -82,24 +83,27 @@ export function ApproveMovesDialog({
     });
     setReason("");
     onApplied();
+    } catch {
+      // The mutation shows the error; keep the preview available for correction.
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl bg-card">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto bg-card">
         <DialogHeader>
           <DialogTitle>Aprobar reprogramación</DialogTitle>
         </DialogHeader>
 
         <p className="text-xs text-muted-foreground">
-          Asigná una categoría a cada movimiento. La cascada empuja a las ODTs siguientes en la misma máquina.
+          {moves.length} movimiento{moves.length === 1 ? "" : "s"} para aplicar.
         </p>
 
         <div className="rounded border border-border divide-y divide-border max-h-[50vh] overflow-auto">
           {moves.map((m) => {
             const movedMachine = m.machine_id !== m.original_machine_id;
             return (
-              <div key={m.jobId} className="grid grid-cols-[1fr,160px,28px] items-center gap-3 px-3 py-2">
+              <div key={m.jobId} className="grid grid-cols-[minmax(0,1fr)_28px] sm:grid-cols-[minmax(0,1fr)_160px_28px] items-center gap-3 px-3 py-2">
                 <div>
                   <div className="font-mono text-sm font-semibold">ODT {m.odf}</div>
                   <div className="text-[11px] text-muted-foreground font-mono">
@@ -124,7 +128,7 @@ export function ApproveMovesDialog({
                   )}
                 </div>
                 <Select value={m.eventKind} onValueChange={(v) => onUpdateKind(m.jobId, v as EventKind)}>
-                  <SelectTrigger className="h-8 text-xs">
+                  <SelectTrigger className="h-8 text-xs row-start-2 sm:row-start-auto">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -138,7 +142,7 @@ export function ApproveMovesDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onRemove(m.jobId)}>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 col-start-2 row-start-1 sm:col-start-3" aria-label={`Quitar movimiento ODT ${m.odf}`} onClick={() => onRemove(m.jobId)}>
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
