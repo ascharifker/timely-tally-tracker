@@ -661,6 +661,7 @@ export interface PendingMoveCommit {
   planned_end: string;
   machine_id: string | null;
   eventKind: EventKind;
+  status?: JobStatus;
 }
 
 export interface ApplyReschedulesInput {
@@ -694,9 +695,9 @@ export function useApplyReschedules() {
 
         // Status auto-sync when the move crosses internal ↔ external_shop.
         const newMachine = machines.find((mm) => mm.id === m.machine_id);
-        const nextStatus = original
+        const nextStatus = m.status ?? (original
           ? statusForMachine(original.status, newMachine ?? null)
-          : fromStatus;
+          : fromStatus);
 
         // 1. patch the dragged job (position + machine)
         const { error: updErr } = await supabase
