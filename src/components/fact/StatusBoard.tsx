@@ -1,457 +1,99 @@
-import type { Job, Machine } from "@/lib/fact-types";
-import { STATUS_PIPELINE, STATUS_LABEL, STATUS_COLOR, type JobStatus } from "@/lib/fact-types";
-import { Card } from "@/components/ui/card";
-import { useUpdateJobStatus, usePartTimes } from "@/hooks/useFactData";
+import type { Job, Machine, JobStatus } from "@/lib/fact-types";
+import { useApplyReschedules, useUpdateJobStatus, usePartTimes } from "@/hooks/useFactData";
 import { useMachineRuns } from "@/hooks/useMachineRuns";
-import { Badge } from "@/components/ui/badge";
-import { useMemo, useState, Fragment } from "react";
-import { ChevronRight, ChevronDown, GripVertical, AlertTriangle } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { getUrgency, urgencyColor } from "@/lib/job-urgency";
+import { useState } from "react";
+import { Maximize2, AlertTriangle, Factory } from "lucide-react";
+import { toast } from "sonner";
+import { getUrgency } from "@/lib/job-urgency";
 import { jobDurationHours } from "@/lib/scheduling/duration";
+import { productionColumns, belongsToColumn, planBoardAssignment, type BoardColumn } from "@/lib/production-board";
+import type { InsertionMove } from "@/lib/scheduling/insertion";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ProductionColumnDialog } from "./ProductionColumnDialog";
 import { ShippedDateDialog } from "./ShippedDateDialog";
 
-const STATUS_HELP: Record<JobStatus, string> = {
-  PLANNED: "Ingresada, sin asignar a máquina",
-  MAZAK: "En MAZAK — maquinado en curso",
-  TALLER_EXTERNO: "En taller externo (tercero) — maquinado fuera",
-  MAQUINADO_LISTO: "Maquinado terminado, listo para tratamiento",
-  CEMENTACION: "En cementación / tratamiento térmico",
-  EXPO: "Lista para exportación",
-  YA_SE_ENVIO: "Despachado al cliente",
-  EN_ESPERA: "Pendiente de iniciar producción",
-  ON_HOLD: "Detenida — esperando definición o material",
-  MAQYRO: "Safety stock Maqyro",
-  EN_GEMAK: "En proceso GEMAK",
-  CEMENTACION_LISTO: "Cementación terminada, lista para Expo",
+const ACCENTS: Partial<Record<JobStatus, string>> = {
+  MAZAK: "border-t-[color:var(--status-mazak)]", TALLER_EXTERNO: "border-t-[color:var(--status-taller)]",
+  MAQUINADO_LISTO: "border-t-[color:var(--status-listo)]", CEMENTACION: "border-t-[color:var(--status-cementacion)]",
+  EXPO: "border-t-[color:var(--status-expo)]", YA_SE_ENVIO: "border-t-[color:var(--status-enviado)]",
 };
+const hours = (value: number) => `${value.toLocaleString("es", { maximumFractionDigits: 1 })} h`;
+const dateTime = (value: string | null) => value ? new Date(value).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "Sin programar";
 
-/** Statuses where cards bind to a specific machine. */
-const MACHINE_BOUND: JobStatus[] = ["MAZAK", "TALLER_EXTERNO"];
-
-/** Fixed palette indexed by machine display_order. Keeps chips visually distinct. */
-const MACHINE_PALETTE = [
-  "oklch(0.70 0.18 250)", // blue
-  "oklch(0.72 0.18 145)", // green
-  "oklch(0.78 0.17 75)",  // amber
-  "oklch(0.70 0.20 25)",  // red
-  "oklch(0.70 0.18 305)", // magenta
-  "oklch(0.72 0.16 195)", // teal
-];
-
-function machineColor(m: Machine | undefined): string {
-  if (!m) return "var(--muted)";
-  return MACHINE_PALETTE[(m.display_order ?? 0) % MACHINE_PALETTE.length];
-}
-
-function machineShortLabel(m: Machine | undefined): string {
-  if (!m) return "—";
-  const mazak = m.name.match(/MAZAK\s*(\d+)/i);
-  if (mazak) return `M${mazak[1]}`;
-  return m.name.slice(0, 4).toUpperCase();
-}
-
-function formatHours(h: number): string {
-  if (h <= 0) return "0h";
-  if (h < 10) return `${h.toFixed(1)}h`;
-  return `${Math.round(h)}h`;
-}
-
-export function StatusBoard({
-  jobs,
-  machines = [],
-  onJobClick,
-}: {
-  jobs: Job[];
-  machines?: Machine[];
-  onJobClick?: (job: Job) => void;
-}) {
+export function StatusBoard({ jobs, machines = [], onJobClick }: { jobs: Job[]; machines?: Machine[]; onJobClick?: (job: Job) => void }) {
   const update = useUpdateJobStatus();
+  const apply = useApplyReschedules();
   const { data: partTimes = [] } = usePartTimes();
   const { data: runs = [] } = useMachineRuns();
-  const [dragOver, setDragOver] = useState<JobStatus | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [selectedMachines, setSelectedMachines] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [shipJob, setShipJob] = useState<Job | null>(null);
+  const [proposal, setProposal] = useState<{ column: BoardColumn; moves: InsertionMove[] } | null>(null);
+  const [selectedMachines, setSelectedMachines] = useState<Set<string>>(new Set());
+  const columns = productionColumns(machines, jobs);
+  const activeRunIds = new Set(runs.filter((r) => !r.ended_at).map((r) => r.job_id));
+  const visible = (j: Job) => !selectedMachines.size || !!j.machine_id && selectedMachines.has(j.machine_id);
+  const expandedColumn = columns.find((c) => c.id === expanded) ?? null;
+  const busy = update.isPending || apply.isPending;
 
-  const machineById = useMemo(
-    () => Object.fromEntries(machines.map((m) => [m.id, m])) as Record<string, Machine>,
-    [machines],
-  );
-
-  // Map job_id -> earliest open run (run with no ended_at).
-  const openRunByJob = useMemo(() => {
-    const m = new Map<string, typeof runs[number]>();
-    for (const r of runs) {
-      if (r.ended_at) continue;
-      if (!m.has(r.job_id)) m.set(r.job_id, r);
+  const drop = (id: string, column: BoardColumn) => {
+    const job = jobs.find((j) => j.id === id);
+    if (!job || busy || belongsToColumn(job, column, machines)) return;
+    if (column.status === "YA_SE_ENVIO") { setShipJob(job); return; }
+    if (column.machine) {
+      try { setProposal({ column, moves: planBoardAssignment(jobs, job, column.machine, partTimes, Date.now()) }); }
+      catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo asignar la máquina"); }
+      return;
     }
-    return m;
-  }, [runs]);
-
-  const isFiltered = selectedMachines.size > 0;
-  const isVisible = (j: Job): boolean => {
-    if (!isFiltered) return true;
-    if (!j.machine_id) return false;
-    return selectedMachines.has(j.machine_id);
+    if (column.unassigned) return;
+    update.mutate({ id, status: column.status });
   };
 
-  const toggleMachine = (id: string) => {
-    setSelectedMachines((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleGroup = (key: string) =>
-    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
-
-  return (
-    <>
-    <Card className="border-border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-sm font-semibold">Flujo de Producción</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Arrastrá una ODT de una etapa a la siguiente para avanzarla. Total: {jobs.length} ODT{jobs.length === 1 ? "" : "s"}.
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-          <GripVertical className="h-3 w-3" /> arrastrá para mover
-        </div>
-      </div>
-
-      {machines.length > 0 && (
-        <div className="mb-3 flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono mr-1">
-            Filtrar:
-          </span>
-          <button
-            onClick={() => setSelectedMachines(new Set())}
-            className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-              !isFiltered
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border bg-sidebar/20 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Todas
-          </button>
-          {machines.map((m) => {
-            const active = selectedMachines.has(m.id);
-            const color = machineColor(m);
-            return (
-              <button
-                key={m.id}
-                onClick={() => toggleMachine(m.id)}
-                className={`rounded border px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors ${
-                  active ? "text-background" : "text-foreground hover:opacity-80"
-                }`}
-                style={{
-                  borderColor: color,
-                  backgroundColor: active ? color : `color-mix(in oklab, ${color} 15%, transparent)`,
-                }}
-                title={m.name}
-              >
-                {machineShortLabel(m)}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div
-        className="grid gap-0 items-stretch"
-        style={{
-          gridTemplateColumns: STATUS_PIPELINE.map(() => "minmax(0,1fr) auto")
-            .slice(0, STATUS_PIPELINE.length * 2 - 1)
-            .join(" "),
-        }}
-      >
-        {STATUS_PIPELINE.map((status, idx) => {
-          const cards = jobs.filter((j) => j.status === status);
-          const visibleCount = cards.filter(isVisible).length;
-          const isOver = dragOver === status;
-          const color = STATUS_COLOR[status];
-          const isMachineBound = MACHINE_BOUND.includes(status);
-
-          // Totals for header
-          const totalHours = isMachineBound
-            ? cards.reduce((acc, j) => acc + jobDurationHours(j, partTimes).hours, 0)
-            : 0;
-
-          // Grouping (only for machine-bound columns)
-          const groups: { key: string; machine: Machine | undefined; items: Job[] }[] = [];
-          if (isMachineBound) {
-            const byMachine = new Map<string, Job[]>();
-            const unassigned: Job[] = [];
-            for (const j of cards) {
-              if (!j.machine_id) unassigned.push(j);
-              else {
-                const arr = byMachine.get(j.machine_id) ?? [];
-                arr.push(j);
-                byMachine.set(j.machine_id, arr);
-              }
-            }
-            if (unassigned.length) {
-              groups.push({ key: `${status}__unassigned`, machine: undefined, items: unassigned });
-            }
-            const sortedIds = [...byMachine.keys()].sort((a, b) => {
-              const oa = machineById[a]?.display_order ?? 999;
-              const ob = machineById[b]?.display_order ?? 999;
-              return oa - ob;
-            });
-            for (const mid of sortedIds) {
-              groups.push({
-                key: `${status}__${mid}`,
-                machine: machineById[mid],
-                items: byMachine.get(mid)!,
-              });
-            }
-          }
-
-          return (
-            <Fragment key={status}>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                if (dragOver !== status) setDragOver(status);
-              }}
-              onDragLeave={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                setDragOver((s) => (s === status ? null : s));
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const id = e.dataTransfer.getData("text/plain") || dragId;
-                setDragOver(null);
-                setDragId(null);
-                if (!id) return;
-                const job = jobs.find((j) => j.id === id);
-                if (!job || job.status === status) return;
-                if (status === "YA_SE_ENVIO") {
-                  setShipJob(job);
-                  return;
-                }
-                update.mutate({ id, status });
-              }}
-              className={`min-h-[180px] rounded-md border p-0 overflow-hidden flex flex-col transition-colors ${
-                isOver
-                  ? "border-primary bg-primary/10 ring-2 ring-primary/50"
-                  : "border-border bg-sidebar/20 hover:bg-sidebar/40"
-              }`}
-            >
-              <div
-                className="px-2 py-1.5 border-b border-border/60"
-                style={{ backgroundColor: `color-mix(in oklab, ${color} 18%, transparent)` }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-background"
-                      style={{ backgroundColor: color }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span className="text-[11px] font-semibold truncate">{STATUS_LABEL[status]}</span>
-                  </div>
-                  <span
-                    className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
-                    style={{
-                      backgroundColor: `color-mix(in oklab, ${color} 25%, transparent)`,
-                      color: "var(--foreground)",
-                    }}
-                  >
-                    {cards.length}
-                    {isFiltered && visibleCount !== cards.length && (
-                      <span className="opacity-60"> ({visibleCount})</span>
-                    )}
-                    {isMachineBound && totalHours > 0 && (
-                      <span className="opacity-70"> · {formatHours(totalHours)}</span>
-                    )}
-                  </span>
-                </div>
-                <div className="text-[9px] text-muted-foreground mt-0.5 leading-tight truncate" title={STATUS_HELP[status]}>
-                  {STATUS_HELP[status]}
-                </div>
-              </div>
-              <div className="space-y-1.5 p-2 flex-1">
-                {cards.length === 0 && (
-                  <div className="flex h-full min-h-[80px] items-center justify-center rounded border border-dashed border-border/50 text-[10px] text-muted-foreground/60 uppercase tracking-widest font-mono">
-                    vacío
-                  </div>
-                )}
-                {isMachineBound
-                  ? groups.map((g) => {
-                      const isCollapsed = !!collapsed[g.key];
-                      const mColor = g.machine ? machineColor(g.machine) : "var(--status-risk)";
-                      const label = g.machine ? g.machine.name : "Sin asignar";
-                      const groupHours = g.items.reduce(
-                        (a, j) => a + jobDurationHours(j, partTimes).hours,
-                        0,
-                      );
-                      return (
-                        <div key={g.key} className="space-y-1">
-                          <button
-                            type="button"
-                            onClick={() => toggleGroup(g.key)}
-                            className="w-full flex items-center gap-1.5 px-1 py-0.5 rounded text-[9px] uppercase tracking-wider font-mono font-bold hover:bg-sidebar/40 transition-colors"
-                            style={{ color: mColor }}
-                          >
-                            {isCollapsed ? (
-                              <ChevronRight className="h-2.5 w-2.5" />
-                            ) : (
-                              <ChevronDown className="h-2.5 w-2.5" />
-                            )}
-                            <span className="truncate flex-1 text-left">{label}</span>
-                            <span className="opacity-70">
-                              {g.items.length}
-                              {groupHours > 0 && ` · ${formatHours(groupHours)}`}
-                            </span>
-                          </button>
-                          {!isCollapsed &&
-                            g.items.map((j) =>
-                              renderCard({
-                                j,
-                                machine: g.machine,
-                                statusColor: color,
-                                dragId,
-                                setDragId,
-                                setDragOver,
-                                onJobClick,
-                                dimmed: !isVisible(j),
-                                showMachineChip: true,
-                                missingMachine: !g.machine,
-                                hasOpenRun: !!openRunByJob.get(j.id),
-                              }),
-                            )}
-                        </div>
-                      );
-                    })
-                  : cards.map((j) =>
-                      renderCard({
-                        j,
-                        machine: j.machine_id ? machineById[j.machine_id] : undefined,
-                        statusColor: color,
-                        dragId,
-                        setDragId,
-                        setDragOver,
-                        onJobClick,
-                        dimmed: !isVisible(j),
-                        showMachineChip: false,
-                        missingMachine: false,
-                        hasOpenRun: false,
-                      }),
-                    )}
-              </div>
-            </div>
-            {idx < STATUS_PIPELINE.length - 1 && (
-              <div className="flex items-center justify-center px-0.5 text-muted-foreground/50">
-                <ChevronRight className="h-4 w-4" />
-              </div>
-            )}
-            </Fragment>
-          );
-        })}
-      </div>
-    </Card>
-    <ShippedDateDialog job={shipJob} onClose={() => setShipJob(null)} />
-    </>
-  );
-}
-
-interface RenderCardArgs {
-  j: Job;
-  machine: Machine | undefined;
-  statusColor: string;
-  dragId: string | null;
-  setDragId: (v: string | null) => void;
-  setDragOver: (v: JobStatus | null) => void;
-  onJobClick?: (j: Job) => void;
-  dimmed: boolean;
-  showMachineChip: boolean;
-  missingMachine: boolean;
-  hasOpenRun: boolean;
-}
-
-function renderCard({
-  j,
-  machine,
-  statusColor,
-  dragId,
-  setDragId,
-  setDragOver,
-  onJobClick,
-  dimmed,
-  showMachineChip,
-  missingMachine,
-  hasOpenRun,
-}: RenderCardArgs) {
-  const urgency = getUrgency(j);
-  const mColor = machine ? machineColor(machine) : "var(--status-risk)";
-  const leftBorder = missingMachine ? "var(--status-risk)" : statusColor;
-  return (
-    <div
-      key={j.id}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", j.id);
-        e.dataTransfer.effectAllowed = "move";
-        setDragId(j.id);
-      }}
-      onDragEnd={() => {
-        setDragId(null);
-        setDragOver(null);
-      }}
-      onClick={(e) => {
-        if (e.defaultPrevented) return;
-        onJobClick?.(j);
-      }}
-      className={`rounded border bg-card p-2 text-[11px] leading-tight cursor-grab active:cursor-grabbing select-none hover:border-primary/60 hover:shadow-sm transition-all ${
-        dragId === j.id ? "opacity-40" : ""
-      } ${dimmed ? "opacity-30" : ""} ${missingMachine ? "border-[color:var(--status-risk)] border-dashed" : "border-border"}`}
-      style={{ borderLeft: `3px solid ${leftBorder}` }}
-      title={missingMachine ? "Sin máquina asignada — abrí la ODT y asigná una, o devolvé a Planificado" : undefined}
-    >
-      <div className="flex items-center justify-between gap-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {missingMachine && (
-            <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: "var(--status-risk)" }} />
-          )}
-          {showMachineChip && machine && (
-            <Link
-              to="/maquina/$id"
-              params={{ id: machine.id }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              draggable={false}
-              className="shrink-0 rounded px-1 py-0 text-[9px] font-mono font-bold leading-tight text-background hover:ring-2 hover:ring-primary/60"
-              style={{ backgroundColor: mColor }}
-              title={`Ver ficha de ${machine.name}`}
-            >
-              {machineShortLabel(machine)}
-            </Link>
-          )}
-          <span className="font-mono font-semibold truncate">ODT {j.odf}</span>
-          {hasOpenRun && (
-            <span
-              className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 animate-pulse"
-              title="Corrida en curso"
-            />
-          )}
-        </div>
-        {urgency && (
-          <Badge
-            className="h-4 px-1 text-[9px] font-bold text-background border-0 shrink-0"
-            style={{ backgroundColor: urgencyColor(urgency.kind) }}
-          >
-            {urgency.label}
-          </Badge>
-        )}
-      </div>
+  return <section className="min-w-0 border-t border-border pt-4">
+    <div className="mb-3 flex items-baseline justify-between gap-3"><h2 className="font-semibold">Flujo de Producción</h2><span className="text-xs text-muted-foreground">{jobs.length} ODTs</span></div>
+    <div className="mb-3 flex items-center gap-1.5 flex-wrap">
+      <Button size="sm" variant={!selectedMachines.size ? "secondary" : "ghost"} onClick={() => setSelectedMachines(new Set())}>Todas</Button>
+      {machines.map((m) => <Button key={m.id} size="sm" variant={selectedMachines.has(m.id) ? "secondary" : "ghost"} aria-pressed={selectedMachines.has(m.id)} onClick={() => setSelectedMachines((prev) => { const next = new Set(prev); if (next.has(m.id)) next.delete(m.id); else next.add(m.id); return next; })}>{m.name}</Button>)}
     </div>
-  );
+    <div className="flex gap-3 overflow-x-auto pb-4 items-stretch" aria-label="Columnas de producción">
+      {columns.map((column) => {
+        const cards = jobs.filter((j) => belongsToColumn(j, column, machines));
+        const shown = cards.filter(visible);
+        return <div key={column.id} data-column={column.label} className={`w-60 shrink-0 min-h-64 border border-t-2 rounded-md flex flex-col ${ACCENTS[column.status] ?? "border-t-muted-foreground"} ${dragOver === column.id ? "bg-primary/10 ring-2 ring-primary" : "bg-sidebar/30"}`}
+          onDragOver={(e) => { if (busy || column.unassigned) return; e.preventDefault(); setDragOver(column.id); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null); }}
+          onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain") || dragId; setDragOver(null); setDragId(null); if (id) drop(id, column); }}>
+          <Button variant="ghost" className="h-auto w-full rounded-none border-b border-border p-3 justify-between gap-2 whitespace-normal text-left" aria-label={`Expandir ${column.label}`} title={`Expandir ${column.label}`} onClick={() => setExpanded(column.id)}>
+            <span className="min-w-0"><span className="block font-semibold break-words">{column.label}</span><span className="block text-xs text-muted-foreground font-normal mt-1">{shown.length} ODTs · {hours(shown.reduce((sum, j) => sum + jobDurationHours(j, partTimes).hours, 0))}</span></span><Maximize2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Button>
+          <div className="space-y-2 p-2 flex-1">
+            {!shown.length && <p className="py-8 text-center text-xs text-muted-foreground">{cards.length ? "Sin ODTs para este filtro" : "Sin ODTs"}</p>}
+            {shown.map((j) => {
+              const external = column.status === "TALLER_EXTERNO";
+              const shop = machines.find((m) => m.id === j.machine_id && m.type === "external_shop");
+              return <div key={j.id} draggable={!busy} onDragStart={(e) => { e.dataTransfer.setData("text/plain", j.id); setDragId(j.id); }} onDragEnd={() => { setDragId(null); setDragOver(null); }} className={`rounded border border-border bg-card p-2 space-y-2 ${dragId === j.id ? "opacity-40" : ""}`}>
+                <Button variant="link" className="p-0 h-auto text-foreground font-mono" onClick={() => onJobClick?.(j)}>ODT {j.odf}</Button>
+                <div className="text-xs text-muted-foreground break-words">PIR {j.pir ?? "—"} · Tubo {j.tube_spec ?? "—"}</div>
+                <div className="text-xs flex justify-between gap-2"><span>{j.qty} piezas</span><span>{hours(jobDurationHours(j, partTimes).hours)}</span></div>
+                {external && <div className={`flex gap-1.5 items-start text-xs rounded p-1.5 ${shop ? "bg-secondary text-secondary-foreground" : "bg-destructive/10 text-destructive"}`}>{shop ? <Factory className="h-3.5 w-3.5 shrink-0" /> : <AlertTriangle className="h-3.5 w-3.5 shrink-0" />}<span className="break-words">{shop ? `Taller: ${shop.name}` : "Sin taller asignado"}</span></div>}
+                <div className="text-[11px] text-muted-foreground">Cliente: {j.customer_date ?? "—"}</div>
+                {(getUrgency(j) || activeRunIds.has(j.id)) && <div className="text-[11px] text-primary">{getUrgency(j)?.label}{activeRunIds.has(j.id) && " · Corrida en curso"}</div>}
+              </div>;
+            })}
+          </div>
+        </div>;
+      })}
+    </div>
+    <ProductionColumnDialog key={expanded ?? "closed"} column={expandedColumn} jobs={jobs.filter((j) => expandedColumn && belongsToColumn(j, expandedColumn, machines) && visible(j))} machines={machines} partTimes={partTimes} activeRunIds={activeRunIds} onClose={() => setExpanded(null)} onJobClick={onJobClick} />
+    <ShippedDateDialog job={shipJob} onClose={() => setShipJob(null)} />
+    <Dialog open={!!proposal} onOpenChange={(open) => { if (!open && !apply.isPending) setProposal(null); }}>
+      <DialogContent className="max-w-2xl max-h-[85dvh] overflow-auto">
+        <DialogHeader><DialogTitle>Asignar a {proposal?.column.label}</DialogTitle><DialogDescription>{proposal && proposal.moves.length > 1 ? `Se reprogramarán ${proposal.moves.length - 1} ODTs siguientes.` : "Confirmar máquina y horario de producción."}</DialogDescription></DialogHeader>
+        <div className="divide-y divide-border">{proposal?.moves.map((move) => { const original = jobs.find((j) => j.id === move.jobId); return <div key={move.jobId} className="py-3 space-y-1"><div className="font-mono font-semibold">ODT {move.odf}</div><div className="text-xs text-muted-foreground">{dateTime(original?.planned_start ?? null)} → {dateTime(original?.planned_end ?? null)}</div><div className="text-sm">{dateTime(move.planned_start)} → {dateTime(move.planned_end)}</div></div>; })}</div>
+        <DialogFooter><Button variant="ghost" disabled={apply.isPending} onClick={() => setProposal(null)}>Cancelar</Button><Button disabled={apply.isPending} onClick={async () => { if (!proposal) return; try { await apply.mutateAsync({ moves: proposal.moves.map((move, i) => ({ ...move, eventKind: "reschedule", ...(i === 0 ? { status: proposal.column.status } : {}) })), reason: `Asignación desde Flujo de Producción a ${proposal.column.label}` }); setProposal(null); } catch { /* Mutation reports errors; retain the preview. */ } }}>{apply.isPending ? "Guardando…" : "Aprobar movimientos"}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </section>;
 }
