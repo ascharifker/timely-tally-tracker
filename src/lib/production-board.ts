@@ -35,6 +35,9 @@ export function belongsToColumn(job: Job, column: BoardColumn, machines: Machine
 }
 
 export function planBoardAssignment(jobs: Job[], job: Job, machine: Machine, partTimes: PartTime[], now: number) {
+  if (job.planned_start && job.planned_end) {
+    return planInsertion(jobs, job.id, machine.id, new Date(job.planned_start).getTime(), new Date(job.planned_end).getTime());
+  }
   const start = job.planned_start ? new Date(job.planned_start).getTime() : now;
   const span = scheduleJob(start, jobDurationHours({ ...job, machine_id: machine.id }, partTimes).hours, machine);
   return planInsertion(jobs, job.id, machine.id, new Date(span.planned_start).getTime(), new Date(span.planned_end).getTime());
