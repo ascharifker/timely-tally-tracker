@@ -17,6 +17,10 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "MEGO Produccion" },
       { name: "description", content: "Planificación de producción Mego Afek — MAZAK, talleres externos, OTD y cascada determinística." },
+      { property: "og:title", content: "MEGO Produccion" },
+      { property: "og:description", content: "Programación de máquinas y seguimiento de órdenes de trabajo MEGO." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: FactDashboard,

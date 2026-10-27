@@ -8,3 +8,8 @@
 - [x] Preview affected ODTs, stage together, and retain approval/discard/undo controls.
 - [x] Save exactly the approved positions without a second hidden cascade.
 - [x] Test scheduling rules and verify the authenticated calendar drag, cascade preview, approval dialog, and discard (no live production changes saved).
+
+# Production Kanban
+- [ ] Separate internal machine columns and assign the selected machine on drop.
+- [ ] Expand each column with searchable ODT details and external workshop filters.
+- [ ] Show complete workshop names and missing assignments; test and verify the board.
