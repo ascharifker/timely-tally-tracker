@@ -19,7 +19,7 @@ export function ProductionColumnDialog({ column, jobs, machines, partTimes, acti
   const filtered = jobs.filter((j) => [j.odf, j.pir, j.tube_spec].some((v) => v?.toLowerCase().includes(search.toLowerCase())) &&
     (!external || workshop === "all" || (workshop === "unassigned" ? !machines.some((m) => m.id === j.machine_id && m.type === "external_shop") : j.machine_id === workshop)));
   return <Dialog open={!!column} onOpenChange={(open) => { if (!open) onClose(); }}>
-    <DialogContent className="w-[calc(100%-2rem)] max-w-6xl h-[85dvh] flex flex-col overflow-hidden">
+    <DialogContent className="w-[calc(100%-2rem)] max-w-6xl h-[85dvh] flex flex-col overflow-hidden bg-card">
       <DialogHeader className="pr-8">
         <DialogTitle>{column?.label}</DialogTitle>
         <DialogDescription>{jobs.length} ODTs · {jobs.reduce((sum, j) => sum + jobDurationHours(j, partTimes).hours, 0).toLocaleString("es", { maximumFractionDigits: 1 })} h de maquinado</DialogDescription>

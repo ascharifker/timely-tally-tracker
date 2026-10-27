@@ -10,6 +10,6 @@
 - [x] Test scheduling rules and verify the authenticated calendar drag, cascade preview, approval dialog, and discard (no live production changes saved).
 
 # Production Kanban
-- [ ] Separate internal machine columns and assign the selected machine on drop.
-- [ ] Expand each column with searchable ODT details and external workshop filters.
-- [ ] Show complete workshop names and missing assignments; test and verify the board.
+- [x] Separate internal machine columns and assign the selected machine on drop using previewed schedule moves.
+- [x] Expand each column with searchable ODT details and external workshop filters.
+- [x] Show complete workshop names and missing assignments; 15 tests passed; authenticated expanded views verified. Calendar remains empty, so live ODT moves were not saved or tested.
