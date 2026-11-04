@@ -37,6 +37,7 @@ import { BODY_SPEC_FIELDS, type BodySpecKey } from "@/lib/body-spec";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
 import { QualityMatrixPanel } from "./QualityMatrixPanel";
 import { DesignPlansPanel } from "./DesignPlansPanel";
+import { PoDocumentCard } from "./PoDocumentCard";
 
 const MASTER_PIR_PATH = "master-pir/current.xlsx";
 
@@ -285,44 +286,6 @@ function PoInfoPanel({
   onSaved: () => void;
 }) {
   const po = line.purchase_order;
-  const signFn = useServerFn(getPoDocumentUrl);
-  const attachFn = useServerFn(attachPoDocument);
-  const [working, setWorking] = useState(false);
-
-  const openPdf = async () => {
-    if (!po?.source_document_url) return;
-    setWorking(true);
-    try {
-      const { url } = await signFn({
-        data: { storagePath: po.source_document_url },
-      });
-      window.open(url, "_blank", "noopener");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo abrir el PDF");
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  const attach = async (file: File) => {
-    if (!po?.id) return;
-    setWorking(true);
-    try {
-      const path = `po/${po.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
-      const { error } = await supabase.storage
-        .from("po-documents")
-        .upload(path, file, { contentType: file.type || "application/pdf" });
-      if (error) throw error;
-      await attachFn({ data: { purchaseOrderId: po.id, storagePath: path } });
-      toast.success("PO PDF attached");
-      onSaved();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setWorking(false);
-    }
-  };
-
   return (
     <div className="space-y-1">
       <h3 className="text-sm font-semibold mb-2">PO Info (read-only)</h3>
@@ -336,41 +299,9 @@ function PoInfoPanel({
       <Field label="Committed date" value={line.committed_date} />
       <Field label="Issued date" value={po?.issued_date} />
       <div className="pt-3">
-        {po?.source_document_url ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={working}
-            onClick={openPdf}
-          >
-            Open source PDF <ExternalLink className="h-3.5 w-3.5 ml-1" />
-          </Button>
-        ) : (
-          <div className="rounded-md border border-dashed p-3 space-y-2">
-            <p className="text-xs text-muted-foreground">
-              No PDF attached to this PO.
-            </p>
-            <label className="inline-flex">
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                disabled={working}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) attach(f);
-                  e.currentTarget.value = "";
-                }}
-              />
-              <Button size="sm" disabled={working} asChild>
-                <span>
-                  <Upload className="h-3.5 w-3.5 mr-1" />
-                  {working ? "Uploading…" : "Attach PO PDF"}
-                </span>
-              </Button>
-            </label>
-          </div>
-        )}
+        {po?.id ? (
+          <PoDocumentCard poId={po.id} poNumber={po.po_number} storagePath={po.source_document_url} onChanged={onSaved} />
+        ) : null}
       </div>
     </div>
   );
