@@ -23,7 +23,7 @@ export type PickedDocument =
   | { source: "dropbox"; name: string; path: string }
   | { source: "upload"; name: string; file: File };
 
-type DropboxHit = { name: string; path_display?: string; path_lower?: string; is_folder?: boolean; size?: number | null; rev_badge?: string | null };
+type DropboxHit = { name: string; path_display?: string; path_lower?: string; is_folder?: boolean };
 
 /** Two-tab picker: local upload or Dropbox team search. */
 export function DocumentPicker({
