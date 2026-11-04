@@ -22,6 +22,7 @@ import {
 import {
   searchDesignPlans,
   getPlanTemporaryLink,
+  getPlanPreview,
   attachPlanToLine,
 } from "@/lib/dropbox.functions";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
@@ -35,6 +36,7 @@ interface PlanFile {
   size: number | null;
   server_modified: string | null;
   rev_from_name: string | null;
+  is_folder?: boolean;
 }
 
 function humanSize(bytes: number | null): string {
@@ -65,6 +67,7 @@ export function DesignPlansPanel({
   const searchFn = useServerFn(searchDesignPlans);
   const linkFn = useServerFn(getPlanTemporaryLink);
   const attachFn = useServerFn(attachPlanToLine);
+  const previewFn = useServerFn(getPlanPreview);
 
   const defaultQuery = line.pir ?? "";
   const [query, setQuery] = useState(defaultQuery);
@@ -95,9 +98,29 @@ export function DesignPlansPanel({
   const openFile = async (path: string, mode: "tab" | "preview", name: string) => {
     setWorking(true);
     try {
-      const { url } = await linkFn({ data: { path } });
-      if (mode === "tab") window.open(url, "_blank", "noopener");
-      else setPreview({ name, url });
+      if (mode === "tab") {
+        const { url } = await linkFn({ data: { path } });
+        window.open(url, "_blank", "noopener");
+      } else {
+        // Fetch bytes and show from a local blob so the browser renders it
+        // inline instead of following Dropbox's forced-download header.
+        const { base64 } = await previewFn({ data: { path } });
+        const bin = atob(base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const ext = name.split(".").pop()?.toLowerCase() ?? "";
+        const type =
+          ext === "pdf" ? "application/pdf"
+          : ext === "png" ? "image/png"
+          : ext === "gif" ? "image/gif"
+          : ext === "webp" ? "image/webp"
+          : "image/jpeg";
+        const url = URL.createObjectURL(new Blob([bytes], { type }));
+        setPreview((prev) => {
+          if (prev) URL.revokeObjectURL(prev.url);
+          return { name, url };
+        });
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo abrir el archivo");
     } finally {
@@ -223,7 +246,7 @@ export function DesignPlansPanel({
 
       {enabled && !isFetching && connected && files.length === 0 && !error && (
         <p className="text-xs text-muted-foreground">
-          Ningún plano (PDF, DWG, DXF o imagen) tiene “{activeQuery}” en el nombre.
+          Nada en Dropbox coincide con “{activeQuery}”.
         </p>
       )}
 
@@ -306,7 +329,14 @@ export function DesignPlansPanel({
               {preview?.name}
             </DialogTitle>
           </DialogHeader>
-          {preview && (
+          {preview && !/\.pdf$/i.test(preview.name) && (
+            <img
+              src={preview.url}
+              alt={preview.name}
+              className="max-h-[70vh] w-full object-contain rounded-md border bg-background"
+            />
+          )}
+          {preview && /\.pdf$/i.test(preview.name) && (
             <iframe
               src={preview.url}
               title={preview.name}
