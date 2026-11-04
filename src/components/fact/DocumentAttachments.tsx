@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { searchDesignPlans, getPlanTemporaryLink } from "@/lib/dropbox.functions";
+import { getPoDocumentUrl } from "@/lib/po-intake.functions";
 
 export type AttachmentEntity = "purchase_order" | "po_line" | "job" | "qc_matrix";
 
@@ -140,6 +141,8 @@ export const CATEGORY_LABELS: Record<string, string> = {
   control_calidad: "Control de calidad",
   certificado: "Certificado",
   orden_compra: "Orden de compra",
+  envio: "Envío / embarque",
+  entrega: "Comprobante de entrega",
   otro: "Otro",
 };
 
@@ -307,6 +310,118 @@ export function AttachmentsPanel({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+type DossierItem = {
+  key: string;
+  stage: string;
+  category: string;
+  name: string;
+  rev: string | null;
+  source: "dropbox" | "upload" | "po_pdf";
+  dropbox_path?: string | null;
+  storage_path?: string | null;
+};
+
+/**
+ * Read-only "dossier" of every document linked to an order line: the PO PDF,
+ * PO attachments, engineering plano and line documents, and each ODT's files.
+ */
+export function OrderDossier({
+  poLineItemId,
+  title = "Expediente de la orden",
+}: {
+  poLineItemId: string;
+  title?: string;
+}) {
+  const linkFn = useServerFn(getPlanTemporaryLink);
+  const poUrlFn = useServerFn(getPoDocumentUrl);
+  const q = useQuery({
+    queryKey: ["order_dossier", poLineItemId],
+    queryFn: async (): Promise<DossierItem[]> => {
+      const { data: line, error } = await supabase
+        .from("po_line_items")
+        .select("id, line_number, purchase_order_id, plan_dropbox_path, plan_dropbox_name, plan_dropbox_rev, purchase_order:purchase_orders(po_number, source_document_url)")
+        .eq("id", poLineItemId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!line) return [];
+      const { data: jobs } = await supabase.from("jobs").select("id, odf").eq("po_line_item_id", poLineItemId);
+      const jobMap = new Map((jobs ?? []).map((j) => [j.id, j.odf]));
+      const ids = [line.id, line.purchase_order_id, ...jobMap.keys()];
+      const { data: atts, error: aErr } = await supabase
+        .from("document_attachments")
+        .select("id, entity_type, entity_id, category, source, name, dropbox_path, storage_path, rev")
+        .in("entity_id", ids)
+        .in("entity_type", ["purchase_order", "po_line", "job"])
+        .order("created_at", { ascending: true });
+      if (aErr) throw aErr;
+      const items: DossierItem[] = [];
+      const po = line.purchase_order as { po_number: string; source_document_url: string | null } | null;
+      if (po?.source_document_url) {
+        items.push({ key: "po_pdf", stage: "Orden de compra", category: "orden_compra", name: `PO ${po.po_number}`, rev: null, source: "po_pdf", storage_path: po.source_document_url });
+      }
+      const seen = new Set<string>();
+      for (const a of atts ?? []) {
+        if (a.dropbox_path) seen.add(`${a.entity_type}:${a.dropbox_path}`);
+        const stage = a.entity_type === "purchase_order" ? "Orden de compra" : a.entity_type === "po_line" ? "Ingeniería" : `Producción · ODT ${jobMap.get(a.entity_id) ?? ""}`;
+        items.push({ key: a.id, stage, category: a.category, name: a.name, rev: a.rev, source: a.source as "dropbox" | "upload", dropbox_path: a.dropbox_path, storage_path: a.storage_path });
+      }
+      if (line.plan_dropbox_path && !seen.has(`po_line:${line.plan_dropbox_path}`)) {
+        items.push({ key: "plan", stage: "Ingeniería", category: "plano", name: line.plan_dropbox_name ?? "Plano", rev: line.plan_dropbox_rev, source: "dropbox", dropbox_path: line.plan_dropbox_path });
+      }
+      return items;
+    },
+  });
+
+  const open = async (it: DossierItem) => {
+    const w = window.open("", "_blank");
+    try {
+      let url: string;
+      if (it.source === "po_pdf") url = (await poUrlFn({ data: { storagePath: it.storage_path ?? "" } })).url;
+      else if (it.storage_path) {
+        const { data, error } = await supabase.storage.from("attachments").createSignedUrl(it.storage_path, 600);
+        if (error) throw error;
+        url = data.signedUrl;
+      } else url = (await linkFn({ data: { path: it.dropbox_path ?? "" } })).url;
+      if (w) w.location.href = url;
+      else window.location.href = url;
+    } catch (e) {
+      w?.close();
+      toast.error(e instanceof Error ? e.message : "No se pudo abrir");
+    }
+  };
+
+  const items = q.data ?? [];
+  const stages = [...new Set(items.map((i) => i.stage))];
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-semibold flex items-center gap-1.5">
+        <FileText className="h-3.5 w-3.5" /> {title} ({items.length})
+      </h4>
+      {q.isLoading && <div className="text-xs text-muted-foreground">Cargando…</div>}
+      {!q.isLoading && items.length === 0 && (
+        <div className="text-xs text-muted-foreground">Aún no hay documentos en esta orden.</div>
+      )}
+      {stages.map((st) => (
+        <div key={st} className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{st}</div>
+          <ul className="space-y-1">
+            {items.filter((i) => i.stage === st).map((it) => (
+              <li key={it.key} className="flex items-center gap-2 rounded border border-border px-2 py-1.5 text-xs">
+                <Badge variant="outline" className="shrink-0">{CATEGORY_LABELS[it.category] ?? it.category}</Badge>
+                <span className="truncate flex-1" title={it.name}>{it.name}</span>
+                {it.rev && <Badge variant="secondary">Rev. {it.rev}</Badge>}
+                <Button type="button" size="icon" variant="ghost" className="h-6 w-6" aria-label={`Abrir ${it.name}`} onClick={() => open(it)}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
