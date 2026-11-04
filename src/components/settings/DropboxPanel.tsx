@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Folder, PlugZap, RefreshCw, Unplug } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Folder,
+  Loader2,
+  PlugZap,
+  RefreshCw,
+  Unplug,
+  X,
+} from "lucide-react";
 import {
   getDropboxStatus,
   startDropboxOAuth,
@@ -15,6 +24,9 @@ import {
   setDropboxRootFolder,
   listDropboxFolder,
 } from "@/lib/dropbox.functions";
+
+const POLL_MS = 2500;
+const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 export function DropboxPanel() {
   const statusFn = useServerFn(getDropboxStatus);
@@ -29,6 +41,10 @@ export function DropboxPanel() {
   const [folders, setFolders] = useState<{ name: string; path_lower: string }[] | null>(
     null,
   );
+  const [waiting, setWaiting] = useState(false);
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+
+  const pollRef = useRef<number | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["dropbox_status"],
@@ -37,12 +53,69 @@ export function DropboxPanel() {
 
   const rootValue = root ?? data?.rootFolder ?? "";
 
+  const stopPolling = useCallback(() => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setWaiting(false);
+  }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    setWaiting(true);
+    const startedAt = Date.now();
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const status = await statusFn({});
+        if (status.connected) {
+          stopPolling();
+          await refetch();
+          toast.success("Dropbox conectado correctamente");
+          return;
+        }
+      } catch {
+        // Transient status failure: keep waiting for the tab to finish.
+      }
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) stopPolling();
+    }, POLL_MS);
+  }, [refetch, statusFn, stopPolling]);
+
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
     setBusy(true);
     try {
       await fn();
       if (ok) toast.success(ok);
       await refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connect = async () => {
+    setBusy(true);
+    setBlockedUrl(null);
+    try {
+      const { url } = await startFn({});
+      const tab = window.open(url, "_blank");
+      if (!tab) {
+        setBlockedUrl(url);
+        toast.error(
+          "El navegador bloqueó la pestaña nueva. Abre el enlace que aparece abajo.",
+        );
+        return;
+      }
+      // Sever the opener link so the external page can't touch this tab.
+      try {
+        tab.opener = null;
+      } catch {
+        /* cross-origin assignment is not always permitted */
+      }
+      startPolling();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
     } finally {
@@ -83,22 +156,75 @@ export function DropboxPanel() {
             </div>
           )}
 
+          {waiting && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-sky-500/40 bg-sky-500/10 p-2 text-xs">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-300" />
+              <span>
+                Autoriza Dropbox en la pestaña nueva. Esta pantalla se actualiza sola al
+                terminar.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-6 text-xs"
+                onClick={() => run(() => refetch())}
+              >
+                Ya conecté
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 text-xs"
+                onClick={stopPolling}
+              >
+                <X className="h-3 w-3 mr-1" /> Cancelar
+              </Button>
+            </div>
+          )}
+
+          {blockedUrl && (
+            <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+              <p>El navegador bloqueó la pestaña nueva. Abre el enlace manualmente:</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    window.open(blockedUrl, "_blank");
+                    startPolling();
+                  }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" /> Abrir enlace de Dropbox
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(blockedUrl);
+                      toast.success("Enlace copiado");
+                    } catch {
+                      toast.error("No se pudo copiar el enlace");
+                    }
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copiar enlace
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
-              disabled={busy || !data?.hasKeys}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  const { url } = await startFn({});
-                  window.location.href = url;
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Error");
-                  setBusy(false);
-                }
-              }}
+              disabled={busy || !data?.hasKeys || waiting}
+              onClick={connect}
             >
-              <PlugZap className="h-3.5 w-3.5 mr-1" />
+              {waiting ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <PlugZap className="h-3.5 w-3.5 mr-1" />
+              )}
               {data?.connected ? "Reconectar" : "Conectar Dropbox"}
             </Button>
             {data?.connected && (
