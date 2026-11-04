@@ -116,6 +116,16 @@ export const getPlanTemporaryLink = createServerFn({ method: "POST" })
     return { url: await temporaryLink(data.path) };
   });
 
+export const getPlanPreview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ path: z.string().min(1).max(400) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { downloadFile } = await import("./dropbox.server");
+    return await downloadFile(data.path);
+  });
+
 export const attachPlanToLine = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
