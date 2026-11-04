@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
-import { useState, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { AppShell } from "@/components/fact/AppShell";
 import { usePoLinesByStatus, type PoLineWithContext } from "@/hooks/usePoQueues";
 import { useMachines } from "@/hooks/useFactData";
@@ -793,13 +793,19 @@ function CreateOdfDialog({
   const [vendorId, setVendorId] = useState<string | undefined>(undefined);
   const [shift, setShift] = useState<"manana" | "tarde" | "noche">("manana");
   const [submitting, setSubmitting] = useState(false);
+  const [pendingDocs, setPendingDocs] = useState<{ doc: PickedDocument; category: string }[]>([]);
+  const [docCategory, setDocCategory] = useState("plano");
+
+  // Clear selections whenever a different line opens (or the dialog closes).
+  useEffect(() => {
+    setPendingDocs([]);
+    setDocCategory("plano");
+  }, [line?.id]);
 
   if (!line) return null;
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const [pendingDocs, setPendingDocs] = useState<{ doc: PickedDocument; category: string }[]>([]);
-  const [docCategory, setDocCategory] = useState("plano");
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
