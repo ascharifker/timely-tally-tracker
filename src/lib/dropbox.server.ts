@@ -251,9 +251,10 @@ export async function searchFiles(
     query,
     options: {
       path: root ? root : undefined,
-      max_results: Math.min(opts.limit ?? 25, 100),
+      max_results: 100,
       file_status: "active",
-      filename_only: false,
+      filename_only: true,
+      file_extensions: ["pdf", "dwg", "dxf", "png", "jpg", "jpeg", "tif", "tiff"],
     },
   });
   const files: DropboxFile[] = [];
