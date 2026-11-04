@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PoDocumentCard } from "./PoDocumentCard";
 import { usePoDetail } from "@/hooks/usePoDetail";
 import { ExternalLink } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -83,17 +84,6 @@ export function PoDetailDialog({
                 <div className="text-xs text-muted-foreground">Customer date</div>
                 <div className="font-mono">{po.committed_date ?? "—"}</div>
               </div>
-              {po.source_document_url && (
-                <div className="col-span-2">
-                  <button
-                    type="button"
-                    onClick={() => openPdf(po.source_document_url!)}
-                    className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
-                  >
-                    <ExternalLink className="h-3 w-3" /> Original document
-                  </button>
-                </div>
-              )}
               {po.notes && (
                 <div className="col-span-2">
                   <div className="text-xs text-muted-foreground">PO notes</div>
@@ -101,6 +91,8 @@ export function PoDetailDialog({
                 </div>
               )}
             </div>
+
+            <PoDocumentCard poId={po.id} poNumber={po.po_number} storagePath={po.source_document_url} />
 
             {/* Lines */}
             <div>
