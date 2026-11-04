@@ -135,6 +135,51 @@ export type Database = {
           },
         ]
       }
+      document_attachments: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          dropbox_path: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          name: string
+          notes: string | null
+          rev: string | null
+          source: string
+          storage_path: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          dropbox_path?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          name: string
+          notes?: string | null
+          rev?: string | null
+          source: string
+          storage_path?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          dropbox_path?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          rev?: string | null
+          source?: string
+          storage_path?: string | null
+        }
+        Relationships: []
+      }
       dropbox_config: {
         Row: {
           account_email: string | null
