@@ -26,6 +26,7 @@ export interface DropboxFile {
   size: number | null;
   server_modified: string | null;
   rev_from_name: string | null;
+  is_folder: boolean;
 }
 
 function appKey(): string {
@@ -184,6 +185,34 @@ export function resetTokenCache(): void {
 
 // ------------------------------------------------------------------ RPC core
 
+// Business accounts: target the team root so shared team folders
+// (e.g. /DOCUMENTACIÓN) are visible, matching what users see on dropbox.com.
+let cachedRootNs: string | null | undefined;
+
+async function rootHeader(token: string): Promise<Record<string, string>> {
+  if (cachedRootNs === undefined) {
+    try {
+      const res = await fetch("https://api.dropboxapi.com/2/users/get_current_account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = (await res.json()) as {
+        root_info?: { root_namespace_id?: string; home_namespace_id?: string };
+      };
+      const r = j.root_info;
+      cachedRootNs =
+        r?.root_namespace_id && r.root_namespace_id !== r.home_namespace_id
+          ? r.root_namespace_id
+          : null;
+    } catch {
+      return {};
+    }
+  }
+  return cachedRootNs
+    ? { "Dropbox-API-Path-Root": JSON.stringify({ ".tag": "root", root: cachedRootNs }) }
+    : {};
+}
+
 async function rpc<T>(path: string, body: unknown): Promise<T> {
   const token = await accessToken();
   const res = await fetch(`https://api.dropboxapi.com/2/${path}`, {
@@ -191,6 +220,7 @@ async function rpc<T>(path: string, body: unknown): Promise<T> {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      ...(await rootHeader(token)),
     },
     body: body === null ? "null" : JSON.stringify(body),
   });
@@ -254,14 +284,14 @@ export async function searchFiles(
       max_results: 100,
       file_status: "active",
       filename_only: true,
-      file_extensions: ["pdf", "dwg", "dxf", "png", "jpg", "jpeg", "tif", "tiff"],
     },
   });
   const files: DropboxFile[] = [];
   for (const m of json.matches ?? []) {
     const md = m.metadata?.metadata;
-    if (!md || md[".tag"] !== "file" || !md.path_lower) continue;
+    if (!md || (md[".tag"] !== "file" && md[".tag"] !== "folder") || !md.path_lower) continue;
     files.push({
+      is_folder: md[".tag"] === "folder",
       id: md.id ?? md.path_lower,
       name: md.name ?? md.path_lower.split("/").pop() ?? "archivo",
       path_lower: md.path_lower,
@@ -278,6 +308,32 @@ export async function temporaryLink(path: string): Promise<string> {
   const json = await rpc<{ link?: string }>("files/get_temporary_link", { path });
   if (!json.link) throw new Error("Dropbox no devolvió un enlace");
   return json.link;
+}
+
+/** Download a file's bytes (for inline preview). Caps size to keep responses sane. */
+export async function downloadFile(
+  path: string,
+): Promise<{ base64: string; name: string }> {
+  const token = await accessToken();
+  const res = await fetch("https://content.dropboxapi.com/2/files/download", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Dropbox-API-Arg": JSON.stringify({ path }).replace(
+        /[\u007f-\uffff]/g,
+        (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"),
+      ),
+      ...(await rootHeader(token)),
+    },
+  });
+  if (!res.ok) throw new Error(`No se pudo descargar [${res.status}]`);
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf.byteLength > 30 * 1024 * 1024) throw new Error("Archivo demasiado grande para vista previa");
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) {
+    bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  }
+  return { base64: btoa(bin), name: path.split("/").pop() ?? "archivo" };
 }
 
 export interface DropboxFolder {
