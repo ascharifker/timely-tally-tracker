@@ -286,44 +286,6 @@ function PoInfoPanel({
   onSaved: () => void;
 }) {
   const po = line.purchase_order;
-  const signFn = useServerFn(getPoDocumentUrl);
-  const attachFn = useServerFn(attachPoDocument);
-  const [working, setWorking] = useState(false);
-
-  const openPdf = async () => {
-    if (!po?.source_document_url) return;
-    setWorking(true);
-    try {
-      const { url } = await signFn({
-        data: { storagePath: po.source_document_url },
-      });
-      window.open(url, "_blank", "noopener");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo abrir el PDF");
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  const attach = async (file: File) => {
-    if (!po?.id) return;
-    setWorking(true);
-    try {
-      const path = `po/${po.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
-      const { error } = await supabase.storage
-        .from("po-documents")
-        .upload(path, file, { contentType: file.type || "application/pdf" });
-      if (error) throw error;
-      await attachFn({ data: { purchaseOrderId: po.id, storagePath: path } });
-      toast.success("PO PDF attached");
-      onSaved();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setWorking(false);
-    }
-  };
-
   return (
     <div className="space-y-1">
       <h3 className="text-sm font-semibold mb-2">PO Info (read-only)</h3>
