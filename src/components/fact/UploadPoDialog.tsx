@@ -32,6 +32,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { DocumentPicker } from "./DocumentAttachments";
+import { getPlanPreview } from "@/lib/dropbox.functions";
 import { useCustomers } from "@/hooks/useCustomers";
 import {
   extractPoFromPdf,
@@ -66,6 +68,7 @@ export function UploadPoDialog() {
   const { data: customers = [] } = useCustomers();
   const extractFn = useServerFn(extractPoFromPdf);
   const commitFn = useServerFn(commitPo);
+  const previewFn = useServerFn(getPlanPreview);
 
   const reset = () => {
     setStage("idle");
@@ -184,7 +187,27 @@ export function UploadPoDialog() {
         </DialogHeader>
 
         {stage === "idle" && (
-          <FileDropZone onFile={handleFile} />
+          <DocumentPicker
+            accept="application/pdf"
+            onPick={async (doc) => {
+              if (doc.source === "upload") return handleFile(doc.file);
+              if (!doc.name.toLowerCase().endsWith(".pdf")) {
+                toast.error("Selecciona un PDF de la orden de compra");
+                return;
+              }
+              try {
+                setStage("uploading");
+                const { base64 } = await previewFn({ data: { path: doc.path } });
+                const bin = atob(base64);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                await handleFile(new File([bytes], doc.name, { type: "application/pdf" }));
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "No se pudo descargar de Dropbox");
+                reset();
+              }
+            }}
+          />
         )}
 
         {(stage === "uploading" || stage === "extracting") && (

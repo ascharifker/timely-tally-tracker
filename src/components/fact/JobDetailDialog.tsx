@@ -1,3 +1,4 @@
+import { AttachmentsPanel } from "./DocumentAttachments";
 import { useEffect, useMemo, useState } from "react";
 import type { Job } from "@/lib/fact-types";
 import { STATUS_LABEL, toHours, type DelayUnit, type EventKind, EVENT_KIND_LABEL, EVENT_KIND_COLOR } from "@/lib/fact-types";
@@ -249,6 +250,10 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
             {job.notes}
           </div>
         )}
+
+        <div className="mt-4">
+          <AttachmentsPanel entityType="job" entityId={job.id} categories={["plano", "control_calidad", "certificado", "otro"]} />
+        </div>
 
         <div className="mt-4">
           <div className="flex items-baseline justify-between mb-1.5">

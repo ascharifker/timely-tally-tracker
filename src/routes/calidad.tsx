@@ -29,6 +29,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { AttachmentsPanel } from "@/components/fact/DocumentAttachments";
 import { useAuth } from "@/hooks/useUserRole";
 import { canDocumentQc } from "@/lib/rbac";
 import {
@@ -117,7 +128,6 @@ function CalidadPage() {
   const deleteFn = useServerFn(deleteMatrixEntries);
 
   const [search, setSearch] = useState("");
-  const [revDrafts, setRevDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [toDelete, setToDelete] = useState<Row | null>(null);
 
@@ -146,16 +156,20 @@ function CalidadPage() {
     qc.invalidateQueries({ queryKey: ["qc_matrix_entry"] });
   };
 
+  const [docRow, setDocRow] = useState<Row | null>(null);
+  const [docRev, setDocRev] = useState("");
+  const [docNote, setDocNote] = useState("");
   const doDocument = async (row: Row) => {
-    const rev = (revDrafts[row.id] ?? "").trim() || row.documented_rev;
+    const rev = docRev.trim() || row.documented_rev;
     if (!rev) {
       toast.error("Captura la revisión");
       return;
     }
     setBusy(true);
     try {
-      await documentFn({ data: { pir: row.pir, rev } });
+      await documentFn({ data: { pir: row.pir, rev, note: docNote.trim() || undefined } });
       toast.success(`${row.pir} documentado en Rev. ${rev}`);
+      setDocRow(null);
       refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -251,15 +265,7 @@ function CalidadPage() {
             {withActions && canDocument && (
               <TableCell>
                 <div className="flex gap-2">
-                  <Input
-                    className="h-8 w-24 font-mono"
-                    placeholder="Rev."
-                    value={revDrafts[r.id] ?? ""}
-                    onChange={(e) =>
-                      setRevDrafts((d) => ({ ...d, [r.id]: e.target.value }))
-                    }
-                  />
-                  <Button size="sm" disabled={busy} onClick={() => doDocument(r)}>
+                  <Button size="sm" disabled={busy} onClick={() => { setDocRow(r); setDocRev(r.documented_rev ?? ""); setDocNote(r.notes ?? ""); }}>
                     Documentar
                   </Button>
                   <Button
@@ -352,6 +358,51 @@ function CalidadPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={!!docRow} onOpenChange={(o) => !o && setDocRow(null)}>
+        <DialogContent className="max-w-2xl bg-card max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Documentar {docRow?.pir}</DialogTitle>
+            <DialogDescription>
+              {docRow?.part_description ?? "Registra la revisión controlada y adjunta sus documentos."}
+            </DialogDescription>
+          </DialogHeader>
+          {docRow && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-xs">
+                <StatusBadge status={docRow.status} />
+                <span className="text-muted-foreground">
+                  Revisión actual: <span className="font-mono">{docRow.documented_rev ?? "—"}</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="qc-rev">Revisión documentada *</Label>
+                  <Input id="qc-rev" className="font-mono" placeholder="Ej. B" value={docRev} onChange={(e) => setDocRev(e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="qc-note">Notas</Label>
+                  <Textarea id="qc-note" rows={2} value={docNote} onChange={(e) => setDocNote(e.target.value)} />
+                </div>
+              </div>
+              <AttachmentsPanel
+                entityType="qc_matrix"
+                entityId={docRow.id}
+                title="Planos, control de calidad y certificados"
+                categories={["control_calidad", "certificado", "plano", "otro"]}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDocRow(null)} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button onClick={() => docRow && doDocument(docRow)} disabled={busy || !docRev.trim()}>
+              Guardar revisión
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <AlertDialogContent>

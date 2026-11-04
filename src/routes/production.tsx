@@ -1,3 +1,4 @@
+import { DocumentPicker, saveAttachment, CATEGORY_LABELS, type PickedDocument } from "@/components/fact/DocumentAttachments";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -797,6 +798,8 @@ function CreateOdfDialog({
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const [pendingDocs, setPendingDocs] = useState<{ doc: PickedDocument; category: string }[]>([]);
+  const [docCategory, setDocCategory] = useState("plano");
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -823,6 +826,13 @@ function CreateOdfDialog({
           notes: v("notes"),
         },
       });
+      for (const d of pendingDocs) {
+        try {
+          await saveAttachment("job", res.job_id, d.doc, d.category);
+        } catch (err) {
+          toast.error(`No se adjuntó ${d.doc.name}: ${err instanceof Error ? err.message : ""}`);
+        }
+      }
       toast.success(`ODT ${res.odf} creada · pendiente ${res.pending_remaining}`);
       await onDone();
     } catch (e) {
@@ -834,7 +844,7 @@ function CreateOdfDialog({
 
   return (
     <Dialog open={!!line} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl bg-card">
+      <DialogContent className="max-w-xl bg-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Crear ODT — {line.purchase_order?.po_number} · L{line.line_number}
@@ -933,6 +943,45 @@ function CreateOdfDialog({
           <div className="col-span-2">
             <Label>Notas</Label>
             <Textarea name="notes" rows={2} />
+          </div>
+          <div className="col-span-2 space-y-2 rounded-md border border-border p-3">
+            <div className="flex items-center gap-2">
+              <Label className="m-0">Documentos</Label>
+              <Select value={docCategory} onValueChange={setDocCategory}>
+                <SelectTrigger className="h-8 w-44 ml-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["plano", "control_calidad", "certificado", "otro"].map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {CATEGORY_LABELS[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DocumentPicker
+              onPick={(doc) => setPendingDocs((p) => [...p, { doc, category: docCategory }])}
+            />
+            {pendingDocs.length > 0 && (
+              <ul className="space-y-1 text-xs">
+                {pendingDocs.map((d, i) => (
+                  <li key={i} className="flex items-center gap-2 rounded border border-border px-2 py-1">
+                    <span className="text-muted-foreground">{CATEGORY_LABELS[d.category]}</span>
+                    <span className="truncate flex-1">{d.doc.name}</span>
+                    <span className="text-muted-foreground">{d.doc.source === "dropbox" ? "Dropbox" : "Subido"}</span>
+                    <button
+                      type="button"
+                      className="text-destructive"
+                      aria-label={`Quitar ${d.doc.name}`}
+                      onClick={() => setPendingDocs((p) => p.filter((_, j) => j !== i))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <DialogFooter className="col-span-2">
             <Button type="button" variant="ghost" onClick={onClose}>
