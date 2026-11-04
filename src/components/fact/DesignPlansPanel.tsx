@@ -25,6 +25,7 @@ import {
   attachPlanToLine,
 } from "@/lib/dropbox.functions";
 import type { PoLineWithContext } from "@/hooks/usePoQueues";
+import { rankPlans, folderLabel } from "@/lib/plan-search";
 
 interface PlanFile {
   id: string;
@@ -85,9 +86,9 @@ export function DesignPlansPanel({
     queryFn: () => searchFn({ data: { query: activeQuery.trim(), limit: 25 } }),
   });
 
-  const files = useMemo<PlanFile[]>(
-    () => (data?.files ?? []) as PlanFile[],
-    [data],
+  const files = useMemo(
+    () => rankPlans((data?.files ?? []) as PlanFile[], activeQuery, line.pir_rev).slice(0, 15),
+    [data, activeQuery, line.pir_rev],
   );
   const connected = data?.connected ?? true;
 
@@ -222,7 +223,7 @@ export function DesignPlansPanel({
 
       {enabled && !isFetching && connected && files.length === 0 && !error && (
         <p className="text-xs text-muted-foreground">
-          Sin resultados para “{activeQuery}”.
+          Ningún plano (PDF, DWG, DXF o imagen) tiene “{activeQuery}” en el nombre.
         </p>
       )}
 
@@ -234,13 +235,21 @@ export function DesignPlansPanel({
             <div key={f.id} className="rounded-md border p-2 text-xs space-y-1">
               <div className="flex items-start gap-2">
                 <span className="font-mono break-all">{f.name}</span>
+                {f.score >= 100 && (
+                  <Badge className="shrink-0">Coincidencia exacta</Badge>
+                )}
                 {f.rev_from_name && (
-                  <Badge variant="outline" className="shrink-0">
+                  <Badge
+                    variant={lineRev && f.rev_from_name === lineRev ? "default" : "outline"}
+                    className="shrink-0"
+                  >
                     REV {f.rev_from_name}
                   </Badge>
                 )}
               </div>
-              <div className="text-muted-foreground break-all">{f.path_display}</div>
+              <div className="text-muted-foreground truncate" title={f.path_display}>
+                📁 {folderLabel(f.path_display)}
+              </div>
               <div className="text-muted-foreground">
                 {humanSize(f.size)}
                 {f.server_modified
