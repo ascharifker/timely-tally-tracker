@@ -284,6 +284,22 @@ export function DesignPlansPanel({
                   Dropbox tiene REV {f.rev_from_name} — la línea dice REV {lineRev}
                 </div>
               )}
+              {f.is_folder ? (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <Button size="sm" variant="secondary" onClick={() => setActiveQuery(`${f.name}`)}>
+                    📁 Carpeta — buscar su contenido
+                  </Button>
+                  <Button size="sm" variant="ghost" asChild>
+                    <a
+                      href={`https://www.dropbox.com/home${f.path_display.split("/").map(encodeURIComponent).join("/")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Abrir en Dropbox <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                    </a>
+                  </Button>
+                </div>
+              ) : (
               <div className="flex flex-wrap gap-1 pt-1">
                 <Button
                   size="sm"
@@ -317,6 +333,7 @@ export function DesignPlansPanel({
                   </Button>
                 )}
               </div>
+              )}
             </div>
           );
         })}
