@@ -1,4 +1,4 @@
-import { AttachmentsPanel } from "./DocumentAttachments";
+import { AttachmentsPanel, OrderDossier } from "./DocumentAttachments";
 import { useEffect, useMemo, useState } from "react";
 import type { Job } from "@/lib/fact-types";
 import { STATUS_LABEL, toHours, type DelayUnit, type EventKind, EVENT_KIND_LABEL, EVENT_KIND_COLOR } from "@/lib/fact-types";
@@ -252,7 +252,17 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
         )}
 
         <div className="mt-4">
-          <AttachmentsPanel entityType="job" entityId={job.id} categories={["plano", "control_calidad", "certificado", "otro"]} />
+          {job.po_line_item_id ? (
+            <OrderDossier poLineItemId={job.po_line_item_id} />
+          ) : null}
+          <div className="mt-3">
+            <AttachmentsPanel
+              entityType="job"
+              entityId={job.id}
+              title="Agregar a esta ODT"
+              categories={["plano", "control_calidad", "certificado", "envio", "entrega", "otro"]}
+            />
+          </div>
         </div>
 
         <div className="mt-4">

@@ -1,5 +1,6 @@
+import { AttachmentsPanel } from "./DocumentAttachments";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery , useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export function DesignPlansPanel({
   const linkFn = useServerFn(getPlanTemporaryLink);
   const attachFn = useServerFn(attachPlanToLine);
   const previewFn = useServerFn(getPlanPreview);
+  const qcRef = useQueryClient();
 
   const defaultQuery = line.pir ?? "";
   const [query, setQuery] = useState(defaultQuery);
@@ -140,6 +142,8 @@ export function DesignPlansPanel({
         },
       });
       toast.success(f ? "Plano adjuntado a la línea" : "Plano desvinculado");
+      qcRef.invalidateQueries({ queryKey: ["attachments", "po_line", line.id] });
+      qcRef.invalidateQueries({ queryKey: ["order_dossier", line.id] });
       onSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error");
@@ -193,6 +197,14 @@ export function DesignPlansPanel({
           </div>
         </div>
       )}
+
+      <AttachmentsPanel
+        entityType="po_line"
+        entityId={line.id}
+        title="Documentos de la línea (viajan a ODT y Calidad)"
+        categories={["plano", "control_calidad", "certificado", "otro"]}
+        canEdit={canReview}
+      />
 
       <form
         className="flex gap-2"

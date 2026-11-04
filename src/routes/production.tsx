@@ -1,4 +1,4 @@
-import { DocumentPicker, saveAttachment, CATEGORY_LABELS, type PickedDocument } from "@/components/fact/DocumentAttachments";
+import { DocumentPicker, saveAttachment, CATEGORY_LABELS, OrderDossier, type PickedDocument } from "@/components/fact/DocumentAttachments";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -950,9 +950,12 @@ function CreateOdfDialog({
             <Label>Notas</Label>
             <Textarea name="notes" rows={2} />
           </div>
+          <div className="col-span-2 rounded-md border border-border p-3">
+            <OrderDossier poLineItemId={line.id} title="Documentos que viajan con esta ODT" />
+          </div>
           <div className="col-span-2 space-y-2 rounded-md border border-border p-3">
             <div className="flex items-center gap-2">
-              <Label className="m-0">Documentos</Label>
+              <Label className="m-0">Documentos adicionales</Label>
               <Select value={docCategory} onValueChange={setDocCategory}>
                 <SelectTrigger className="h-8 w-44 ml-auto">
                   <SelectValue />

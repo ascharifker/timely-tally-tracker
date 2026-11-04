@@ -151,5 +151,27 @@ export const attachPlanToLine = createServerFn({ method: "POST" })
       })
       .eq("id", data.poLineItemId);
     if (error) throw new Error(error.message);
+    // Keep the plano in the order's document trail so it follows the line into
+    // ODTs, Calidad and shipping. Replace the previous engineering plano row.
+    await supabaseAdmin
+      .from("document_attachments")
+      .delete()
+      .eq("entity_type", "po_line")
+      .eq("entity_id", data.poLineItemId)
+      .eq("category", "plano")
+      .eq("source", "dropbox");
+    if (data.path && data.name) {
+      const { error: aErr } = await supabaseAdmin.from("document_attachments").insert({
+        entity_type: "po_line",
+        entity_id: data.poLineItemId,
+        category: "plano",
+        source: "dropbox",
+        name: data.name,
+        dropbox_path: data.path,
+        rev: data.rev,
+        created_by: context.userId,
+      });
+      if (aErr) throw new Error(aErr.message);
+    }
     return { ok: true };
   });
