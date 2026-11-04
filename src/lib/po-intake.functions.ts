@@ -17,6 +17,16 @@ async function assertCanEditPo(userId: string) {
   }
 }
 
+async function assertIsStaff(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Forbidden: staff role required");
+}
+
 // ---------------------------------------------------------------
 // Shared Zod schemas
 // ---------------------------------------------------------------
@@ -313,13 +323,16 @@ export const commitPo = createServerFn({ method: "POST" })
 export const getPoDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ storagePath: z.string().min(1) }).parse(input),
+    z
+      .object({ storagePath: z.string().min(1), download: z.string().optional() })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertCanEditPo(context.userId);
+    // Any staff member (engineering, quality, production) may view the PO file.
+    await assertIsStaff(context.userId);
     const { data: signed, error } = await supabaseAdmin.storage
       .from("po-documents")
-      .createSignedUrl(data.storagePath, 60 * 60);
+      .createSignedUrl(data.storagePath, 60 * 60, data.download ? { download: data.download } : undefined);
     if (error || !signed) throw new Error(error?.message ?? "No se pudo firmar URL");
     return { url: signed.signedUrl };
   });
