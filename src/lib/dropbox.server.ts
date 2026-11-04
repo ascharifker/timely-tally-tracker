@@ -283,7 +283,6 @@ export async function searchFiles(
       path: root ? root : undefined,
       max_results: 100,
       file_status: "active",
-      filename_only: true,
     },
   });
   const files: DropboxFile[] = [];
