@@ -39,6 +39,7 @@ export function DocumentPicker({
   const searchFn = useServerFn(searchDesignPlans);
   const [q, setQ] = useState("");
   const [active, setActive] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const res = useQuery({
     queryKey: ["doc_picker_search", active],
     enabled: active.trim().length >= 2,
@@ -57,9 +58,30 @@ export function DocumentPicker({
         </TabsTrigger>
       </TabsList>
       <TabsContent value="upload" className="mt-2">
-        <label className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border hover:border-primary/60 p-5 cursor-pointer text-sm text-muted-foreground">
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            if (busy) return;
+            const f = e.dataTransfer.files?.[0];
+            if (!f) return;
+            if (accept === "application/pdf" && f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) {
+              toast.error("Solo se aceptan archivos PDF");
+              return;
+            }
+            onPick({ source: "upload", name: f.name, file: f });
+          }}
+          className={`flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-5 cursor-pointer text-sm text-muted-foreground transition-colors ${
+            dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/60"
+          }`}
+        >
           <FileText className="h-7 w-7" />
-          Haz clic para seleccionar un archivo
+          Arrastra un archivo aquí o haz clic para seleccionar
           <input
             type="file"
             accept={accept}
