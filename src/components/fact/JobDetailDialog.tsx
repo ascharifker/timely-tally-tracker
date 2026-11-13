@@ -1,4 +1,5 @@
 import { AttachmentsPanel, OrderDossier } from "./DocumentAttachments";
+import { JobShiftHistory } from "./ShiftTracking";
 import { useEffect, useMemo, useState } from "react";
 import type { Job } from "@/lib/fact-types";
 import { STATUS_LABEL, toHours, type DelayUnit, type EventKind, EVENT_KIND_LABEL, EVENT_KIND_COLOR } from "@/lib/fact-types";
@@ -263,6 +264,11 @@ export function JobDetailDialog({ job: jobProp, onClose }: Props) {
               categories={["plano", "control_calidad", "certificado", "envio", "entrega", "otro"]}
             />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold mb-1.5">Avance por turno</h3>
+          <JobShiftHistory job={job} machines={machines} />
         </div>
 
         <div className="mt-4">

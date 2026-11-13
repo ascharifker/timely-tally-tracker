@@ -21,6 +21,7 @@ import { PoDetailDialog } from "@/components/fact/PoDetailDialog";
 import { OdfBreakdownDialog } from "@/components/fact/OdfBreakdownDialog";
 import { JobDetailDialog } from "@/components/fact/JobDetailDialog";
 import { MachineGantt } from "@/components/fact/MachineGantt";
+import { ShiftSummary } from "@/components/fact/ShiftTracking";
 import { SHIFTS, shiftIndexFromDate } from "@/lib/shifts";
 import { computeOdfOtd, OTD_TONE } from "@/lib/scheduling/odf-otd";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,6 +182,7 @@ function ProductionPage() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="turnos">4 · Avance por turno</TabsTrigger>
           <TabsTrigger value="historico">
             Histórico
             {completedJobs.length > 0 && (
@@ -298,6 +300,13 @@ function ProductionPage() {
             onOpenPo={setDetailPoId}
             onOpenOdf={setDetailJob}
           />
+        </TabsContent>
+
+        <TabsContent value="turnos" className="mt-0">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Al terminar cada turno, registrá las piezas maquinadas. Aquí ves el resumen del día por máquina y el avance de cada ODT por etapa.
+          </p>
+          <ShiftSummary jobs={activeJobs} machines={machines} />
         </TabsContent>
 
         <TabsContent value="historico" className="mt-0">
