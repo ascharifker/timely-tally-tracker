@@ -213,6 +213,39 @@ export type Database = {
         }
         Relationships: []
       }
+      job_stage_settings: {
+        Row: {
+          job_id: string
+          not_applicable: string[]
+          updated_at: string
+        }
+        Insert: {
+          job_id: string
+          not_applicable?: string[]
+          updated_at?: string
+        }
+        Update: {
+          job_id?: string
+          not_applicable?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_stage_settings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_stage_settings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "v_job_current_step"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
       job_steps: {
         Row: {
           completed_at: string | null
@@ -988,6 +1021,70 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      shift_logs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          job_id: string
+          log_date: string
+          machine_id: string | null
+          notes: string | null
+          operator_name: string | null
+          pieces_machined: number
+          shift_number: number
+          stage_counts: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id: string
+          log_date?: string
+          machine_id?: string | null
+          notes?: string | null
+          operator_name?: string | null
+          pieces_machined?: number
+          shift_number: number
+          stage_counts?: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id?: string
+          log_date?: string
+          machine_id?: string | null
+          notes?: string | null
+          operator_name?: string | null
+          pieces_machined?: number
+          shift_number?: number
+          stage_counts?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_current_step"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "shift_logs_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shifts: {
         Row: {
